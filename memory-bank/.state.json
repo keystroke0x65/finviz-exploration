@@ -4,9 +4,12 @@
     "brief": 3,
     "stack": 5,
     "dec": 2,
-    "prog": 2
+    "prog": 3,
+    "dev-environment": 1
   },
-  "reminded_sessions": [],
+  "reminded_sessions": [
+    "8526e8ea-be9e-4201-ba24-a0c6fc35964e"
+  ],
   "created": "2026-09-17",
-  "batches": 1
+  "batches": 2
 }
