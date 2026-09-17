@@ -1,0 +1,26 @@
+{
+  "_comment": "Merge the 'hooks' block into .claude/settings.json (project) or ~/.claude/settings.json (user). Paths assume the skill is installed at .claude/skills/memory-bank in the project; for a user-level install use $HOME/.claude/skills/memory-bank instead. Hook formats change between agent versions: check your agent's current hooks documentation before installing.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/skills/memory-bank/scripts/hooks.py\" session-start" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/skills/memory-bank/scripts/hooks.py\" stop" }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/skills/memory-bank/scripts/hooks.py\" pre-compact" }
+        ]
+      }
+    ]
+  }
+}

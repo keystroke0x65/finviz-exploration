@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "memory-bank operations batch",
+  "description": "Input to `memory.py apply`. Operations run in order; any error aborts the whole batch. Human-readable rules live in references/spec.md and references/curate.md.",
+  "type": "object",
+  "properties": {
+    "note": { "type": "string", "description": "One line describing the session/task this batch records." },
+    "feedback": {
+      "type": "array",
+      "description": "ACE counters: tag every memory ID you actually relied on.",
+      "items": {
+        "type": "object",
+        "required": ["id", "tag"],
+        "properties": {
+          "id": { "type": "string" },
+          "tag": { "enum": ["helpful", "harmful", "neutral"] }
+        }
+      }
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["op"],
+        "properties": {
+          "op": { "enum": ["ADD_ROOT", "ADD_DELTA", "UPDATE", "SUPERSEDE", "DELETE", "PROMOTE"] },
+          "ref": { "type": "string", "description": "Local name; later ops in the batch can use '@ref' as an id or parent." },
+          "file": { "type": "string", "description": "ADD_ROOT: context/<name>.md, progress.md, or experience/<topic>.md" },
+          "section": { "type": "string", "description": "ADD_ROOT target section; UPDATE/PROMOTE: move to section" },
+          "kind": { "enum": ["root", "trap"], "description": "ADD_ROOT only; trap = failure record" },
+          "parent": { "type": "string", "description": "ADD_DELTA: id or @ref of the node this varies" },
+          "id": { "type": "string", "description": "UPDATE/SUPERSEDE/DELETE/PROMOTE target" },
+          "when": { "type": "string", "maxLength": 120, "description": "ADD_DELTA (required): the specific condition this variation applies to" },
+          "content": { "type": "string", "minLength": 12, "maxLength": 400 },
+          "labels": { "type": "array", "items": { "type": "string" }, "maxItems": 6 },
+          "source": { "type": "string", "description": "Where the fact was verified, e.g. a file path or 'user'" },
+          "reason": { "type": "string", "description": "Required for UPDATE, SUPERSEDE, DELETE" },
+          "force": { "type": "boolean", "description": "Bypass duplicate check; justify in reason" }
+        },
+        "allOf": [
+          { "if": { "properties": { "op": { "const": "ADD_ROOT" } } }, "then": { "required": ["file", "section", "content"] } },
+          { "if": { "properties": { "op": { "const": "ADD_DELTA" } } }, "then": { "required": ["parent", "when", "content"] } },
+          { "if": { "properties": { "op": { "const": "UPDATE" } } }, "then": { "required": ["id", "reason"] } },
+          { "if": { "properties": { "op": { "const": "SUPERSEDE" } } }, "then": { "required": ["id", "content", "reason"] } },
+          { "if": { "properties": { "op": { "const": "DELETE" } } }, "then": { "required": ["id", "reason"] } },
+          { "if": { "properties": { "op": { "const": "PROMOTE" } } }, "then": { "required": ["id", "content"] } }
+        ]
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,52 @@
+{
+  "skill_name": "memory-bank",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Set up a memory bank for this project so future sessions know how it works.",
+      "expected_output": "memory-bank/ created via memory.py init; context files populated through a validated operations batch with facts verifiable in README.md, package.json, .env.example and middleware.ts; no secrets; active-context.md filled.",
+      "files": ["evals/fixtures/sample-project"],
+      "expectations": [
+        "Ran scripts/memory.py init, then applied at least one operations batch (no hand edits to entry files)",
+        "tech-stack.md records Next.js 14.2, Clerk, Drizzle and Neon with versions and src attributes",
+        "Commands section includes pnpm dev and pnpm test",
+        "Env vars are recorded by name only",
+        "memory.py validate passes"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I just spent an hour on this: the /api/share route kept returning 401 even when I was logged in. Turns out the middleware matcher was fine, but I was calling auth() from a helper in lib/ that ran outside the request scope. Moving the auth() call into the route handler fixed it. Remember this.",
+      "expected_output": "Record mode: runs find first; stores one lesson root (or delta under an existing auth root, with a specific when) and a trap describing the failed approach; updates active-context.md; reports IDs.",
+      "files": ["evals/fixtures/sample-project"],
+      "expectations": [
+        "Ran memory.py find before writing",
+        "Created a trap whose content includes FAILED and INSTEAD",
+        "Did not create two entries that say the same thing",
+        "Reported recorded IDs to the user"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "We switched from Drizzle to Prisma last week. Update the memory so it stops telling you to use drizzle-kit.",
+      "expected_output": "SUPERSEDE (not UPDATE) of the Drizzle tech-stack and decision entries with reasons; old entries appear in history/archive.md; harmful feedback or deletion for drizzle-specific experience entries.",
+      "files": ["evals/fixtures/sample-project"],
+      "expectations": [
+        "Used SUPERSEDE for entries whose fact changed",
+        "history/archive.md contains the superseded Drizzle entries",
+        "No remaining active entry recommends drizzle-kit"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "The memory bank feels bloated. Clean it up.",
+      "expected_output": "Maintain mode: runs validate and consolidate; promotes proven deltas with self-contained content; prunes harmful entries; merges duplicates; applies one batch; summarizes changes.",
+      "files": [],
+      "expectations": [
+        "Ran memory.py consolidate before changing anything",
+        "Any PROMOTE content is self-contained (no references to 'the above' or the parent)",
+        "Did not delete entries with helpful counts without a stated reason"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "name": "sharelog",
+  "private": true,
+  "scripts": { "dev": "next dev", "build": "next build", "test": "vitest run", "db:migrate": "drizzle-kit migrate" },
+  "dependencies": { "next": "14.2.5", "react": "18.3.1", "@clerk/nextjs": "5.2.0", "drizzle-orm": "0.33.0", "@neondatabase/serverless": "0.9.4" },
+  "devDependencies": { "typescript": "5.5.4", "vitest": "2.0.5", "drizzle-kit": "0.24.0" }
+}
