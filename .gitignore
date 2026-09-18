@@ -22,3 +22,5 @@ __pycache__/
 *:Zone.Identifier
 # Worktrees
 .worktrees/
+# Subagent-driven-development scratch workspace
+.superpowers/
