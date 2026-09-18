@@ -20,3 +20,5 @@ desktop.ini
 __pycache__/
 *.pyc
 *:Zone.Identifier
+# Worktrees
+.worktrees/
