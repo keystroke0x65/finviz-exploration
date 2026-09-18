@@ -17,7 +17,7 @@ def test_get_settings_reads_env(monkeypatch):
     assert settings.quote_cache_ttl_minutes == 30
 
 
-FINVIZ_EXPORT_URL = "https://elite.finviz.com/export.ashx"
+FINVIZ_EXPORT_URL = "https://elite.finviz.com/export/screener"
 
 VALID_QUOTE_CSV = (
     "Ticker,Company,Sector,Price,Change,Volume,Market Cap,P/E\n"

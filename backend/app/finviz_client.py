@@ -6,11 +6,14 @@ import requests
 from app.config import get_settings
 from app.errors import FinvizAuthError, TickerNotFoundError
 
-FINVIZ_EXPORT_URL = "https://elite.finviz.com/export.ashx"
+# /export.ashx is a legacy alias that 301-redirects to /export/screener;
+# /export/stock (a different endpoint) returns historical price bars, not
+# a current quote row, so it doesn't apply here.
+FINVIZ_EXPORT_URL = "https://elite.finviz.com/export/screener"
 
-# Finviz's quote export view code; "152" returns the overview column set
-# (price, sector, market cap, P/E, etc.) used by the /api/stocks endpoint.
-QUOTE_VIEW = "152"
+# Finviz's "Overview" screener view code, giving one row per ticker with
+# Sector, Market Cap, P/E, Price, Change, Volume, etc.
+QUOTE_VIEW = "111"
 
 
 def get_quote(ticker: str) -> dict:
