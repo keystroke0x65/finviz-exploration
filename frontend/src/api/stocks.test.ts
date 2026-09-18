@@ -35,4 +35,38 @@ describe("fetchQuote", () => {
       "No Finviz data found for ticker 'ZZZZ'",
     );
   });
+
+  it("throws a status-based message when the error response isn't valid JSON", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => {
+          throw new SyntaxError("Unexpected token '<', \"<html>\" is not valid JSON");
+        },
+      }),
+    );
+
+    await expect(fetchQuote("AAPL")).rejects.toThrow("Request failed (500)");
+  });
+
+  it("does not read the response body before checking ok on success", async () => {
+    let bodyReadCount = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => {
+          bodyReadCount += 1;
+          return { Ticker: "AAPL", Price: "227.52" };
+        },
+      }),
+    );
+
+    const result = await fetchQuote("AAPL");
+
+    expect(result).toEqual({ Ticker: "AAPL", Price: "227.52" });
+    expect(bodyReadCount).toBe(1);
+  });
 });

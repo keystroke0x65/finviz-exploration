@@ -19,7 +19,9 @@ export function QuoteTable({ quote, error, isLoading }: QuoteTableProps) {
     return null;
   }
 
-  const rows = Object.entries(quote).filter(([, value]) => value !== undefined);
+  // FastAPI serializes missing Pydantic fields as JSON `null`, not
+  // `undefined`, so both must be excluded to omit empty rows (e.g. P/E).
+  const rows = Object.entries(quote).filter(([, value]) => value != null);
 
   return (
     <table>
