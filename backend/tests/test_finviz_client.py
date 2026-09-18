@@ -73,3 +73,27 @@ def test_get_quote_raises_auth_error_on_401(monkeypatch):
 
     with pytest.raises(FinvizAuthError):
         get_quote("AAPL")
+
+
+# Finviz omits some columns for certain tickers (e.g. no P/E for an
+# unprofitable company), which pandas reads as a blank cell -> float NaN.
+QUOTE_CSV_WITH_MISSING_FIELD = (
+    "Ticker,Company,Sector,Price,Change,Volume,Market Cap,P/E\n"
+    "AAPL,Apple Inc.,Technology,227.52,1.35%,48291012,3.45T,\n"
+)
+
+
+@responses.activate
+def test_get_quote_converts_missing_fields_to_none_not_nan(monkeypatch):
+    monkeypatch.setenv("FINVIZ_API_TOKEN", "test-token")
+    get_settings.cache_clear()
+    responses.add(
+        responses.GET,
+        FINVIZ_EXPORT_URL,
+        body=QUOTE_CSV_WITH_MISSING_FIELD,
+        status=200,
+    )
+
+    result = get_quote("AAPL")
+
+    assert result["P/E"] is None

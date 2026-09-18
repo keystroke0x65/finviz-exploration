@@ -36,4 +36,12 @@ def get_quote(ticker: str) -> dict:
     if df.empty:
         raise TickerNotFoundError(ticker)
 
-    return df.iloc[0].to_dict()
+    row = df.iloc[0].to_dict()
+    # pandas represents missing cells as float NaN even in a dtype=str frame,
+    # and on pandas's newer "str" extension dtype (3.0+), DataFrame.where(...,
+    # None) silently leaves those NaNs in place instead of casting them —
+    # https://github.com/pandas-dev/pandas/issues/58484. json.dumps then
+    # serializes NaN as a bare `NaN` token, which isn't valid JSON. Cleaning
+    # the already-extracted row per-value with pd.isna() sidesteps the
+    # dtype-cast quirk entirely.
+    return {key: (None if pd.isna(value) else value) for key, value in row.items()}
