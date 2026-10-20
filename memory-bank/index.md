@@ -9,12 +9,12 @@ or run `memory.py find <keywords>` to pull just the relevant root → delta chai
 |---|---|---|---|---|
 | context/project-brief.md | 3 (3/0/0) | Purpose, Users, Scope, Non-goals, Constraints, User background | product, roadmap, audience | 2026-09-17 |
 | context/architecture.md | 0 (0/0/0) | Components, Data flow, Integrations, Invariants |  |  |
-| context/tech-stack.md | 5 (5/0/0) | Runtime and frameworks, Services and infrastructure, Dev environment, Commands, Storage, External APIs | api, python, fastapi, react, typescript | 2026-09-17 |
+| context/tech-stack.md | 5 (5/0/0) | Runtime and frameworks, Services and infrastructure, Dev environment, Commands, Storage, External APIs | api, python, fastapi, react, typescript | 2026-10-20 |
 | context/conventions.md | 0 (0/0/0) | Code style, Patterns, Testing, Workflow |  |  |
 | context/decisions.md | 2 (2/0/0) | Decisions, Architecture, Finviz client design | architecture, security, finviz | 2026-09-17 |
-| progress.md | 3 (3/0/0) | Now, Next, Done, Known issues | status, roadmap | 2026-09-17 |
-| experience/dev-environment.md | 1 (0/0/1) | Lessons, Traps | git, wsl, gitignore | 2026-09-17 |
+| progress.md | 4 (4/0/0) | Now, Next, Done, Known issues | status, roadmap, screener, phase1, schwab | 2026-10-20 |
+| experience/dev-environment.md | 2 (1/0/1) | Lessons, Traps | git, worktree, env, wsl, gitignore | 2026-10-20 |
 
 Also: `active-context.md` (current focus, freeform), `history/archive.md` (superseded/deleted, not loaded by default), `ops-log.jsonl` (audit trail).
 
-Batches applied: 2. Bank created: 2026-09-17.
+Batches applied: 4. Bank created: 2026-09-17.

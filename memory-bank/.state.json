@@ -2,14 +2,15 @@
   "version": 1,
   "counters": {
     "brief": 3,
-    "stack": 5,
+    "stack": 6,
     "dec": 2,
-    "prog": 3,
-    "dev-environment": 1
+    "prog": 8,
+    "dev-environment": 2
   },
   "reminded_sessions": [
-    "8526e8ea-be9e-4201-ba24-a0c6fc35964e"
+    "8526e8ea-be9e-4201-ba24-a0c6fc35964e",
+    "18086c86-3585-44fc-8c36-16cd608bf967"
   ],
   "created": "2026-09-17",
-  "batches": 2
+  "batches": 4
 }
