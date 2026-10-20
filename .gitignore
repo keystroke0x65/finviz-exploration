@@ -20,6 +20,17 @@ desktop.ini
 __pycache__/
 *.pyc
 *:Zone.Identifier
+# Backend
+backend/.venv/
+backend/__pycache__/
+backend/.pytest_cache/
+backend/*.egg-info/
+# Frontend
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
+# Database
+*.db
 # Worktrees
 .worktrees/
 # Subagent-driven-development scratch workspace
