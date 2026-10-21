@@ -4,20 +4,20 @@
      to operations-only writes). Keep it under 80 lines. Durable facts belong in context/ or experience/. -->
 
 ## Current focus
-Phase 2 milestones 1, 2a, 2b and a cleanup batch are merged into main (2026-10-21); main not
-pushed. Docker runs from main with FRONTEND_PORT=5174 on the real DB. Backups in data/:
-finviz_dashboard.db.backup-2026-10-21 (pre-2a), ...-m2b (pre-2b).
-Next: milestone 3 plan (continuation/reversal patterns, candlestick score modifiers, Track
-record view, track record feeding ranking).
+Phase 2 milestones 1, 2a, 2b, a cleanup batch and M3 are merged into main (2026-10-21);
+main not pushed. Docker runs from main with FRONTEND_PORT=5174 on the real DB. Backups in
+data/: finviz_dashboard.db.backup-2026-10-21 (pre-2a), ...-m2b, ...-m3.
 
 ## Open questions / blockers
 - Schwab developer API application not started (user's action).
 - FRONTEND_PORT=5174 not yet in user's .env.
-- 4 deferred minors (see progress.md).
+- Deferred minors listed in progress.md (prog-0015).
 
 ## Recent changes
-- 2026-10-21: Cleanup batch (7 tasks, ~22 minors + 5 review fixes) merged; live check OK.
-- 2026-10-21: M2b merged (patterns + verdict); M2a merged (setups engine).
+- 2026-10-21: M3 merged (track record, candles, 13 more pattern pairs); review fixed 4 issues
+  (candle wick through stop, mid-range "breakouts", duplicate trades, avg win shown).
+- 2026-10-21: Cleanup batch, M2b and M2a merged.
 
 ## Next steps
-- Milestone 3 plan when the user is ready.
+- Track record needs 5+ trading days before it moves scores; revisit numbers after a week.
+- Options: cleanup batch for deferred minors, push main, or Phase 3 (needs Schwab).
