@@ -141,3 +141,15 @@ def test_breakout_bar_is_not_part_of_a_micro_pullback():
     bars = shape(RUN_HIGHS + [2.08, 2.15], RUN_LOWS + [2.06, 2.10], last_close=2.14)
 
     assert detect_micro_pullbacks(bars, PLAIN) == []
+
+
+def test_micro_pullback_does_not_span_the_overnight_gap():
+    from datetime import datetime
+
+    from app.market_time import EASTERN
+
+    # Yesterday's after-hours run, then today's first pre-market bar dipping below it.
+    yesterday = shape(RUN_HIGHS, RUN_LOWS, start=datetime(2026, 10, 19, 19, 56, tzinfo=EASTERN))
+    today = shape([2.08], [2.06], start=datetime(2026, 10, 20, 4, 0, tzinfo=EASTERN))
+
+    assert detect_micro_pullbacks(yesterday + today, PLAIN) == []

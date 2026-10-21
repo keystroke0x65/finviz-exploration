@@ -46,6 +46,8 @@ def _micro_pullback(bars: list[Bar], pullback_length: int, timeframe: Interval) 
     run = before[run_start : run_end + 1]
     if len(run) < MIN_RUN_BARS:
         return None
+    if _eastern_day(pullback[0]) != _eastern_day(run[-1]):
+        return None  # the overnight gap sits between the run and the "pullback"
     if pullback[0].close >= run[-1].close:
         return None  # not a dip
     top = max(bar.high for bar in run)
