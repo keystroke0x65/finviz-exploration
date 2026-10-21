@@ -203,3 +203,12 @@ def test_run_scan_lists_skipped_tickers_after_auth_failure(db_conn):
     result = run_scan(db_conn, NOW, deps(auth_failing="AAA"), tickers=["AAA", "BBB", "CCC"])
 
     assert result.failed[1] == ("BBB, CCC", "skipped: Finviz rejected the auth token")
+
+
+def test_scan_passes_relative_volume_to_the_verdict(db_conn):
+    from app.scanning.verdicts import read_verdicts
+
+    scan_ticker(db_conn, "HOST", snapshot("HOST", relative_volume=4.2), NOW, deps())
+
+    verdict, _ = read_verdicts(db_conn)["HOST"]
+    assert any("4.2x relative volume" in reason for reason in verdict.reasons)

@@ -17,7 +17,18 @@ VerdictCall = Literal["leans_long", "leans_short", "no_clear_edge"]
 WEIGHTS = {"trend": 0.35, "patterns": 0.30, "volume": 0.20, "location": 0.15}
 CALL_THRESHOLD = 0.25
 VOLUME_LOOKBACK_BARS = 20
-MISSING_LEVEL_ROOM = 0.20  # a side with no level counts as 20% of room
+# Room on each side is capped (and a side with no level counts as the cap), so a
+# distant support doesn't read as bearish for a stock with blue sky overhead.
+MAX_LEVEL_ROOM = 0.20
+# Below this much available weight (e.g. only patterns, or only the daily trend)
+# there isn't enough evidence for a call.
+MIN_WEIGHT_FOR_CALL = 0.5
+# Trend and patterns pulling hard in opposite directions is a mixed picture.
+STRONG_DISAGREEMENT = 0.5
+# Relative volume at or above this gives the volume balance full weight.
+FULL_RELATIVE_VOLUME = 1.5
+NOT_ENOUGH_DATA = "Not enough data for a call"
+DISAGREEMENT = "Trend and patterns disagree"
 MIXED_BAND = 0.2
 FAST_EMA, SLOW_EMA = 9, 20
 SHORT_SMA, LONG_SMA = 20, 50
@@ -74,9 +85,10 @@ def _location(price: float | None, levels: list[PriceLevel]) -> tuple[float, str
     if price is None or not levels:
         return None
     above, below = nearest_level_above(levels, price), nearest_level_below(levels, price)
-    up_room = (above.price - price) / price if above else MISSING_LEVEL_ROOM
-    down_room = (price - below.price) / price if below else MISSING_LEVEL_ROOM
-    value = (up_room - down_room) / (up_room + down_room)
+    up_room = (above.price - price) / price if above else MAX_LEVEL_ROOM
+    down_room = (price - below.price) / price if below else MAX_LEVEL_ROOM
+    capped_up, capped_down = min(up_room, MAX_LEVEL_ROOM), min(down_room, MAX_LEVEL_ROOM)
+    value = (capped_up - capped_down) / (capped_up + capped_down)
     above_text = f"resistance {above.price:.2f} (+{up_room:.0%})" if above else "no resistance overhead"
     below_text = f"support {below.price:.2f} (-{down_room:.0%})" if below else "no support below"
     return value, f"Room: {above_text}, {below_text}"
@@ -107,6 +119,21 @@ def _volume_reason(value: float) -> str:
     return "Volume balanced between up and down bars"
 
 
+def _caveat(parts: dict[str, float], total_weight: float) -> str | None:
+    """Why the evidence can't support a call, if it can't."""
+    if total_weight < MIN_WEIGHT_FOR_CALL:
+        return NOT_ENOUGH_DATA
+    trend, patterns = parts.get("trend"), parts.get("patterns")
+    if (
+        trend is not None
+        and patterns is not None
+        and trend * patterns < 0
+        and min(abs(trend), abs(patterns)) >= STRONG_DISAGREEMENT
+    ):
+        return DISAGREEMENT
+    return None
+
+
 def compute_verdict(
     intraday_1m: list[Bar],
     intraday_5m: list[Bar],
@@ -114,6 +141,7 @@ def compute_verdict(
     vwap_1m: list[float | None] | None,
     daily_levels: list[PriceLevel],
     matches: list[PatternMatch],
+    relative_volume: float | None = None,
 ) -> Verdict:
     parts: dict[str, float] = {}
     part_reasons: dict[str, str] = {}
@@ -125,8 +153,13 @@ def compute_verdict(
 
     volume = _volume_balance(intraday_1m)
     if volume is not None:
+        reason = _volume_reason(volume)
+        if relative_volume is not None:
+            # Up/down balance on thin trading says less than on heavy trading.
+            volume *= min(relative_volume / FULL_RELATIVE_VOLUME, 1.0)
+            reason += f" on {relative_volume:.1f}x relative volume"
         parts["volume"] = volume
-        part_reasons["volume"] = _volume_reason(volume)
+        part_reasons["volume"] = reason
 
     latest = next((bars[-1].close for bars in (intraday_1m, intraday_5m, daily) if bars), None)
     location = _location(latest, daily_levels)
@@ -139,15 +172,16 @@ def compute_verdict(
 
     total_weight = sum(WEIGHTS[name] for name in parts)
     score = sum(WEIGHTS[name] * value for name, value in parts.items()) / total_weight if total_weight else 0.0
-    if score >= CALL_THRESHOLD:
+    caveat = _caveat(parts, total_weight)
+    if caveat is None and score >= CALL_THRESHOLD:
         call: VerdictCall = "leans_long"
-    elif score <= -CALL_THRESHOLD:
+    elif caveat is None and score <= -CALL_THRESHOLD:
         call = "leans_short"
     else:
         call = "no_clear_edge"
 
     ordered = sorted(parts, key=lambda name: abs(WEIGHTS[name] * parts[name]), reverse=True)
-    reasons = [part_reasons[name] for name in ordered] + [
+    reasons = ([caveat] if caveat else []) + [part_reasons[name] for name in ordered] + [
         MISSING_REASONS[name] for name in WEIGHTS if name not in parts
     ]
     return Verdict(call=call, score=round(score, 3), parts=parts, reasons=reasons)

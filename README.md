@@ -69,11 +69,15 @@ clear edge**, with the reasons listed on the Stock tab (and on hover elsewhere).
 combines four things, each shown in the reasons:
 - trend: price against VWAP, the 9 and 20 EMAs on 1m and 5m, and the 20- and 50-day
   averages;
-- volume: whether recent 1m volume is heavier on up bars or down bars;
-- room: distance to the nearest daily resistance above versus support below;
+- volume: whether recent 1m volume is heavier on up bars or down bars, counted for less
+  when relative volume is low;
+- room: distance to the nearest daily resistance above versus support below (each side
+  counted up to 20%, so a stock with nothing overhead isn't marked down for distant support);
 - patterns: bullish versus bearish patterns found, weighted by quality.
 
 "No clear edge" is common and means the signals disagree; the app doesn't force a call.
+It is also the answer when there's too little data (e.g. only the daily trend) or when the
+trend and the patterns point strongly in opposite directions.
 Inputs it doesn't have (e.g. no trades yet today) are left out and named in the reasons.
 The verdict is shown even when short setups are hidden.
 
