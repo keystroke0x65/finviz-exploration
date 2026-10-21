@@ -111,3 +111,19 @@ def test_stock_setups_filter_by_ticker(api_client, db_conn):
     body = api_client.get("/api/stocks/host/setups").json()
 
     assert [setup["ticker"] for setup in body["setups"]] == ["HOST"]
+
+
+def test_bearish_pattern_on_lower_timeframe_is_not_a_conflict(api_client, db_conn):
+    from app.patterns.ranking import ScoreBreakdown as Breakdown
+
+    long_match = PatternMatch(pattern="bull_flag", direction="long", timeframe="5m", entry=2.0, stop=1.9,
+                              detected_at=NOW, quality=0.7, quality_parts={}, key_points=[])
+    long_plan = TradePlan(direction="long", entry=2.0, stop=1.9, risk_per_share=0.1, risk_percent=5.0,
+                          target_3r=2.3, capped_target=2.3, available_reward_risk=3.0, blocking_level=None,
+                          partial_1r=2.1, partial_2r=2.2, trailing_stop=None)
+    record_match(db_conn, "HOST", long_match, long_plan, "forming", Breakdown(70.0, {}), "regular", 5.0, NOW)
+    store_setup(db_conn, "HOST", "short", pattern="bear_flag")  # 1m, lower than 5m
+
+    body = api_client.get("/api/setups").json()
+
+    assert body["setups"][0]["has_conflict"] is False

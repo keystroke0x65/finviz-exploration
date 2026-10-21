@@ -13,6 +13,8 @@ interface StockViewProps {
 }
 
 const TIMEFRAMES: Timeframe[] = ["1m", "5m", "daily"];
+// Initial zoom: about the last 3 hours (1m), one full 4 AM-8 PM day (5m), six months (daily).
+const VISIBLE_BARS: Record<Timeframe, number> = { "1m": 180, "5m": 192, daily: 126 };
 // Daily levels far from the current price only clutter the chart.
 const LEVEL_RANGE_FRACTION = 0.3;
 
@@ -166,7 +168,13 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
             </div>
             {bars ? (
               bars.bars.length > 0 ? (
-                <CandleChart bars={bars.bars} levels={chartLevels} outline={outline} vwap={bars.vwap} />
+                <CandleChart
+                  bars={bars.bars}
+                  levels={chartLevels}
+                  outline={outline}
+                  vwap={bars.vwap}
+                  visibleBars={VISIBLE_BARS[timeframe]}
+                />
               ) : (
                 <p className="empty-state">Finviz has no {timeframe} bars for {ticker}.</p>
               )

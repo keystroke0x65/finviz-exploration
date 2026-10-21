@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 from app.routes.dependencies import get_db_connection
 from app.routes.stocks import TickerPath
 from app.scanning.scanner import finviz_scan_deps, run_scan
+from app.patterns.types import TIMEFRAME_ORDER
 from app.schemas import ScanIn, ScanOut, SetupOut, SetupsOut
 from app.setups.store import SetupRecord, list_current_setups
 from app.user_settings import get_show_short_setups
@@ -32,7 +33,14 @@ def post_scan(body: ScanIn, conn: DbConnection) -> ScanOut:
 
 
 def _to_setup_out(record: SetupRecord, records: list[SetupRecord]) -> SetupOut:
-    has_conflict = any(other.ticker == record.ticker and other.direction != record.direction for other in records)
+    # Same rule as the ranking penalty: only an opposite pattern on the same
+    # or a higher timeframe counts; a 1m wiggle against a 5m setup doesn't.
+    has_conflict = any(
+        other.ticker == record.ticker
+        and other.direction != record.direction
+        and TIMEFRAME_ORDER[other.timeframe] >= TIMEFRAME_ORDER[record.timeframe]
+        for other in records
+    )
     values = asdict(record)
     for field in ("float_at_detection", "outcome", "resolved_at", "max_favorable_r", "max_adverse_r"):
         values.pop(field)

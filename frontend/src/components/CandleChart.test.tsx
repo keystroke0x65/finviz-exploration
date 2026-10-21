@@ -1,18 +1,35 @@
 import { cleanup, render } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CandleChart, CHART_COLORS } from "./CandleChart";
 
 const chart = vi.hoisted(() => {
-  const candleSeries = { setData: vi.fn(), createPriceLine: vi.fn((options) => options), removePriceLine: vi.fn() };
+  const state = { isRemoved: false };
+  // Like the real library: touching a removed chart throws.
+  const throwIfRemoved = () => {
+    if (state.isRemoved) throw new Error("Value is undefined");
+  };
+  const candleSeries = {
+    setData: vi.fn(),
+    createPriceLine: vi.fn((options) => options),
+    removePriceLine: vi.fn(throwIfRemoved),
+  };
   const lineSeries = { setData: vi.fn() };
+  const timeScale = { fitContent: vi.fn(), setVisibleLogicalRange: vi.fn() };
   const instance = {
     addCandlestickSeries: vi.fn(() => candleSeries),
     addLineSeries: vi.fn(() => lineSeries),
-    removeSeries: vi.fn(),
-    timeScale: vi.fn(() => ({ fitContent: vi.fn() })),
-    remove: vi.fn(),
+    removeSeries: vi.fn(throwIfRemoved),
+    timeScale: vi.fn(() => timeScale),
+    remove: vi.fn(() => {
+      state.isRemoved = true;
+    }),
   };
-  return { instance, candleSeries, lineSeries, createChart: vi.fn(() => instance) };
+  const createChart = vi.fn(() => {
+    state.isRemoved = false;
+    return instance;
+  });
+  return { instance, candleSeries, lineSeries, timeScale, createChart };
 });
 vi.mock("lightweight-charts", () => ({ createChart: chart.createChart, LineStyle: { Dashed: 2, Dotted: 1 } }));
 
@@ -70,5 +87,35 @@ describe("CandleChart", () => {
     unmount();
 
     expect(chart.instance.remove).toHaveBeenCalled();
+  });
+
+  it("survives React StrictMode's mount-unmount-mount in development", () => {
+    const strictRender = () =>
+      render(
+        <StrictMode>
+          <CandleChart bars={BARS} levels={[{ price: 2.0, label: "Entry", kind: "entry" }]} outline={null} vwap={[2.0, 2.1]} />
+        </StrictMode>,
+      );
+
+    expect(strictRender).not.toThrow();
+    expect(chart.createChart).toHaveBeenCalledTimes(2);
+  });
+
+  it("opens zoomed to the most recent bars when there are more than it shows", () => {
+    const manyBars = Array.from({ length: 500 }, (_, index) => ({
+      ...BARS[0],
+      time: new Date(Date.UTC(2026, 9, 1) + index * 300_000).toISOString(),
+    }));
+
+    render(<CandleChart bars={manyBars} levels={[]} outline={null} vwap={null} visibleBars={192} />);
+
+    expect(chart.timeScale.setVisibleLogicalRange).toHaveBeenCalledWith({ from: 308, to: 503 });
+    expect(chart.timeScale.fitContent).not.toHaveBeenCalled();
+  });
+
+  it("fits everything when there are fewer bars than it shows", () => {
+    render(<CandleChart bars={BARS} levels={[]} outline={null} vwap={null} visibleBars={192} />);
+
+    expect(chart.timeScale.fitContent).toHaveBeenCalled();
   });
 });

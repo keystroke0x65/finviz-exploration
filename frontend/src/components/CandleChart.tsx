@@ -23,6 +23,8 @@ interface CandleChartProps {
   levels: ChartLevel[];
   outline: [string, number][] | null;
   vwap: (number | null)[] | null;
+  // How many of the most recent bars to show at first; the user can scroll back.
+  visibleBars?: number;
 }
 
 // Mirrors the tokens in styles.css; the chart draws on canvas and can't read CSS variables.
@@ -42,6 +44,8 @@ export const CHART_COLORS = {
 } as const;
 
 const CHART_HEIGHT = 420;
+// Empty space after the last bar so the latest candle isn't against the axis.
+const RIGHT_PADDING_BARS = 4;
 
 function toTime(isoTime: string): UTCTimestamp {
   return toChartTime(isoTime) as UTCTimestamp;
@@ -53,7 +57,7 @@ function toSortedUniquePoints(points: [string, number][]): { time: UTCTimestamp;
   return [...byTime.entries()].sort(([left], [right]) => left - right).map(([time, value]) => ({ time, value }));
 }
 
-export function CandleChart({ bars, levels, outline, vwap }: CandleChartProps) {
+export function CandleChart({ bars, levels, outline, vwap, visibleBars }: CandleChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -118,13 +122,25 @@ export function CandleChart({ bars, levels, outline, vwap }: CandleChartProps) {
       outlineSeries.setData(toSortedUniquePoints(outline));
       extraSeries.push(outlineSeries);
     }
-    chart.timeScale().fitContent();
+    if (visibleBars != null && bars.length > visibleBars) {
+      chart.timeScale().setVisibleLogicalRange({
+        from: bars.length - visibleBars,
+        to: bars.length - 1 + RIGHT_PADDING_BARS,
+      });
+    } else {
+      chart.timeScale().fitContent();
+    }
 
     return () => {
+      // On unmount the chart-creating effect's cleanup runs first and removes
+      // the chart; touching its series afterwards throws inside the library.
+      if (chartRef.current !== chart) {
+        return;
+      }
       priceLines.forEach((line) => candles.removePriceLine(line));
       extraSeries.forEach((series) => chart.removeSeries(series));
     };
-  }, [bars, levels, outline, vwap]);
+  }, [bars, levels, outline, vwap, visibleBars]);
 
   return <div ref={containerRef} className="candle-chart" />;
 }
