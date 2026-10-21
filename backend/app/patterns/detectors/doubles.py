@@ -35,6 +35,13 @@ def _match_double(bars: list[Bar], direction: Direction, timeframe: Interval) ->
         return None
     if abs(first.price - second.price) / first.price * 100 > MATCH_TOLERANCE_PERCENT:
         return None
+    # A double bottom is the low of the move: nothing lower before the first
+    # test. Without this, a tight range at the top of a run matches too.
+    before_first = window[: first.index]
+    if direction == "long" and any(bar.low < first.price for bar in before_first):
+        return None
+    if direction == "short" and any(bar.high > first.price for bar in before_first):
+        return None
     necklines = [
         swing for swing in swings
         if swing.is_high == (direction == "long") and first.index < swing.index < second.index

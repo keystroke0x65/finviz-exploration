@@ -57,3 +57,14 @@ def test_double_bottom_long_past_its_breakout_is_not_current():
     lows = W_LOWS + [2.30, 2.35, 2.40, 2.45, 2.50, 2.52]
 
     assert detect_doubles(shape(highs, lows), CONTEXT) == []
+
+
+def test_range_at_the_top_of_a_run_is_not_a_double_bottom():
+    run_highs = [1.00 + 0.05 * index + 0.02 for index in range(20)]
+    run_lows = [1.00 + 0.05 * index - 0.02 for index in range(20)]
+    range_highs = [2.00, 1.95, 1.93, 1.95, 1.99, 1.96, 1.93, 1.92, 1.94, 1.97]
+    range_lows = [1.95, 1.90, 1.88, 1.90, 1.94, 1.91, 1.89, 1.88, 1.89, 1.92]
+
+    patterns = {match.pattern for match in detect_doubles(shape(run_highs + range_highs, run_lows + range_lows), CONTEXT)}
+
+    assert "double_bottom" not in patterns
