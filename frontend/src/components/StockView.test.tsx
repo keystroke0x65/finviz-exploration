@@ -131,5 +131,6 @@ describe("StockView", () => {
 
     expect(await screen.findByText("Leans short")).toBeInTheDocument();
     expect(screen.getByText("Volume heavier on down bars")).toBeInTheDocument();
+    expect(screen.getByText(/^Scored /)).toBeInTheDocument();
   });
 });

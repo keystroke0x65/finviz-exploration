@@ -129,6 +129,6 @@ describe("SetupsView", () => {
     render(<SetupsView onOpenStock={vi.fn()} />);
 
     const badge = await screen.findByText("Leans long");
-    expect(badge).toHaveAttribute("title", "Above 5 of 5 trend lines");
+    expect(badge.getAttribute("title")).toContain("Above 5 of 5 trend lines");
   });
 });

@@ -15,7 +15,7 @@ import { finvizQuoteUrl, formatPrice } from "../format";
 import { CandleChart, ChartLevel } from "./CandleChart";
 import { QuoteTable } from "./QuoteTable";
 import { StockSearch } from "./StockSearch";
-import { VerdictBadge } from "./VerdictBadge";
+import { describeVerdictAge, VerdictBadge } from "./VerdictBadge";
 
 interface StockViewProps {
   ticker: string | null;
@@ -204,11 +204,14 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
                 Verdict <VerdictBadge verdict={verdict} />
               </h3>
               {verdict ? (
-                <ul className="verdict-reasons">
-                  {verdict.reasons.map((reason) => (
-                    <li key={reason}>{reason}</li>
-                  ))}
-                </ul>
+                <>
+                  <ul className="verdict-reasons">
+                    {verdict.reasons.map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
+                  </ul>
+                  <p className="muted verdict-age">{describeVerdictAge(verdict)}</p>
+                </>
               ) : (
                 <p className="muted">Not scanned yet. Scan this stock to get a verdict.</p>
               )}
