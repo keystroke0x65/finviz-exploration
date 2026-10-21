@@ -6,14 +6,12 @@ from fastapi import APIRouter, Depends, Query
 
 from app.routes.dependencies import get_db_connection
 from app.schemas import TrackRecordOut
-from app.setups.track_record import FloatBucket, compute_track_record
+from app.setups.track_record import MIN_TRADES_FOR_TRACK_RECORD, FloatBucket, compute_track_record
 
 router = APIRouter(prefix="/api/track-record", tags=["track record"])
 
 DbConnection = Annotated[sqlite3.Connection, Depends(get_db_connection)]
 
-# History only starts to move scores once a pattern has this many trades.
-MIN_TRADES_FOR_TRACK_RECORD = 30
 PATTERN_NAME = r"^[a-z_]{1,40}$"
 
 

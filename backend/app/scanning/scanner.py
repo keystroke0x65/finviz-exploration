@@ -21,6 +21,7 @@ from app.scanning.active import select_active_tickers
 from app.scanning.snapshots import save_snapshots
 from app.scanning.verdicts import save_verdict
 from app.setups.resolver import has_deadline_passed, resolve_outcome
+from app.setups.track_record import PatternStats, stats_for
 from app.setups.store import (
     list_open_records,
     list_tickers_with_open_records,
@@ -169,9 +170,13 @@ def _record_setups(
     matches = [setup.match for setup in setups]
     relative_volume = snapshot.relative_volume if snapshot else None
     float_millions = snapshot.float_millions if snapshot else None
+    history: dict[tuple[str, str], PatternStats | None] = {}
     for setup in setups:
+        key = (setup.match.pattern, setup.match.timeframe)
+        if key not in history:
+            history[key] = stats_for(conn, *key)
         others = [other for other in matches if other is not setup.match]
-        score = score_setup(setup.match, setup.plan, setup.state, relative_volume, others)
+        score = score_setup(setup.match, setup.plan, setup.state, relative_volume, others, track_record=history[key])
         record_match(
             conn, ticker, setup.match, setup.plan, setup.state, score, _session_label(setup.match),
             float_millions, now, verdict=verdict_call,

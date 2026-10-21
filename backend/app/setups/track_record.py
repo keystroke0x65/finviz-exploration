@@ -22,6 +22,8 @@ FLOAT_BUCKETS: list[tuple[float, FloatBucket]] = [
     (50.0, "20m_to_50m"),
 ]
 NOT_A_TRADE = {"not_tracked", "unresolved"}
+# History only starts to move scores once a pattern has this many trades.
+MIN_TRADES_FOR_TRACK_RECORD = 30
 
 
 def classify_float(float_millions: float | None) -> FloatBucket:

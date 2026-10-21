@@ -138,4 +138,18 @@ describe("SetupsView", () => {
 
     expect(await screen.findByText("Bullish pattern too")).toBeInTheDocument();
   });
+
+  it("shows the pattern's track record in the score details", async () => {
+    respond([
+      setup({ track_record: { trades: 42, win_rate: 20 / 42, average_r: 0.31 } }),
+      setup({ id: 2, ticker: "WORX", track_record: { trades: 12, win_rate: 0.5, average_r: 0.1 } }),
+    ]);
+    render(<SetupsView onOpenStock={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Score details for HOST" }));
+    expect(screen.getByText("Track record: 42 trades, 48% wins, +0.31R on average")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Score details for WORX" }));
+    expect(screen.getByText("Track record: not enough history yet (12 of 30 trades)")).toBeInTheDocument();
+  });
 });

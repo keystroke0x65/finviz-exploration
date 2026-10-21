@@ -189,3 +189,15 @@ def test_warnings_do_not_include_short_trade_plans(api_client, db_conn):
     for field in ("stop", "capped_target", "target_3r", "partial_1r", "partial_2r", "trailing_stop",
                   "available_reward_risk", "risk_percent"):
         assert field not in warning
+
+
+def test_setups_include_pattern_track_record(api_client, db_conn):
+    from tests.test_track_record import add_record
+
+    store_setup(db_conn, "HOST")  # high_of_day_break, 1m
+    for _ in range(3):
+        add_record(db_conn, "target", pattern="high_of_day_break", timeframe="1m")
+
+    setup = api_client.get("/api/setups").json()["setups"][0]
+
+    assert setup["track_record"] == {"trades": 3, "win_rate": 1.0, "average_r": 3.0}

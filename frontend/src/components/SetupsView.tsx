@@ -1,12 +1,14 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import {
   fetchSetups,
+  MIN_TRADES_FOR_TRACK_RECORD,
   patternName,
   runScan,
   ScanResult,
   SCORE_PART_NAMES,
   Setup,
   SetupsResponse,
+  TrackRecordSummary,
 } from "../api/setups";
 import { saveSettings } from "../api/settings";
 import { formatPrice } from "../format";
@@ -242,6 +244,15 @@ function SetupRow({ setup, showDirection, isExpanded, onToggleScore, onOpenStock
   );
 }
 
+function describeTrackRecord(history: TrackRecordSummary | null | undefined): string {
+  if (!history || history.trades < MIN_TRADES_FOR_TRACK_RECORD) {
+    return `Track record: not enough history yet (${history?.trades ?? 0} of ${MIN_TRADES_FOR_TRACK_RECORD} trades)`;
+  }
+  const winRate = history.win_rate == null ? "—" : `${Math.round(history.win_rate * 100)}%`;
+  const averageR = history.average_r == null ? "—" : `${history.average_r > 0 ? "+" : ""}${history.average_r.toFixed(2)}R`;
+  return `Track record: ${history.trades} trades, ${winRate} wins, ${averageR} on average`;
+}
+
 function ScoreDetails({ setup }: { setup: Setup }) {
   return (
     <div className="score-details">
@@ -253,6 +264,7 @@ function ScoreDetails({ setup }: { setup: Setup }) {
           </div>
         ))}
       </dl>
+      <p className="muted">{describeTrackRecord(setup.track_record)}</p>
       <p className="muted">
         Partial profits at {formatPrice(setup.partial_1r)} (1R) and {formatPrice(setup.partial_2r)} (2R)
         {setup.trailing_stop != null && <>; trail the stop under {formatPrice(setup.trailing_stop)}</>}.

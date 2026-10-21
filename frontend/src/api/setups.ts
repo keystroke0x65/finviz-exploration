@@ -40,7 +40,17 @@ export interface Setup {
   last_seen_at: string;
   has_conflict: boolean;
   verdict?: Verdict | null;
+  track_record?: TrackRecordSummary | null;
 }
+
+export interface TrackRecordSummary {
+  trades: number;
+  win_rate: number | null;
+  average_r: number | null;
+}
+
+// History starts to count in scores at this many trades (mirrors the backend).
+export const MIN_TRADES_FOR_TRACK_RECORD = 30;
 
 // A bearish pattern shown while short setups are off: no stop, targets or R:R.
 export interface Warning {
@@ -107,6 +117,8 @@ export const SCORE_PART_NAMES: Record<string, string> = {
   freshness: "Freshness",
   timeframe_agreement: "Other timeframes agree",
   conflict: "Opposite pattern",
+  track_record: "Track record",
+  candles: "Candlestick at a key level",
 };
 
 export function patternName(pattern: string): string {

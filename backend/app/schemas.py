@@ -235,6 +235,7 @@ class SetupOut(BaseModel):
     last_seen_at: datetime
     has_conflict: bool
     verdict: VerdictOut | None = None
+    track_record: "TrackRecordSummaryOut | None" = None
 
 
 class WarningOut(BaseModel):
@@ -252,6 +253,15 @@ class WarningOut(BaseModel):
     detected_at: datetime
     last_seen_at: datetime
     verdict: VerdictOut | None = None
+
+
+class TrackRecordSummaryOut(BaseModel):
+    trades: int
+    win_rate: float | None
+    average_r: float | None
+
+
+SetupOut.model_rebuild()
 
 
 class SetupsOut(BaseModel):
