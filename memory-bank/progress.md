@@ -7,7 +7,7 @@
 
 ## Next
 <!-- empty: planned work, highest priority first -->
-- [prog-0008] root h=0 x=0 d=2026-10-20 labels=roadmap,screener src="docs/superpowers/specs/2026-09-17-finviz-dashboard-phase1-design.md" supersedes=prog-0005 :: Next: phase 2 (screener: Finviz screener export, filter UI, saved queries) via its own brainstorm -> spec -> plan cycle.
+- [prog-0009] root h=0 x=0 d=2026-10-21 labels=roadmap,phase2 src="docs/superpowers/plans/2026-10-20-phase2-m1-screens-watchlist.md" supersedes=prog-0008 :: Next: execute docs/superpowers/plans/2026-10-20-phase2-m1-screens-watchlist.md (10 tasks: screens + watchlist feeder) once user picks execution approach; then plan M2.
 
 ## Done
 <!-- empty: completed milestones (keep the latest 15; consolidate archives older ones) -->

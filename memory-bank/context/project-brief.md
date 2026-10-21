@@ -21,4 +21,5 @@
 <!-- empty: deadlines, budget, compliance, platform limits -->
 
 ## User background
-- [brief-0003] root h=0 x=0 d=2026-09-17 labels=audience src="user" :: User is an experienced software engineer but new to financial/trading APIs. Wants domain-specific quirks (Finviz export semantics, options mechanics, market data behavior) documented in code/docs, but doesn't need general software engineering explained.
+- [brief-0003] root h=1 x=0 d=2026-09-17 labels=audience src="user" :: User is an experienced software engineer but new to financial/trading APIs. Wants domain-specific quirks (Finviz export semantics, options mechanics, market data behavior) documented in code/docs, but doesn't need general software engineering explained.
+- [brief-0004] root h=0 x=0 d=2026-10-21 labels=trading,audience src="user, phase 2 brainstorm" :: User trades small-cap momentum (US, under $20, float <10-20M, rel vol 2x+, top gainers, after-hours), long only today but plans to short later. Workflow: screen -> news -> 2y daily S/R lines -> 1m/5m reaction. Wants pattern detection, long/short verdict, entry/exit at 3:1 R:R, ranked.
