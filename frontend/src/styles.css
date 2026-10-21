@@ -948,3 +948,9 @@ input[type="checkbox"] {
   margin: 0.5rem 0 0;
   font-size: 0.75rem;
 }
+
+/* Track record */
+
+.data-table tr[data-thin="true"] td {
+  color: var(--text-muted);
+}

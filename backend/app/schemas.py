@@ -266,3 +266,25 @@ class SettingsOut(BaseModel):
 
 class SettingsIn(BaseModel):
     show_short_setups: Annotated[bool, Field(strict=True)]
+
+
+# --- Track record (phase 2, milestone 3) ---
+
+
+class PatternStatsOut(BaseModel):
+    pattern: str
+    timeframe: str
+    trades: int
+    wins: int
+    losses: int
+    expired_after_fill: int
+    win_rate: float | None
+    average_r: float | None
+    average_max_favorable_r: float | None
+    not_trades: int
+    still_open: int
+
+
+class TrackRecordOut(BaseModel):
+    rows: list[PatternStatsOut]
+    min_trades: int
