@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BarsResponse, fetchBars } from "../api/bars";
 import {
   fetchStockSetups,
@@ -77,6 +77,10 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [selectedSetupId, setSelectedSetupId] = useState<number | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  // A scan takes seconds; if the user switches stocks meanwhile, its results
+  // belong to the old ticker and must not land in the new one's view.
+  const shownTicker = useRef(ticker);
+  shownTicker.current = ticker;
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -140,14 +144,23 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
     if (!ticker) {
       return;
     }
+    const scannedTicker = ticker;
     setIsScanning(true);
     setError(null);
     try {
-      await runScan(ticker);
-      setSetups(await fetchStockSetups(ticker));
-      setVerdict(await fetchStockVerdict(ticker));
+      await runScan(scannedTicker);
+      const [freshSetups, freshVerdict] = await Promise.all([
+        fetchStockSetups(scannedTicker),
+        fetchStockVerdict(scannedTicker),
+      ]);
+      if (shownTicker.current === scannedTicker) {
+        setSetups(freshSetups);
+        setVerdict(freshVerdict);
+      }
     } catch (scanError) {
-      setError(errorMessage(scanError));
+      if (shownTicker.current === scannedTicker) {
+        setError(errorMessage(scanError));
+      }
     } finally {
       setIsScanning(false);
     }

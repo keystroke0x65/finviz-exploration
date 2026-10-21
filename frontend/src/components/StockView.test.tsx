@@ -156,4 +156,24 @@ describe("StockView", () => {
     expect(screen.queryByRole("button", { name: /Bull flag/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /ABCD/ })).toBeInTheDocument();
   });
+
+  it("drops a scan's results if the ticker changed while it ran", async () => {
+    let finishScan: (value: unknown) => void = () => {};
+    api.runScan.mockImplementation(() => new Promise((resolve) => (finishScan = resolve)));
+    api.fetchStockSetups.mockImplementation((ticker: string) =>
+      Promise.resolve({
+        setups: [ticker === "HOST" ? SETUP : { ...SETUP, id: 9, ticker: "WORX", pattern: "abcd" }],
+        warnings: [], show_short_setups: false,
+      }),
+    );
+    const { rerender } = render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Scan this stock" }));
+
+    rerender(<StockView ticker="WORX" onTickerChange={vi.fn()} />);
+    expect(await screen.findByRole("button", { name: /ABCD/ })).toBeInTheDocument();
+    finishScan({ scanned: ["HOST"], failed: [], setups_found: 1, scanned_at: "x" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.queryByRole("button", { name: /Bull flag/ })).not.toBeInTheDocument();
+  });
 });
