@@ -56,3 +56,10 @@ def test_candle_away_from_key_levels_is_ignored():
     bars = [make_bar(9, 30, 2.40, 2.41, 2.30, 2.405)]  # a hammer, but nowhere near 2.00 or 2.10
 
     assert candle_points(long_plan(), bars) == 0.0
+
+
+def test_wick_through_the_stop_earns_no_bonus():
+    # Long stop 2.00; a hammer whose low (1.985) already went through the stop.
+    bars = [make_bar(9, 30, 2.08, 2.09, 1.985, 2.085)]
+
+    assert candle_points(long_plan(), bars) == 0.0

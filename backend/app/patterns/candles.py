@@ -101,6 +101,14 @@ def _near(price: float, level: float) -> bool:
     return abs(price - level) <= level * KEY_LEVEL_TOLERANCE
 
 
+def _holds_stop(touch: float, stop: float, is_long: bool) -> bool:
+    """A test of the stop counts only if the bar stayed on the trade's side of it;
+    a wick through the stop already hit it."""
+    if is_long:
+        return stop <= touch <= stop * (1 + KEY_LEVEL_TOLERANCE)
+    return stop * (1 - KEY_LEVEL_TOLERANCE) <= touch <= stop
+
+
 def candle_points(plan: TradePlan, bars: list[Bar]) -> float:
     """+CANDLE_POINTS when a supporting signal tags the setup's stop or entry,
     -CANDLE_POINTS when an opposing one appears at its entry, 0 otherwise or if both."""
@@ -111,7 +119,7 @@ def candle_points(plan: TradePlan, bars: list[Bar]) -> float:
     for signal, bar in detect_candle_signals(bars):
         touch = bar.low if is_long else bar.high
         against_touch = bar.high if is_long else bar.low
-        if signal in supporting and (_near(touch, plan.stop) or _near(touch, plan.entry)):
+        if signal in supporting and (_holds_stop(touch, plan.stop, is_long) or _near(touch, plan.entry)):
             confirms = True
         if signal in opposing and _near(against_touch, plan.entry):
             undercuts = True
