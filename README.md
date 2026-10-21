@@ -2,8 +2,9 @@
 
 A personal financial dashboard built on a Finviz Elite subscription.
 
-**Current status:** Phase 1 (stock lookup) and Phase 2 milestone 1 (screens + watchlist).
-Pattern detection and trade setups (milestones 2–3) are next. See
+**Current status:** Phase 2 milestones 1 and 2a: screens, an auto-fed watchlist, pattern
+detection with entry/stop/target plans, outcome tracking, and a candle chart. More patterns
+and a per-stock long/short verdict (milestone 2b) are next. See
 [the phase 2 design](docs/superpowers/specs/2026-10-20-screener-watchlist-patterns-design.md)
 and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-phase1-design.md).
 
@@ -11,6 +12,18 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
 
 - The header shows the US market session (pre-market, regular hours, after-hours) on a
   4 AM to 8 PM Eastern strip with a marker for now. Exchange holidays aren't shown.
+- **Setups** tab (home): setups found in the latest scans, best score first. Each shows
+  the pattern, timeframe (1m, 5m or daily), state (forming = entry not reached yet,
+  triggered, extended = already more than 1R past entry), entry, stop, target, the
+  reward:risk actually available, risk as a % of price, and a 0-100 score you can expand
+  to see how it was built. Targets are 3R unless a daily support/resistance level sits in
+  the way; then the target stops at that level and the row says "capped by level at …".
+  Bearish patterns are listed as warnings; tick "Show short setups" to turn them into
+  ranked short setups. Detection is rule-based: it flags shapes worth checking on the
+  chart, it doesn't predict, and it isn't advice.
+- **Stock** tab: candles (1m, 5m or daily) with daily support/resistance near the price,
+  pre-market high/low, previous close and VWAP. Click a setup to draw its entry, stop and
+  target. Tickers anywhere in the app open this tab; the small "Finviz" link opens Finviz.
 - **Screens** tab: saved Finviz screens. Paste a Finviz screener URL (build it on
   finviz.com, copy the address bar) or use the form for country, price, float, market cap,
   volume and relative volume. Running a screen shows price, change, after-hours change,
@@ -24,7 +37,28 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
   and manually added stocks never expire. "Refresh from feeder" runs it immediately.
   The tab shows when the feeder last ran and which screens failed (e.g. an expired
   token or Finviz rate limiting); failures are also logged as warnings.
-- **Lookup** tab: single-ticker quote (Phase 1).
+  Each row also shows the stock's latest price, change, after-hours change and relative
+  volume from the most recent scan.
+
+### How scanning works
+
+After every feeder run (every 15 minutes, 4:00 AM to 8:00 PM ET on weekdays) the app gets
+current prices for the whole watchlist, then scans up to 40 of the most active stocks:
+those the feeder just found, or with relative volume of 1.5 or more, or moving 5% or more
+(regular or after-hours). For each it loads 1m, 5m and daily bars (cached: 1 minute,
+5 minutes, and until the next close), finds daily levels, runs the pattern detectors and
+records what it finds. "Scan watchlist" on the Setups tab and "Scan this stock" on the
+Stock tab run a scan on demand; a full scan takes about two minutes because Finviz is
+called at most once a second. If Finviz starts rate limiting, the scan stops and lists the
+stocks it skipped.
+
+Patterns so far: high/low of day break, pre-market high/low break, opening range
+breakout/breakdown, red-to-green / green-to-red, VWAP reclaim/rejection, bull/bear flag,
+flat-top breakout / flat-bottom breakdown.
+
+Every setup is recorded and later marked as having hit its target or stop first, expired
+(intraday setups at 8:00 PM ET, daily ones after 20 sessions), or unresolved (Finviz no
+longer had the bars). These outcomes will feed a track-record view in a later milestone.
 
 Finviz silently ignores filter codes it doesn't recognise, so saving a screen checks any
 pasted codes with Finviz first and rejects ones it would ignore.
@@ -105,4 +139,6 @@ cd backend
 FINVIZ_API_TOKEN=<your real token> python -m scripts.finviz_sanity_check AAPL
 # Screens: runs the default screens and checks Finviz recognises every form code
 FINVIZ_API_TOKEN=<your real token> python -m scripts.finviz_sanity_check --screens
+# Bars: fetches 1m/5m/daily bars for a ticker and runs a full scan of it
+FINVIZ_API_TOKEN=<your real token> python -m scripts.finviz_sanity_check --bars HOST
 ```

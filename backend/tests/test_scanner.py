@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 import pytest
 
-from app.errors import FinvizAuthError, FinvizUnavailableError
+from app.errors import FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError
 from app.market_time import EASTERN
 from app.scanning.scanner import ScanDeps, run_scan, scan_ticker
 from app.scanning.snapshots import read_snapshots
@@ -24,8 +24,10 @@ def bars_for(closes):
     return fetch_bars
 
 
-def deps(fetch_bars=None, failing=None, auth_failing=None):
+def deps(fetch_bars=None, failing=None, auth_failing=None, rate_limited=None):
     def fetch(ticker, interval):
+        if ticker == rate_limited:
+            raise FinvizRateLimitError(f"{interval} bars {ticker}")
         if ticker == failing:
             raise FinvizUnavailableError(f"{interval} bars {ticker}", "ReadTimeout")
         if ticker == auth_failing:
@@ -89,3 +91,12 @@ def test_run_scan_reports_snapshot_failure(db_conn):
 
     assert result.scanned == []
     assert result.failed == [("watchlist prices", "Finviz request failed (snapshot): HTTP 500")]
+
+
+def test_run_scan_backs_off_after_rate_limit(db_conn):
+    # Every further request would also be refused; stop and say what was skipped.
+    result = run_scan(db_conn, NOW, deps(rate_limited="BBB"), tickers=["AAA", "BBB", "CCC", "DDD"])
+
+    assert result.scanned == ["AAA"]
+    assert result.failed[0] == ("BBB", "Finviz is rate limiting requests (daily bars BBB); try again in a minute.")
+    assert result.failed[1] == ("CCC, DDD", "skipped: Finviz is rate limiting requests")

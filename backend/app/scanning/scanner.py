@@ -28,6 +28,7 @@ TRAILING_STOP_BARS = 30
 REGULAR_OPEN = time(9, 30)
 REGULAR_CLOSE = time(16, 0)
 SNAPSHOT_FAILURE_LABEL = "watchlist prices"
+RATE_LIMIT_SKIPPED_REASON = "skipped: Finviz is rate limiting requests"
 
 
 @dataclass(frozen=True)
@@ -159,14 +160,22 @@ def run_scan(
 
     scanned: list[str] = []
     setups_found = 0
-    for ticker in tickers:
+    for index, ticker in enumerate(tickers):
         try:
             setups_found += scan_ticker(conn, ticker, snapshots.get(ticker), now, deps)
         except FinvizAuthError as exc:
             # Every later request would fail the same way.
             failed.append((ticker, str(exc)))
             break
-        except (FinvizRateLimitError, FinvizUnavailableError) as exc:
+        except FinvizRateLimitError as exc:
+            # Back off: more requests now would only be refused too and could
+            # prolong the throttling. The next scheduled scan picks them up.
+            failed.append((ticker, str(exc)))
+            skipped = tickers[index + 1 :]
+            if skipped:
+                failed.append((", ".join(skipped), RATE_LIMIT_SKIPPED_REASON))
+            break
+        except FinvizUnavailableError as exc:
             failed.append((ticker, str(exc)))
             continue
         scanned.append(ticker)
