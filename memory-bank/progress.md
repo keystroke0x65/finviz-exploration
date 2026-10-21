@@ -12,7 +12,7 @@
 <!-- empty: completed milestones (keep the latest 15; consolidate archives older ones) -->
 - [prog-0001] root h=0 x=0 d=2026-09-17 labels=status src="user" :: Brainstorming/design phase complete for Phase 1 (foundation + stock lookup). Writing design spec doc next, then an implementation plan.
 - [prog-0007] root h=0 x=0 d=2026-10-20 labels=status,phase1 src="git log main" supersedes=prog-0004 :: Phase 1 (foundation + stock lookup) merged into main on 2026-10-20 (merge a9d414b) and pushed; 17 backend pytest + 7 frontend vitest tests green on merged result. Feature worktree removed.
-- [prog-0012] root h=0 x=0 d=2026-10-21 labels=status,phase2 src="git log main" supersedes=prog-0011 :: Phase 2 M1, M2a and M2b merged into main by 2026-10-21 (M2b merge 0bdedea): screens, watchlist feeder, 18 pattern pairs across 1m/5m/daily, trade plans, ranking, outcome tracking, per-stock verdict, Setups/Stock/Watchlist views. 317 backend + 90 frontend tests. Not pushed. Next: milestone 3 or a deferred-minors cleanup batch.
+- [prog-0013] root h=0 x=0 d=2026-10-21 labels=status,phase2 src="git log main" supersedes=prog-0012 :: Phase 2 M1, M2a, M2b and a cleanup batch of ~25 deferred review minors merged into main by 2026-10-21; 345 backend + 94 frontend tests; not pushed. Remaining deferred minors: 4 (daily state uses thin pre-market prints, single-ticker scan 409s during scheduled scan, volume reason ignores rel-vol scaling, commit 37e03a2 has a failing test). Next: milestone 3 plan.
 
 ## Known issues
 <!-- empty: bugs, tech debt, limitations still open -->

@@ -13,9 +13,9 @@ or run `memory.py find <keywords>` to pull just the relevant root → delta chai
 | context/conventions.md | 1 (1/0/0) | Code style, Patterns, Testing, Workflow | ui, design, css | 2026-10-21 |
 | context/decisions.md | 4 (4/0/0) | Decisions, Architecture, Finviz client design | phase2, patterns, architecture, roadmap, verdict | 2026-10-21 |
 | progress.md | 4 (4/0/0) | Now, Next, Done, Known issues | status, phase1, phase2, schwab, options | 2026-10-21 |
-| experience/dev-environment.md | 6 (3/0/3) | Lessons, Traps | git, docker, wsl, worktree, env | 2026-10-21 |
+| experience/dev-environment.md | 7 (3/0/4) | Lessons, Traps | git, docker, wsl, shell, worktree | 2026-10-21 |
 | experience/finviz.md | 6 (5/0/1) | Lessons, Traps | finviz, bars, intraday, columns, export | 2026-10-21 |
 
 Also: `active-context.md` (current focus, freeform), `history/archive.md` (superseded/deleted, not loaded by default), `ops-log.jsonl` (audit trail).
 
-Batches applied: 10. Bank created: 2026-09-17.
+Batches applied: 11. Bank created: 2026-09-17.

@@ -4,8 +4,8 @@
     "brief": 4,
     "stack": 7,
     "dec": 4,
-    "prog": 12,
-    "dev-environment": 6,
+    "prog": 13,
+    "dev-environment": 7,
     "finviz": 7,
     "conv": 1
   },
@@ -14,5 +14,5 @@
     "18086c86-3585-44fc-8c36-16cd608bf967"
   ],
   "created": "2026-09-17",
-  "batches": 10
+  "batches": 11
 }
