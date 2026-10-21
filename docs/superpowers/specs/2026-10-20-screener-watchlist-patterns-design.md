@@ -88,11 +88,21 @@ Domain quirks the builder must handle (and document in code):
   AM/PM suffix. Parse the 24-hour part and ignore the suffix. Times appear to be US
   Eastern (session starts 04:00); confirm with the sanity script.
 - Daily dates are `MM/DD/YYYY`.
-- Screener exports may cap row counts (one broad screen returned exactly 1,024 rows).
-  Treat a result of exactly 1,024 as "possibly truncated" and say so in the UI.
-- Not yet verified: whether `t=` accepts many comma-separated tickers in one call, and the
-  exact filter codes for after-hours change / current volume. The builder verifies these
-  with the sanity script before relying on them.
+- **Unknown filter or signal codes are silently ignored**: a typo returns the whole
+  market (~10,400 rows) instead of an error. Flag any screen result over 5,000 rows as
+  "filters may have been ignored", and have the sanity script check that every code the
+  form can produce actually narrows results.
+- Wide-column exports (`v=152&c=<ids>`) return columns in ascending id order regardless
+  of the order requested, and omit `No.` unless id 0 is requested. Map columns by header
+  name, not position.
+- Units: `Market Cap` and `Shares Float` are in millions; `Average Volume` is in
+  thousands; `Volume` is a raw share count. Percent columns include a `%` sign.
+- `t=` accepts several comma-separated tickers in one call (verified with 4).
+- Verified codes: `geo_usa`, `sh_price_u20`, `sh_float_u10`, `sh_float_u20`,
+  `cap_largeunder`, `sh_relvol_o2`, `sh_curvol_o1000`, signal `ta_topgainers`, order
+  `-change`. Column ids: Ticker 1, Company 2, Country 5, Market Cap 6, Shares Float 25,
+  Average Volume 63, Relative Volume 64, Price 65, Change 66, Volume 67, After-Hours
+  Close 71, After-Hours Change 72, News Time 135, News URL 136, News Title 137.
 
 **Massive (Polygon.io) is not used in this phase.** The user has a subscription and keys
 in `.env` (`MASSIVE_API_KEY`, `MASSIVE_S3_*`). It becomes relevant for backtesting
@@ -399,7 +409,7 @@ Same principle as Phase 1: never show empty or misleading data silently.
 
 - Finviz auth failure, rate limiting and timeouts are distinct, visible errors.
 - A scan that couldn't fetch some tickers lists them ("12 scanned, 3 failed: …").
-- A possibly truncated screen result (1,024 rows) is flagged.
+- A screen result over 5,000 rows is flagged as "filters may have been ignored".
 - Stale data is labelled with its fetch time.
 
 ## Testing
