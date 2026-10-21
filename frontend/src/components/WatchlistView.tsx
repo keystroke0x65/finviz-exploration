@@ -20,6 +20,7 @@ import {
   MISSING_VALUE,
 } from "../format";
 import { RunDots } from "./RunDots";
+import { VerdictBadge } from "./VerdictBadge";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown error";
@@ -161,6 +162,7 @@ export function WatchlistView({ onOpenStock }: WatchlistViewProps) {
                 <th className="number">Change</th>
                 <th className="number">After-hours</th>
                 <th className="number">Rel vol</th>
+                <th>Verdict</th>
                 <th>Source</th>
                 <th>Last 30 days</th>
                 <th>Last seen</th>
@@ -230,6 +232,9 @@ function WatchlistRow({ entry, isExpanded, onToggleHistory, onTogglePin, onRemov
         </td>
         <td className="number">{formatNumber(snapshot?.relative_volume ?? null)}</td>
         <td>
+          <VerdictBadge verdict={entry.verdict} />
+        </td>
+        <td>
           <span className="badge" data-source={entry.source}>
             {entry.source}
           </span>
@@ -274,7 +279,7 @@ function WatchlistRow({ entry, isExpanded, onToggleHistory, onTogglePin, onRemov
       </tr>
       {isExpanded && (
         <tr>
-          <td colSpan={11}>
+          <td colSpan={12}>
             {entry.appearances.length === 0 ? (
               <span className="muted">No feeder runs yet.</span>
             ) : (

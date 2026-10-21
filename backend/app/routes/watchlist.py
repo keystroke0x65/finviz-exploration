@@ -15,7 +15,9 @@ from app.errors import (
 from app.finviz_client import get_quote, run_screen
 from app.routes.dependencies import finviz_error_to_http, get_db_connection
 from app.routes.stocks import TickerPath
+from app.routes.setups import to_verdict_out
 from app.scanning.snapshots import read_snapshots
+from app.scanning.verdicts import read_verdicts
 from app.schemas import AddTickerIn, FeederResultOut, FeederStatusOut, PinIn, WatchlistEntryOut
 from app.watchlist.feeder import run_feeder
 from app.watchlist.run_status import FeederResult, get_last_feeder_run
@@ -33,7 +35,9 @@ router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
 DbConnection = Annotated[sqlite3.Connection, Depends(get_db_connection)]
 
 
-def _to_entry_out(entry: WatchlistEntry, snapshots: dict | None = None) -> WatchlistEntryOut:
+def _to_entry_out(
+    entry: WatchlistEntry, snapshots: dict | None = None, verdicts: dict | None = None
+) -> WatchlistEntryOut:
     retention_days = get_settings().watchlist_retention_days
     snapshot = (snapshots or {}).get(entry.ticker)
     snapshot_out = None
@@ -47,14 +51,18 @@ def _to_entry_out(entry: WatchlistEntry, snapshots: dict | None = None) -> Watch
             "fetched_at": fetched_at,
         }
     return WatchlistEntryOut(
-        **asdict(entry), expires_at=entry_expires_at(entry, retention_days), snapshot=snapshot_out
+        **asdict(entry),
+        expires_at=entry_expires_at(entry, retention_days),
+        snapshot=snapshot_out,
+        verdict=to_verdict_out((verdicts or {}).get(entry.ticker)),
     )
 
 
 @router.get("", response_model=list[WatchlistEntryOut])
 def get_watchlist(conn: DbConnection) -> list[WatchlistEntryOut]:
     snapshots = read_snapshots(conn)
-    return [_to_entry_out(entry, snapshots) for entry in list_entries(conn)]
+    verdicts = read_verdicts(conn)
+    return [_to_entry_out(entry, snapshots, verdicts) for entry in list_entries(conn)]
 
 
 @router.post("", response_model=WatchlistEntryOut, status_code=201)

@@ -4,6 +4,16 @@ export type Direction = "long" | "short";
 export type Timeframe = "1m" | "5m" | "daily";
 export type SetupState = "forming" | "triggered" | "extended" | "invalidated";
 
+export type VerdictCall = "leans_long" | "leans_short" | "no_clear_edge";
+
+export interface Verdict {
+  call: VerdictCall;
+  score: number;
+  parts: Record<string, number>;
+  reasons: string[];
+  computed_at: string;
+}
+
 export interface Setup {
   id: number;
   ticker: string;
@@ -29,6 +39,7 @@ export interface Setup {
   detected_at: string;
   last_seen_at: string;
   has_conflict: boolean;
+  verdict?: Verdict | null;
 }
 
 export interface SetupsResponse {
@@ -59,6 +70,15 @@ export const PATTERN_NAMES: Record<string, string> = {
   bear_flag: "Bear flag",
   flat_top_breakout: "Flat-top breakout",
   flat_bottom_breakdown: "Flat-bottom breakdown",
+  ascending_triangle: "Ascending triangle",
+  descending_triangle: "Descending triangle",
+  double_bottom: "Double bottom",
+  double_top: "Double top",
+  abcd: "ABCD",
+  inverse_abcd: "Inverse ABCD",
+  micro_pullback: "Micro pullback",
+  first_pullback: "First pullback",
+  first_bounce_fail: "First bounce fail",
 };
 
 export const SCORE_PART_NAMES: Record<string, string> = {
@@ -84,4 +104,8 @@ export function fetchStockSetups(ticker: string): Promise<SetupsResponse> {
 
 export function runScan(ticker?: string): Promise<ScanResult> {
   return requestJson<ScanResult>("/api/scans", jsonRequest("POST", ticker ? { ticker } : {}));
+}
+
+export function fetchStockVerdict(ticker: string): Promise<Verdict | null> {
+  return requestJson<Verdict | null>(`/api/stocks/${encodeURIComponent(ticker)}/verdict`);
 }

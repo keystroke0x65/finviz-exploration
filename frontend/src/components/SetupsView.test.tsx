@@ -122,4 +122,13 @@ describe("SetupsView", () => {
 
     expect(onOpenStock).toHaveBeenCalledWith("HOST");
   });
+
+  it("shows each setup's stock verdict", async () => {
+    respond([setup({ verdict: { call: "leans_long", score: 0.4, parts: {}, reasons: ["Above 5 of 5 trend lines"],
+      computed_at: "2026-10-20T14:00:00Z" } })]);
+    render(<SetupsView onOpenStock={vi.fn()} />);
+
+    const badge = await screen.findByText("Leans long");
+    expect(badge).toHaveAttribute("title", "Above 5 of 5 trend lines");
+  });
 });

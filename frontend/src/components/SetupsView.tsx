@@ -10,6 +10,7 @@ import {
 } from "../api/setups";
 import { saveSettings } from "../api/settings";
 import { formatPrice } from "../format";
+import { VerdictBadge } from "./VerdictBadge";
 
 interface SetupsViewProps {
   onOpenStock: (ticker: string) => void;
@@ -124,6 +125,7 @@ export function SetupsView({ onOpenStock }: SetupsViewProps) {
               <tr>
                 <th>Ticker</th>
                 <th>Pattern</th>
+                <th>Stock verdict</th>
                 <th>Timeframe</th>
                 <th>State</th>
                 <th className="number">Entry</th>
@@ -146,7 +148,7 @@ export function SetupsView({ onOpenStock }: SetupsViewProps) {
                   />
                   {expandedId === setup.id && (
                     <tr>
-                      <td colSpan={10}>
+                      <td colSpan={11}>
                         <ScoreDetails setup={setup} />
                       </td>
                     </tr>
@@ -207,6 +209,9 @@ function SetupRow({ setup, showDirection, isExpanded, onToggleScore, onOpenStock
       <td>
         {patternName(setup.pattern)}
         {showDirection && <div className={setup.direction === "long" ? "gain" : "loss"}>{setup.direction}</div>}
+      </td>
+      <td>
+        <VerdictBadge verdict={setup.verdict} />
       </td>
       <td>{setup.timeframe}</td>
       <td>{STATE_NAMES[setup.state]}</td>

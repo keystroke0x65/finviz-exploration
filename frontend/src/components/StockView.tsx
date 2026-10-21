@@ -1,11 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { BarsResponse, fetchBars } from "../api/bars";
-import { fetchStockSetups, patternName, runScan, Setup, SetupsResponse, Timeframe } from "../api/setups";
+import {
+  fetchStockSetups,
+  fetchStockVerdict,
+  patternName,
+  runScan,
+  Setup,
+  SetupsResponse,
+  Timeframe,
+  Verdict,
+} from "../api/setups";
 import { fetchQuote, Quote } from "../api/stocks";
 import { finvizQuoteUrl, formatPrice } from "../format";
 import { CandleChart, ChartLevel } from "./CandleChart";
 import { QuoteTable } from "./QuoteTable";
 import { StockSearch } from "./StockSearch";
+import { VerdictBadge } from "./VerdictBadge";
 
 interface StockViewProps {
   ticker: string | null;
@@ -62,6 +72,7 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
   const [bars, setBars] = useState<BarsResponse | null>(null);
   const [setups, setSetups] = useState<SetupsResponse | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
+  const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [selectedSetupId, setSelectedSetupId] = useState<number | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,9 +83,12 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
     }
     setSelectedSetupId(null);
     setQuote(null);
-    Promise.all([fetchStockSetups(ticker).then(setSetups), fetchQuote(ticker).then(setQuote)]).catch((loadError) =>
-      setError(errorMessage(loadError)),
-    );
+    setVerdict(null);
+    Promise.all([
+      fetchStockSetups(ticker).then(setSetups),
+      fetchQuote(ticker).then(setQuote),
+      fetchStockVerdict(ticker).then(setVerdict),
+    ]).catch((loadError) => setError(errorMessage(loadError)));
   }, [ticker]);
 
   useEffect(() => {
@@ -111,6 +125,7 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
     try {
       await runScan(ticker);
       setSetups(await fetchStockSetups(ticker));
+      setVerdict(await fetchStockVerdict(ticker));
     } catch (scanError) {
       setError(errorMessage(scanError));
     } finally {
@@ -184,6 +199,20 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
           </div>
 
           <aside className="stock-side">
+            <div className="verdict-panel">
+              <h3 className="editor-section-title">
+                Verdict <VerdictBadge verdict={verdict} />
+              </h3>
+              {verdict ? (
+                <ul className="verdict-reasons">
+                  {verdict.reasons.map((reason) => (
+                    <li key={reason}>{reason}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="muted">Not scanned yet. Scan this stock to get a verdict.</p>
+              )}
+            </div>
             <h3 className="editor-section-title">Setups</h3>
             {allSetups.length === 0 ? (
               <p className="muted">No setups in the last scan. Scan this stock to check now.</p>

@@ -1,4 +1,5 @@
 import { jsonRequest, requestJson } from "./http";
+import type { Verdict } from "./setups";
 
 export interface Appearance {
   seen_on: string;
@@ -23,6 +24,7 @@ export interface WatchlistEntry {
   expires_at: string | null;
   appearances: Appearance[];
   snapshot: PriceSnapshot | null;
+  verdict: Verdict | null;
 }
 
 export interface FeederResult {
