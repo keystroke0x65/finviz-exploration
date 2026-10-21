@@ -93,3 +93,29 @@ def test_save_outcome_closes_record(db_conn):
     save_outcome(db_conn, saved.id, Resolution("target", SCAN_2, 3.0, -0.2))
 
     assert list_open_records(db_conn, "HOST") == []
+
+
+def test_redetection_keeps_original_plan_and_refreshes_state(db_conn):
+    first = record(db_conn, now=SCAN_1, state="forming")
+    changed_plan = TradePlan(direction="long", entry=2.0, stop=1.8, risk_per_share=0.2, risk_percent=10.0,
+                             target_3r=2.6, capped_target=2.6, available_reward_risk=3.0, blocking_level=None,
+                             partial_1r=2.2, partial_2r=2.4, trailing_stop=None)
+
+    second = record_match(db_conn, "HOST", match(), changed_plan, "triggered", SCORE, "regular", 5.46, SCAN_2)
+
+    assert second.id == first.id
+    assert (second.stop, second.capped_target) == (1.9, 2.15)  # plan as first detected
+    assert second.state == "triggered"
+    assert second.first_state == "forming"
+
+
+def test_resolved_record_is_not_reused_by_a_new_detection(db_conn):
+    first = record(db_conn, now=SCAN_1)
+    save_outcome(db_conn, first.id, Resolution("stop", SCAN_2, 0.5, -1.0))
+
+    second = record(db_conn, now=SCAN_2 + timedelta(days=7), state="forming")
+
+    assert second.id != first.id
+    assert second.outcome == "open"
+    outcomes = [row[0] for row in db_conn.execute("SELECT outcome FROM setup_records ORDER BY id")]
+    assert outcomes == ["stop", "open"]

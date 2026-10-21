@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import datetime, timedelta
 
 import pytest
@@ -16,7 +17,7 @@ def setup(direction="long", timeframe="1m", detected_at=DETECTED, entry=2.0, sto
         id=1, ticker="HOST", pattern="bull_flag", direction=direction, timeframe=timeframe, entry=entry,
         stop=stop, capped_target=target, target_3r=target, available_reward_risk=3.0, risk_percent=5.0,
         blocking_level=None, partial_1r=0, partial_2r=0, trailing_stop=None, quality=0.7, score=70.0,
-        score_parts={}, key_points=[], state="forming", session="regular", float_at_detection=5.0,
+        score_parts={}, key_points=[], state="forming", first_state="forming", session="regular", float_at_detection=5.0,
         detected_at=detected_at, last_seen_at=detected_at, outcome="open", resolved_at=None,
         max_favorable_r=None, max_adverse_r=None,
     )
@@ -97,3 +98,21 @@ def test_short_resolution_mirrors():
 
     assert resolution.outcome == "target"
     assert resolution.max_favorable_r == pytest.approx(3.0)
+
+
+def test_setup_first_seen_past_entry_is_not_tracked():
+    # Already triggered when found: nobody could have entered at the planned entry.
+    record = replace(setup(), first_state="triggered")
+    bars = bars_after((2.05, 2.30, 2.04, 2.28))
+
+    assert resolve_outcome(record, bars, LATER_SAME_DAY).outcome == "not_tracked"
+
+
+def test_stop_hit_before_entry_expires_without_a_trade():
+    bars = bars_after((1.95, 1.97, 1.88, 1.90), (1.95, 2.35, 1.94, 2.30))
+
+    resolution = resolve_outcome(setup(), bars, LATER_SAME_DAY)
+
+    assert resolution.outcome == "expired"
+    assert resolution.resolved_at == bars[1].time
+    assert resolution.max_favorable_r is None

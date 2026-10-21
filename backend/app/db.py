@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS setup_records (
     score_parts TEXT NOT NULL,
     key_points TEXT NOT NULL,
     state TEXT NOT NULL,
+    first_state TEXT NOT NULL,
     session TEXT NOT NULL,
     float_at_detection REAL,
     detected_at TEXT NOT NULL,
@@ -64,9 +65,14 @@ CREATE TABLE IF NOT EXISTS setup_records (
     outcome TEXT NOT NULL DEFAULT 'open',
     resolved_at TEXT,
     max_favorable_r REAL,
-    max_adverse_r REAL,
-    UNIQUE (ticker, pattern, direction, timeframe, entry)
+    max_adverse_r REAL
 );
+
+-- One open record per setup; once resolved, a later occurrence of the same
+-- setup starts a new record instead of rewriting a finished one.
+CREATE UNIQUE INDEX IF NOT EXISTS setup_records_open_key
+    ON setup_records (ticker, pattern, direction, timeframe, entry)
+    WHERE outcome = 'open';
 
 CREATE TABLE IF NOT EXISTS ticker_scans (
     ticker TEXT PRIMARY KEY,

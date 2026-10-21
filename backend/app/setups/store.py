@@ -35,6 +35,9 @@ class SetupRecord:
     score_parts: dict[str, float]
     key_points: list[tuple[datetime, float]]
     state: SetupState
+    # State when first detected: only setups found before their entry was hit
+    # are tracked as trades someone could have taken.
+    first_state: SetupState
     session: str
     float_at_detection: float | None
     detected_at: datetime
@@ -72,26 +75,25 @@ def record_match(
 ) -> SetupRecord:
     entry = round(match.entry, ENTRY_DECIMALS)
     key_points = json.dumps([[moment.isoformat(), price] for moment, price in match.key_points])
+    # The plan is stored as first detected; later scans only refresh how the
+    # setup looks now, so the outcome is judged against the original plan.
     conn.execute(
         """
         INSERT INTO setup_records (
             ticker, pattern, direction, timeframe, entry, stop, capped_target, target_3r,
             available_reward_risk, risk_percent, blocking_level, partial_1r, partial_2r, trailing_stop,
-            quality, score, score_parts, key_points, state, session, float_at_detection, detected_at, last_seen_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT (ticker, pattern, direction, timeframe, entry) DO UPDATE SET
-            stop = excluded.stop, capped_target = excluded.capped_target, target_3r = excluded.target_3r,
-            available_reward_risk = excluded.available_reward_risk, risk_percent = excluded.risk_percent,
-            blocking_level = excluded.blocking_level, partial_1r = excluded.partial_1r,
-            partial_2r = excluded.partial_2r, trailing_stop = excluded.trailing_stop, quality = excluded.quality,
-            score = excluded.score, score_parts = excluded.score_parts, key_points = excluded.key_points,
-            state = excluded.state, last_seen_at = excluded.last_seen_at
+            quality, score, score_parts, key_points, state, first_state, session, float_at_detection,
+            detected_at, last_seen_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (ticker, pattern, direction, timeframe, entry) WHERE outcome = 'open' DO UPDATE SET
+            score = excluded.score, score_parts = excluded.score_parts, state = excluded.state,
+            last_seen_at = excluded.last_seen_at
         """,
         (
             ticker, match.pattern, match.direction, match.timeframe, entry, match.stop, plan.capped_target,
             plan.target_3r, plan.available_reward_risk, plan.risk_percent, plan.blocking_level, plan.partial_1r,
             plan.partial_2r, plan.trailing_stop, match.quality, score.total, json.dumps(score.parts), key_points,
-            state, session, float_millions, match.detected_at.isoformat(), now.isoformat(),
+            state, state, session, float_millions, match.detected_at.isoformat(), now.isoformat(),
         ),
     )
     conn.commit()
@@ -99,6 +101,7 @@ def record_match(
         """
         SELECT * FROM setup_records
         WHERE ticker = ? AND pattern = ? AND direction = ? AND timeframe = ? AND entry = ?
+          AND outcome = 'open'
         """,
         (ticker, match.pattern, match.direction, match.timeframe, entry),
     ).fetchone()

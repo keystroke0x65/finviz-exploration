@@ -12,7 +12,8 @@ from app.market_time import EASTERN
 if TYPE_CHECKING:
     from app.setups.store import SetupRecord
 
-Outcome = Literal["open", "target", "stop", "expired", "unresolved"]
+# not_tracked: first seen already past entry, so not a trade anyone could have taken.
+Outcome = Literal["open", "target", "stop", "expired", "unresolved", "not_tracked"]
 
 INTRADAY_DEADLINE = time(20, 0)
 DAILY_DEADLINE_BARS = 20
@@ -32,6 +33,8 @@ def _deadline(record: SetupRecord) -> datetime:
 
 
 def resolve_outcome(record: SetupRecord, bars: list[Bar], now: datetime) -> Resolution:
+    if record.first_state != "forming":
+        return Resolution("not_tracked", record.detected_at, None, None)
     if not bars or bars[0].time > record.detected_at:
         # Finviz only keeps ~2 weeks of 1m bars; once the detection bar is gone
         # the outcome can't be known, and guessing would corrupt the stats.
@@ -53,6 +56,10 @@ def resolve_outcome(record: SetupRecord, bars: list[Bar], now: datetime) -> Reso
     for bar in later_bars:
         favorable_price, adverse_price = (bar.high, bar.low) if sign == 1 else (bar.low, bar.high)
         if not is_filled:
+            # Through the stop before ever reaching entry: the setup failed
+            # without a trade, so it must not count as a fill later.
+            if (adverse_price - record.stop) * sign <= 0 and (favorable_price - record.entry) * sign < 0:
+                return Resolution("expired", bar.time, None, None)
             is_filled = (favorable_price - record.entry) * sign >= 0
             if not is_filled:
                 continue
