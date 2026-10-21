@@ -12,7 +12,8 @@ from app.errors import (
     FinvizUnavailableError,
     TickerNotFoundError,
 )
-from app.finviz_client import get_quote, run_screen
+from app.finviz_client import ScreenRow, get_quote, run_screen
+from app.patterns.verdict import Verdict
 from app.routes.dependencies import finviz_error_to_http, get_db_connection
 from app.routes.stocks import TickerPath
 from app.routes.setups import to_verdict_out
@@ -36,7 +37,9 @@ DbConnection = Annotated[sqlite3.Connection, Depends(get_db_connection)]
 
 
 def _to_entry_out(
-    entry: WatchlistEntry, snapshots: dict | None = None, verdicts: dict | None = None
+    entry: WatchlistEntry,
+    snapshots: dict[str, tuple[ScreenRow, datetime]] | None = None,
+    verdicts: dict[str, tuple[Verdict, datetime]] | None = None,
 ) -> WatchlistEntryOut:
     retention_days = get_settings().watchlist_retention_days
     snapshot = (snapshots or {}).get(entry.ticker)

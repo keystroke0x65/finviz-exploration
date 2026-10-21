@@ -237,9 +237,26 @@ class SetupOut(BaseModel):
     verdict: VerdictOut | None = None
 
 
+class WarningOut(BaseModel):
+    """A bearish pattern shown while short setups are off: what and where, never a
+    short trade plan (no stop, targets or reward:risk)."""
+
+    id: int
+    ticker: str
+    pattern: str
+    direction: Literal["long", "short"]
+    timeframe: Literal["1m", "5m", "daily"]
+    entry: float  # the breakdown level
+    state: Literal["forming", "triggered", "extended", "invalidated"]
+    key_points: list[tuple[datetime, float]]
+    detected_at: datetime
+    last_seen_at: datetime
+    verdict: VerdictOut | None = None
+
+
 class SetupsOut(BaseModel):
     setups: list[SetupOut]
-    warnings: list[SetupOut]
+    warnings: list[WarningOut]
     show_short_setups: bool
 
 

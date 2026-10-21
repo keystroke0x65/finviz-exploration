@@ -178,3 +178,14 @@ def test_scan_lock_released_after_error(api_client):
 
     assert scan_lock.acquire(blocking=False)
     scan_lock.release()
+
+
+def test_warnings_do_not_include_short_trade_plans(api_client, db_conn):
+    store_setup(db_conn, "SHORT", "short", pattern="low_of_day_break")
+
+    warning = api_client.get("/api/setups").json()["warnings"][0]
+
+    assert warning["entry"] == 2.0  # the breakdown level
+    for field in ("stop", "capped_target", "target_3r", "partial_1r", "partial_2r", "trailing_stop",
+                  "available_reward_risk", "risk_percent"):
+        assert field not in warning

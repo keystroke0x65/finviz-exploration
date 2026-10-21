@@ -3,12 +3,14 @@ import { BarsResponse, fetchBars } from "../api/bars";
 import {
   fetchStockSetups,
   fetchStockVerdict,
+  isTradeSetup,
   patternName,
   runScan,
   Setup,
   SetupsResponse,
   Timeframe,
   Verdict,
+  Warning,
 } from "../api/setups";
 import { fetchQuote, Quote } from "../api/stocks";
 import { finvizQuoteUrl, formatPrice } from "../format";
@@ -55,9 +57,9 @@ function sessionLevels(bars: BarsResponse): ChartLevel[] {
   return candidates.flatMap(([price, label]) => (price == null ? [] : [{ price, label, kind: "session" as const }]));
 }
 
-function setupLevels(setup: Setup, isWarningOnly: boolean): ChartLevel[] {
-  // Never draw a short trade plan while short setups are switched off.
-  if (isWarningOnly) {
+function setupLevels(setup: Setup | Warning): ChartLevel[] {
+  // Warnings carry no trade plan: only the breakdown level is drawn.
+  if (!isTradeSetup(setup)) {
     return [{ price: setup.entry, label: "Breakdown", kind: "session" }];
   }
   return [
@@ -84,11 +86,19 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
     setSelectedSetupId(null);
     setQuote(null);
     setVerdict(null);
+    // A response for a ticker the user has already left must not overwrite the new one.
+    let isCurrent = true;
+    const ifCurrent = <T,>(apply: (value: T) => void) => (value: T) => {
+      if (isCurrent) apply(value);
+    };
     Promise.all([
-      fetchStockSetups(ticker).then(setSetups),
-      fetchQuote(ticker).then(setQuote),
-      fetchStockVerdict(ticker).then(setVerdict),
-    ]).catch((loadError) => setError(errorMessage(loadError)));
+      fetchStockSetups(ticker).then(ifCurrent(setSetups)),
+      fetchQuote(ticker).then(ifCurrent(setQuote)),
+      fetchStockVerdict(ticker).then(ifCurrent(setVerdict)),
+    ]).catch(ifCurrent((loadError: unknown) => setError(errorMessage(loadError))));
+    return () => {
+      isCurrent = false;
+    };
   }, [ticker]);
 
   useEffect(() => {
@@ -97,22 +107,32 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
     }
     setError(null);
     setBars(null);
+    let isCurrent = true;
     fetchBars(ticker, timeframe)
-      .then(setBars)
-      .catch((loadError) => setError(errorMessage(loadError)));
+      .then((loaded) => {
+        if (isCurrent) setBars(loaded);
+      })
+      .catch((loadError) => {
+        if (isCurrent) setError(errorMessage(loadError));
+      });
+    return () => {
+      isCurrent = false;
+    };
   }, [ticker, timeframe]);
 
-  const allSetups = useMemo(() => [...(setups?.setups ?? []), ...(setups?.warnings ?? [])], [setups]);
+  const allSetups = useMemo<(Setup | Warning)[]>(
+    () => [...(setups?.setups ?? []), ...(setups?.warnings ?? [])],
+    [setups],
+  );
   const selectedSetup = allSetups.find((setup) => setup.id === selectedSetupId) ?? null;
 
   const chartLevels = useMemo(() => {
     if (!bars) {
       return [];
     }
-    const isWarningOnly = selectedSetup?.direction === "short" && !setups?.show_short_setups;
-    const selectedLevels = selectedSetup ? setupLevels(selectedSetup, isWarningOnly) : [];
+    const selectedLevels = selectedSetup ? setupLevels(selectedSetup) : [];
     return [...nearbyDailyLevels(bars), ...sessionLevels(bars), ...selectedLevels];
-  }, [bars, selectedSetup, setups]);
+  }, [bars, selectedSetup]);
 
   const outline = selectedSetup && selectedSetup.timeframe === timeframe ? selectedSetup.key_points : null;
 
@@ -133,7 +153,7 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
     }
   }
 
-  function handleSelectSetup(setup: Setup) {
+  function handleSelectSetup(setup: Setup | Warning) {
     setSelectedSetupId(setup.id);
     setTimeframe(setup.timeframe);
   }
@@ -233,9 +253,9 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
                         {patternName(setup.pattern)} <span className="muted">{setup.timeframe}</span>
                       </span>
                       <span className="screen-meta">
-                        {setup.direction === "short" && !setups?.show_short_setups
-                          ? `Bearish warning, breaks below ${formatPrice(setup.entry)}`
-                          : `Entry ${formatPrice(setup.entry)}, stop ${formatPrice(setup.stop)}, ${setup.available_reward_risk.toFixed(1)}R`}
+                        {isTradeSetup(setup)
+                          ? `Entry ${formatPrice(setup.entry)}, stop ${formatPrice(setup.stop)}, ${setup.available_reward_risk.toFixed(1)}R`
+                          : `Bearish warning, breaks below ${formatPrice(setup.entry)}`}
                       </span>
                     </button>
                   </li>

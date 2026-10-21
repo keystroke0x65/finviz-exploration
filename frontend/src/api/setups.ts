@@ -42,9 +42,28 @@ export interface Setup {
   verdict?: Verdict | null;
 }
 
+// A bearish pattern shown while short setups are off: no stop, targets or R:R.
+export interface Warning {
+  id: number;
+  ticker: string;
+  pattern: string;
+  direction: Direction;
+  timeframe: Timeframe;
+  entry: number;
+  state: SetupState;
+  key_points: [string, number][];
+  detected_at: string;
+  last_seen_at: string;
+  verdict?: Verdict | null;
+}
+
+export function isTradeSetup(item: Setup | Warning): item is Setup {
+  return "stop" in item;
+}
+
 export interface SetupsResponse {
   setups: Setup[];
-  warnings: Setup[];
+  warnings: Warning[];
   show_short_setups: boolean;
 }
 
