@@ -2,12 +2,11 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal
-from zoneinfo import ZoneInfo
 
-# US market sessions (pre-market, regular, after-hours) are defined in New
-# York time, so a "day" a stock ran is an Eastern calendar day: a hit at
-# 22:30 ET belongs to that day's after-hours, not to tomorrow in UTC.
-EASTERN = ZoneInfo("America/New_York")
+from app.market_time import EASTERN
+
+# A "day" a stock ran is an Eastern calendar day: a hit at 22:30 ET belongs
+# to that day's after-hours, not to tomorrow in UTC.
 
 EntrySource = Literal["auto", "manual"]
 

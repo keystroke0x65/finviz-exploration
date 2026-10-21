@@ -2,7 +2,8 @@ import io
 import threading
 import time
 from dataclasses import dataclass
-from typing import Callable
+from datetime import datetime
+from typing import Callable, Literal
 
 import pandas as pd
 import requests
@@ -14,6 +15,7 @@ from app.errors import (
     FinvizUnavailableError,
     TickerNotFoundError,
 )
+from app.market_time import EASTERN
 
 # /export.ashx is a legacy alias that 301-redirects to /export/screener;
 # /export/stock (a different endpoint) returns historical price bars, not
@@ -35,6 +37,16 @@ SCREEN_COLUMN_IDS = "1,2,5,6,25,63,64,65,66,67,71,72,135,136,137"
 
 # Ticker only: the cheapest export, used when just counting rows.
 COUNT_COLUMN_IDS = "1"
+
+# Price bars (date/time, OHLC, volume). Verified 2026-10-20: daily ~10 years,
+# 1-minute ~2 weeks, 5-minute ~3 weeks, intraday 04:00-20:00 ET.
+FINVIZ_BARS_URL = "https://elite.finviz.com/quote_export.ashx"
+
+Interval = Literal["1m", "5m", "daily"]
+BAR_PERIOD_CODES: dict[str, str] = {"1m": "i1", "5m": "i5", "daily": "d"}
+
+# Tickers per snapshot request; keeps the URL a sensible length.
+SNAPSHOT_BATCH_SIZE = 100
 
 MIN_SECONDS_BETWEEN_REQUESTS = 1.0
 REQUEST_TIMEOUT_SECONDS = 10
@@ -96,12 +108,12 @@ class ScreenResult:
     rows: list[ScreenRow]
 
 
-def _fetch_export_csv(params: dict[str, str], operation: str) -> str:
+def _fetch_export_csv(url: str, params: dict[str, str], operation: str) -> str:
     settings = get_settings()
     _request_pacer.wait_for_turn()
     try:
         response = requests.get(
-            FINVIZ_EXPORT_URL,
+            url,
             params={**params, "auth": settings.finviz_api_token},
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
@@ -122,9 +134,11 @@ def _fetch_export_csv(params: dict[str, str], operation: str) -> str:
 UNEXPECTED_FORMAT = "unexpected response format"
 
 
-def _read_csv_as_strings(csv_text: str, operation: str) -> pd.DataFrame:
+def _read_csv_as_strings(
+    csv_text: str, operation: str, required_column: str = "Ticker"
+) -> pd.DataFrame:
     # Finviz sometimes answers 200 with an HTML page (maintenance, login) or
-    # an empty body; a CSV without a Ticker column is never a real export.
+    # an empty body; a CSV without its key column is never a real export.
     try:
         # dtype=str keeps every column as the raw Finviz string (e.g. "1.35%",
         # "3.45T"); default dtype inference produces a dict with inconsistent
@@ -132,7 +146,7 @@ def _read_csv_as_strings(csv_text: str, operation: str) -> pd.DataFrame:
         df = pd.read_csv(io.StringIO(csv_text), dtype=str)
     except (pd.errors.ParserError, pd.errors.EmptyDataError):
         raise FinvizUnavailableError(operation, UNEXPECTED_FORMAT) from None
-    if "Ticker" not in df.columns:
+    if required_column not in df.columns:
         raise FinvizUnavailableError(operation, UNEXPECTED_FORMAT)
     return df
 
@@ -150,7 +164,8 @@ def _clean_missing(row: dict) -> dict:
 
 def get_quote(ticker: str) -> dict:
     operation = f"quote {ticker}"
-    df = _read_csv_as_strings(_fetch_export_csv({"v": QUOTE_VIEW, "t": ticker}, operation), operation)
+    csv_text = _fetch_export_csv(FINVIZ_EXPORT_URL, {"v": QUOTE_VIEW, "t": ticker}, operation)
+    df = _read_csv_as_strings(csv_text, operation)
     if df.empty:
         raise TickerNotFoundError(ticker)
     return _clean_missing(df.iloc[0].to_dict())
@@ -198,21 +213,77 @@ def _screen_params(
     return params
 
 
-def run_screen(filters: list[str], signal: str | None, order: str | None) -> ScreenResult:
-    params = _screen_params(SCREEN_COLUMN_IDS, filters, signal, order)
-    df = _read_csv_as_strings(_fetch_export_csv(params, "screen"), "screen")
+def _fetch_screen_rows(params: dict[str, str], operation: str) -> list[ScreenRow]:
+    df = _read_csv_as_strings(_fetch_export_csv(FINVIZ_EXPORT_URL, params, operation), operation)
     try:
-        rows = [_to_screen_row(_clean_missing(record)) for record in df.to_dict("records")]
+        return [_to_screen_row(_clean_missing(record)) for record in df.to_dict("records")]
     except ValueError:
         # A non-numeric value in a numeric column means the export changed shape.
-        raise FinvizUnavailableError("screen", UNEXPECTED_FORMAT) from None
-    return ScreenResult(rows=rows)
+        raise FinvizUnavailableError(operation, UNEXPECTED_FORMAT) from None
+
+
+def run_screen(filters: list[str], signal: str | None, order: str | None) -> ScreenResult:
+    params = _screen_params(SCREEN_COLUMN_IDS, filters, signal, order)
+    return ScreenResult(rows=_fetch_screen_rows(params, "screen"))
+
+
+def get_snapshots(tickers: list[str]) -> list[ScreenRow]:
+    """Current price, change, after-hours change and rel vol for specific tickers."""
+    rows: list[ScreenRow] = []
+    for start in range(0, len(tickers), SNAPSHOT_BATCH_SIZE):
+        batch = tickers[start : start + SNAPSHOT_BATCH_SIZE]
+        params = {"v": CUSTOM_VIEW, "c": SCREEN_COLUMN_IDS, "t": ",".join(batch)}
+        rows.extend(_fetch_screen_rows(params, "snapshot"))
+    return rows
+
+
+@dataclass(frozen=True)
+class Bar:
+    time: datetime
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int
+
+
+def parse_bar_time(raw: str, interval: Interval) -> datetime:
+    if interval == "daily":
+        return datetime.strptime(raw, "%m/%d/%Y").replace(tzinfo=EASTERN)
+    # Intraday stamps look like "10/20/2026 19:59 PM": a 24-hour clock with a
+    # redundant AM/PM suffix, so the suffix is dropped rather than parsed.
+    clock = raw.removesuffix(" AM").removesuffix(" PM")
+    return datetime.strptime(clock, "%m/%d/%Y %H:%M").replace(tzinfo=EASTERN)
+
+
+def _to_bar(record: dict, interval: Interval) -> Bar:
+    return Bar(
+        time=parse_bar_time(record["Date"], interval),
+        open=float(record["Open"]),
+        high=float(record["High"]),
+        low=float(record["Low"]),
+        close=float(record["Close"]),
+        volume=int(float(record["Volume"])),
+    )
+
+
+def get_bars(ticker: str, interval: Interval) -> list[Bar]:
+    operation = f"{interval} bars {ticker}"
+    params = {"t": ticker, "p": BAR_PERIOD_CODES[interval]}
+    df = _read_csv_as_strings(
+        _fetch_export_csv(FINVIZ_BARS_URL, params, operation), operation, required_column="Date"
+    )
+    try:
+        return [_to_bar(_clean_missing(record), interval) for record in df.to_dict("records")]
+    except (ValueError, TypeError):
+        raise FinvizUnavailableError(operation, UNEXPECTED_FORMAT) from None
 
 
 def _count_screen_rows(filters: list[str], signal: str | None) -> int:
     operation = "check filter codes"
     params = _screen_params(COUNT_COLUMN_IDS, filters, signal, None)
-    return len(_read_csv_as_strings(_fetch_export_csv(params, operation), operation))
+    csv_text = _fetch_export_csv(FINVIZ_EXPORT_URL, params, operation)
+    return len(_read_csv_as_strings(csv_text, operation))
 
 
 def find_unrecognised_codes(filters: list[str], signal: str | None) -> list[str]:
