@@ -119,11 +119,22 @@ def _fetch_export_csv(params: dict[str, str], operation: str) -> str:
     return response.text
 
 
-def _read_csv_as_strings(csv_text: str) -> pd.DataFrame:
-    # dtype=str keeps every column as the raw Finviz string (e.g. "1.35%",
-    # "3.45T"); default dtype inference produces a dict with inconsistent
-    # value types per ticker, since only some columns are pure numbers.
-    return pd.read_csv(io.StringIO(csv_text), dtype=str)
+UNEXPECTED_FORMAT = "unexpected response format"
+
+
+def _read_csv_as_strings(csv_text: str, operation: str) -> pd.DataFrame:
+    # Finviz sometimes answers 200 with an HTML page (maintenance, login) or
+    # an empty body; a CSV without a Ticker column is never a real export.
+    try:
+        # dtype=str keeps every column as the raw Finviz string (e.g. "1.35%",
+        # "3.45T"); default dtype inference produces a dict with inconsistent
+        # value types per ticker, since only some columns are pure numbers.
+        df = pd.read_csv(io.StringIO(csv_text), dtype=str)
+    except (pd.errors.ParserError, pd.errors.EmptyDataError):
+        raise FinvizUnavailableError(operation, UNEXPECTED_FORMAT) from None
+    if "Ticker" not in df.columns:
+        raise FinvizUnavailableError(operation, UNEXPECTED_FORMAT)
+    return df
 
 
 def _clean_missing(row: dict) -> dict:
@@ -138,8 +149,8 @@ def _clean_missing(row: dict) -> dict:
 
 
 def get_quote(ticker: str) -> dict:
-    csv_text = _fetch_export_csv({"v": QUOTE_VIEW, "t": ticker}, f"quote {ticker}")
-    df = _read_csv_as_strings(csv_text)
+    operation = f"quote {ticker}"
+    df = _read_csv_as_strings(_fetch_export_csv({"v": QUOTE_VIEW, "t": ticker}, operation), operation)
     if df.empty:
         raise TickerNotFoundError(ticker)
     return _clean_missing(df.iloc[0].to_dict())
@@ -189,14 +200,19 @@ def _screen_params(
 
 def run_screen(filters: list[str], signal: str | None, order: str | None) -> ScreenResult:
     params = _screen_params(SCREEN_COLUMN_IDS, filters, signal, order)
-    df = _read_csv_as_strings(_fetch_export_csv(params, "screen"))
-    rows = [_to_screen_row(_clean_missing(record)) for record in df.to_dict("records")]
+    df = _read_csv_as_strings(_fetch_export_csv(params, "screen"), "screen")
+    try:
+        rows = [_to_screen_row(_clean_missing(record)) for record in df.to_dict("records")]
+    except ValueError:
+        # A non-numeric value in a numeric column means the export changed shape.
+        raise FinvizUnavailableError("screen", UNEXPECTED_FORMAT) from None
     return ScreenResult(rows=rows)
 
 
 def _count_screen_rows(filters: list[str], signal: str | None) -> int:
+    operation = "check filter codes"
     params = _screen_params(COUNT_COLUMN_IDS, filters, signal, None)
-    return len(_read_csv_as_strings(_fetch_export_csv(params, "check filter codes")))
+    return len(_read_csv_as_strings(_fetch_export_csv(params, operation), operation))
 
 
 def find_unrecognised_codes(filters: list[str], signal: str | None) -> list[str]:

@@ -147,3 +147,19 @@ def test_broad_valid_screen_over_5000_rows_still_feeds_watchlist(db_conn, monkey
     assert result.failed_screens == []
     assert len(result.tickers_added) == 6000
     get_settings.cache_clear()
+
+
+@responses.activate
+def test_malformed_finviz_response_fails_only_that_screen(db_conn, monkeypatch):
+    monkeypatch.setenv("FINVIZ_API_TOKEN", "test-token")
+    get_settings.cache_clear()
+    _add_screen(db_conn, "Broken", ["geo_usa"])
+    _add_screen(db_conn, "Good", ["sh_price_u20"])
+    responses.add(responses.GET, "https://elite.finviz.com/export/screener", body="<html>login</html>")
+    responses.add(responses.GET, "https://elite.finviz.com/export/screener", body="Ticker,Change\nHOST,4.0%\n")
+
+    result = run_feeder(db_conn, run_screen, NOW, RETENTION_DAYS)
+
+    assert result.tickers_added == ["HOST"]
+    assert [name for name, _ in result.failed_screens] == ["Broken"]
+    get_settings.cache_clear()

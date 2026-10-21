@@ -236,3 +236,32 @@ def test_requests_are_paced():
     pacer.wait_for_turn()
 
     assert sleeps == [pytest.approx(0.8)]
+
+
+@responses.activate
+def test_run_screen_raises_unavailable_on_html_page():
+    responses.add(
+        responses.GET,
+        FINVIZ_EXPORT_URL,
+        body="<!DOCTYPE html><html><body>Scheduled maintenance</body></html>",
+        status=200,
+    )
+
+    with pytest.raises(FinvizUnavailableError, match="unexpected response format"):
+        run_screen(["geo_usa"], None, None)
+
+
+@responses.activate
+def test_run_screen_raises_unavailable_on_non_numeric_cell():
+    responses.add(responses.GET, FINVIZ_EXPORT_URL, body=SCREEN_HEADER + "HOST,H,USA,-,,,,,,,,,,,\n")
+
+    with pytest.raises(FinvizUnavailableError, match="unexpected response format"):
+        run_screen(["geo_usa"], None, None)
+
+
+@responses.activate
+def test_run_screen_raises_unavailable_on_empty_body():
+    responses.add(responses.GET, FINVIZ_EXPORT_URL, body="")
+
+    with pytest.raises(FinvizUnavailableError, match="unexpected response format"):
+        run_screen(["geo_usa"], None, None)
