@@ -18,4 +18,4 @@ or run `memory.py find <keywords>` to pull just the relevant root → delta chai
 
 Also: `active-context.md` (current focus, freeform), `history/archive.md` (superseded/deleted, not loaded by default), `ops-log.jsonl` (audit trail).
 
-Batches applied: 9. Bank created: 2026-09-17.
+Batches applied: 10. Bank created: 2026-09-17.

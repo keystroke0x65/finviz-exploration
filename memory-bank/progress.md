@@ -12,7 +12,7 @@
 <!-- empty: completed milestones (keep the latest 15; consolidate archives older ones) -->
 - [prog-0001] root h=0 x=0 d=2026-09-17 labels=status src="user" :: Brainstorming/design phase complete for Phase 1 (foundation + stock lookup). Writing design spec doc next, then an implementation plan.
 - [prog-0007] root h=0 x=0 d=2026-10-20 labels=status,phase1 src="git log main" supersedes=prog-0004 :: Phase 1 (foundation + stock lookup) merged into main on 2026-10-20 (merge a9d414b) and pushed; 17 backend pytest + 7 frontend vitest tests green on merged result. Feature worktree removed.
-- [prog-0011] root h=0 x=0 d=2026-10-21 labels=status,phase2 src="git log main" supersedes=prog-0010 :: Phase 2 M1 (screens, watchlist feeder) and M2a (bars, level/flag/flat detectors, trade plans, ranking, outcome tracking, scans, Setups + Stock views) merged into main by 2026-10-21 (M2a merge 041ea54); not pushed. 261 backend + 84 frontend tests. Next: plan M2b (triangles, doubles, ABCD, micro/first pullback, verdict).
+- [prog-0012] root h=0 x=0 d=2026-10-21 labels=status,phase2 src="git log main" supersedes=prog-0011 :: Phase 2 M1, M2a and M2b merged into main by 2026-10-21 (M2b merge 0bdedea): screens, watchlist feeder, 18 pattern pairs across 1m/5m/daily, trade plans, ranking, outcome tracking, per-stock verdict, Setups/Stock/Watchlist views. 317 backend + 90 frontend tests. Not pushed. Next: milestone 3 or a deferred-minors cleanup batch.
 
 ## Known issues
 <!-- empty: bugs, tech debt, limitations still open -->
