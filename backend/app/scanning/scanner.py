@@ -40,6 +40,7 @@ REGULAR_OPEN = time(9, 30)
 REGULAR_CLOSE = time(16, 0)
 SNAPSHOT_FAILURE_LABEL = "watchlist prices"
 RATE_LIMIT_SKIPPED_REASON = "skipped: Finviz is rate limiting requests"
+AUTH_SKIPPED_REASON = "skipped: Finviz rejected the auth token"
 # Inactive tickers whose setups have passed their deadline, settled per scan.
 MAX_INACTIVE_RESOLUTIONS = 10
 
@@ -121,7 +122,20 @@ class _UsableSetup:
     state: SetupState
 
 
-def _usable_setups(matches: list[PatternMatch], bars_by_timeframe: dict[Interval, list[Bar]]) -> list[_UsableSetup]:
+def _latest_price(bars_by_timeframe: dict[Interval, list[Bar]], timeframe: Interval, now: datetime) -> float:
+    # Daily bars are cached until the close, so a daily setup's state would be
+    # hours stale; today's intraday close is the current price when there is one.
+    if timeframe == "daily":
+        for intraday in ("1m", "5m"):
+            todays = _todays_bars(bars_by_timeframe[intraday], now)
+            if todays:
+                return todays[-1].close
+    return bars_by_timeframe[timeframe][-1].close
+
+
+def _usable_setups(
+    matches: list[PatternMatch], bars_by_timeframe: dict[Interval, list[Bar]], now: datetime
+) -> list[_UsableSetup]:
     """Matches that give a valid plan and aren't already past their stop.
 
     Only these become setups, and only these count as evidence in the verdict.
@@ -133,7 +147,7 @@ def _usable_setups(matches: list[PatternMatch], bars_by_timeframe: dict[Interval
         plan = build_trade_plan(match, daily_levels, bars[-TRAILING_STOP_BARS:])
         if plan is None:
             continue
-        state = classify_state(plan, bars[-1].close)
+        state = classify_state(plan, _latest_price(bars_by_timeframe, match.timeframe, now))
         # A setup already past its stop isn't a setup; recording it would also
         # skew outcome stats with trades nobody could have taken.
         if state != "invalidated":
@@ -197,7 +211,7 @@ def scan_ticker(conn: sqlite3.Connection, ticker: str, snapshot: ScreenRow | Non
     bars_by_timeframe = {
         timeframe: load_bars(conn, ticker, timeframe, now, deps.fetch_bars).bars for timeframe in TIMEFRAMES
     }
-    setups = _usable_setups(_detect_all(bars_by_timeframe, now), bars_by_timeframe)
+    setups = _usable_setups(_detect_all(bars_by_timeframe, now), bars_by_timeframe, now)
     verdict = _verdict_for(bars_by_timeframe, [setup.match for setup in setups], now)
     save_verdict(conn, ticker, verdict, now)
     recorded = _record_setups(conn, ticker, setups, snapshot, now, verdict.call)
@@ -247,6 +261,9 @@ def run_scan(
         except FinvizAuthError as exc:
             # Every later request would fail the same way.
             failed.append((ticker, str(exc)))
+            skipped = tickers[index + 1 :]
+            if skipped:
+                failed.append((", ".join(skipped), AUTH_SKIPPED_REASON))
             was_stopped_by_finviz = True
             break
         except FinvizRateLimitError as exc:

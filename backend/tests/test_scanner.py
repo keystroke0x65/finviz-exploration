@@ -67,7 +67,7 @@ def test_run_scan_stops_after_auth_failure(db_conn):
     result = run_scan(db_conn, NOW, deps(auth_failing="AAA"), tickers=["AAA", "BBB"])
 
     assert result.scanned == []
-    assert [ticker for ticker, _ in result.failed] == ["AAA"]
+    assert [ticker for ticker, _ in result.failed] == ["AAA", "BBB"]  # BBB listed as skipped
 
 
 def test_run_scan_saves_watchlist_snapshots(db_conn):
@@ -180,3 +180,26 @@ def test_verdict_counts_only_patterns_that_became_setups(db_conn):
     verdict, _ = read_verdicts(db_conn)["HOST"]
     counted = sum(int(n) for n in re.findall(r"(\d+) (?:bullish|bearish)", " ".join(verdict.reasons)))
     assert counted == len(list_current_setups(db_conn, "HOST"))
+
+
+def test_daily_setup_state_uses_todays_intraday_price(db_conn):
+    # Daily bull flag (pole ~1.00 -> 1.30, flag 1.26-1.31) whose cached daily close
+    # still looks fine, while today's 1m bars have already broken below the flag.
+    daily = daily_bars([1.0, 1.0, 1.06, 1.12, 1.18, 1.24, 1.30, 1.28, 1.27, 1.27, 1.28], start=date(2026, 10, 5),
+                       spread=0.01)
+
+    def fetch(ticker, interval):
+        if interval == "daily":
+            return daily
+        return minute_bars(9, 30, [1.27, 1.25, 1.22, 1.20, 1.18, 1.17, 1.16, 1.15], spread=0.005)
+
+    scan_ticker(db_conn, "HOST", None, NOW, deps(fetch))
+
+    daily_flags = [s for s in list_current_setups(db_conn, "HOST") if s.timeframe == "daily" and s.pattern == "bull_flag"]
+    assert daily_flags == []
+
+
+def test_run_scan_lists_skipped_tickers_after_auth_failure(db_conn):
+    result = run_scan(db_conn, NOW, deps(auth_failing="AAA"), tickers=["AAA", "BBB", "CCC"])
+
+    assert result.failed[1] == ("BBB, CCC", "skipped: Finviz rejected the auth token")
