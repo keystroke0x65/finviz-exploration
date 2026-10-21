@@ -150,3 +150,14 @@ def test_get_bars_drops_bars_with_non_positive_prices():
     )
 
     assert [bar.close for bar in get_bars("HOST", "daily")] == [1.8]
+
+
+@responses.activate
+def test_get_bars_returns_bars_oldest_first_even_if_unsorted():
+    responses.add(
+        responses.GET,
+        FINVIZ_BARS_URL,
+        body=BARS_HEADER + "10/20/2026,2,2.1,1.9,2.05,10\n10/16/2026,1.8,1.9,1.7,1.85,10\n10/19/2026,1.9,2,1.8,1.95,10\n",
+    )
+
+    assert [bar.close for bar in get_bars("HOST", "daily")] == [1.85, 1.95, 2.05]

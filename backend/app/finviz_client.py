@@ -278,7 +278,10 @@ def get_bars(ticker: str, interval: Interval) -> list[Bar]:
     except (ValueError, TypeError, KeyError):
         raise FinvizUnavailableError(operation, UNEXPECTED_FORMAT) from None
     # A zero or negative price is a bad print, and pattern maths divides by price.
-    return [bar for bar in bars if min(bar.open, bar.high, bar.low, bar.close) > 0]
+    # Sorted because nothing documents Finviz's row order and the chart and
+    # detectors need bars oldest first.
+    valid = [bar for bar in bars if min(bar.open, bar.high, bar.low, bar.close) > 0]
+    return sorted(valid, key=lambda bar: bar.time)
 
 
 def _count_screen_rows(filters: list[str], signal: str | None) -> int:

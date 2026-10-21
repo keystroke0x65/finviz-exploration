@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app.errors import FinvizAuthError, TickerNotFoundError
+from app.errors import FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError, TickerNotFoundError
 from app.main import app
 
 client = TestClient(app)
@@ -97,3 +97,20 @@ def test_refresh_route_rejects_invalid_ticker_shape(mock_get_quote):
 
     assert response.status_code == 422
     mock_get_quote.assert_not_called()
+
+
+@patch("app.routes.stocks.get_cached_quote", return_value=None)
+@patch("app.routes.stocks.get_quote", side_effect=FinvizRateLimitError("quote AAPL"))
+def test_get_stock_returns_503_when_rate_limited(mock_get_quote, mock_get_cached):
+    response = client.get("/api/stocks/AAPL")
+
+    assert response.status_code == 503
+    assert "rate limiting" in response.json()["detail"]
+
+
+@patch("app.routes.stocks.get_cached_quote", return_value=None)
+@patch("app.routes.stocks.get_quote", side_effect=FinvizUnavailableError("quote AAPL", "ReadTimeout"))
+def test_get_stock_returns_504_when_finviz_unavailable(mock_get_quote, mock_get_cached):
+    response = client.get("/api/stocks/AAPL")
+
+    assert response.status_code == 504
