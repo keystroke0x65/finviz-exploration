@@ -158,3 +158,10 @@ def expire_stale_entries(
     ).fetchall()
     conn.commit()
     return sorted(row["ticker"] for row in rows)
+
+
+def entry_expires_at(entry: WatchlistEntry, retention_days: int) -> datetime | None:
+    """When `expire_stale_entries` will drop this entry, or None if it never will."""
+    if entry.source == "manual" or entry.is_pinned or entry.last_seen_in_feeder_at is None:
+        return None
+    return entry.last_seen_in_feeder_at + timedelta(days=retention_days)

@@ -20,6 +20,7 @@ from app.watchlist.feeder import run_feeder
 from app.watchlist.store import (
     WatchlistEntry,
     add_manual_entry,
+    entry_expires_at,
     list_entries,
     remove_entry,
     set_pinned,
@@ -31,7 +32,8 @@ DbConnection = Annotated[sqlite3.Connection, Depends(get_db_connection)]
 
 
 def _to_entry_out(entry: WatchlistEntry) -> WatchlistEntryOut:
-    return WatchlistEntryOut(**asdict(entry))
+    retention_days = get_settings().watchlist_retention_days
+    return WatchlistEntryOut(**asdict(entry), expires_at=entry_expires_at(entry, retention_days))
 
 
 @router.get("", response_model=list[WatchlistEntryOut])

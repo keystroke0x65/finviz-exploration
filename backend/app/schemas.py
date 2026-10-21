@@ -106,6 +106,7 @@ class WatchlistEntryOut(BaseModel):
     added_at: datetime
     last_seen_in_feeder_at: datetime | None
     is_pinned: bool
+    expires_at: datetime | None
     appearances: list[AppearanceOut]
 
 

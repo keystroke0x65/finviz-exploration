@@ -29,3 +29,9 @@ export function isWebUrl(url: string | null): url is string {
     return false;
   }
 }
+
+// Market days are New York calendar days, matching how the backend records
+// watchlist appearances.
+export function formatEasternDate(isoTimestamp: string): string {
+  return new Date(isoTimestamp).toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+}

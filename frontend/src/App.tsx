@@ -1,33 +1,33 @@
 import { useState } from "react";
-import { fetchQuote, Quote } from "./api/stocks";
-import { QuoteTable } from "./components/QuoteTable";
-import { StockSearch } from "./components/StockSearch";
+import { LookupView } from "./components/LookupView";
+import { ScreensView } from "./components/ScreensView";
+import { WatchlistView } from "./components/WatchlistView";
+
+const TABS = ["Screens", "Watchlist", "Lookup"] as const;
+type Tab = (typeof TABS)[number];
 
 export default function App() {
-  const [quote, setQuote] = useState<Quote | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  async function handleSearch(ticker: string) {
-    setIsLoading(true);
-    setError(null);
-    setQuote(null);
-
-    try {
-      const result = await fetchQuote(ticker);
-      setQuote(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const [activeTab, setActiveTab] = useState<Tab>("Screens");
 
   return (
     <div>
       <h1>Finviz Dashboard</h1>
-      <StockSearch onSearch={handleSearch} />
-      <QuoteTable quote={quote} error={error} isLoading={isLoading} />
+      <nav role="tablist">
+        {TABS.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab}
+          </button>
+        ))}
+      </nav>
+      {activeTab === "Screens" && <ScreensView />}
+      {activeTab === "Watchlist" && <WatchlistView />}
+      {activeTab === "Lookup" && <LookupView />}
     </div>
   );
 }

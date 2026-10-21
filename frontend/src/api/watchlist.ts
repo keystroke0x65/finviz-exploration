@@ -12,6 +12,7 @@ export interface WatchlistEntry {
   added_at: string;
   last_seen_in_feeder_at: string | null;
   is_pinned: boolean;
+  expires_at: string | null;
   appearances: Appearance[];
 }
 

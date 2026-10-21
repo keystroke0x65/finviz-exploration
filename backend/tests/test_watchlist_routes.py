@@ -75,3 +75,21 @@ def test_refresh_runs_feeder_and_reports_failures(api_client, db_conn):
     assert body["failed_screens"] == [
         {"screen": "Broken", "reason": "Finviz request failed (screen): ReadTimeout"}
     ]
+
+
+def test_entries_include_expiry_only_for_unpinned_auto_entries(api_client, db_conn, monkeypatch):
+    from app.config import get_settings
+    from app.watchlist.store import add_manual_entry, record_feeder_hit, set_pinned
+
+    monkeypatch.setenv("WATCHLIST_RETENTION_DAYS", "30")
+    get_settings.cache_clear()
+    record_feeder_hit(db_conn, "AUTO", 5.0, 1, NOW)
+    record_feeder_hit(db_conn, "PINNED", 5.0, 1, NOW)
+    set_pinned(db_conn, "PINNED", True)
+    add_manual_entry(db_conn, "MANUAL", NOW)
+
+    entries = {entry["ticker"]: entry for entry in api_client.get("/api/watchlist").json()}
+
+    assert entries["AUTO"]["expires_at"] == "2026-11-19T14:00:00Z"
+    assert entries["PINNED"]["expires_at"] is None
+    assert entries["MANUAL"]["expires_at"] is None
