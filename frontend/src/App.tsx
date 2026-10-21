@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { LookupView } from "./components/LookupView";
 import { ScreensView } from "./components/ScreensView";
+import { SetupsView } from "./components/SetupsView";
 import { SessionStrip } from "./components/SessionStrip";
 import { WatchlistView } from "./components/WatchlistView";
 
-const TABS = ["Screens", "Watchlist", "Lookup"] as const;
+const TABS = ["Setups", "Screens", "Watchlist", "Lookup"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Tab>("Screens");
+  const [activeTab, setActiveTab] = useState<Tab>("Setups");
 
   return (
     <>
@@ -31,6 +32,7 @@ export default function App() {
         </nav>
       </header>
       <main className="app-main">
+        {activeTab === "Setups" && <SetupsView onOpenStock={() => setActiveTab("Lookup")} />}
         {activeTab === "Screens" && <ScreensView />}
         {activeTab === "Watchlist" && <WatchlistView />}
         {activeTab === "Lookup" && <LookupView />}

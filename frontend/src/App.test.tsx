@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 
 vi.mock("./components/ScreensView", () => ({ ScreensView: () => <p>screens view</p> }));
+vi.mock("./components/SetupsView", () => ({ SetupsView: () => <p>setups view</p> }));
 vi.mock("./components/WatchlistView", () => ({ WatchlistView: () => <p>watchlist view</p> }));
 
 describe("App", () => {
@@ -10,8 +11,11 @@ describe("App", () => {
     cleanup();
   });
 
-  it("opens on Screens and switches tabs", () => {
+  it("opens on Setups and switches tabs", () => {
     render(<App />);
+    expect(screen.getByText("setups view")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Screens" }));
     expect(screen.getByText("screens view")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Watchlist" }));
