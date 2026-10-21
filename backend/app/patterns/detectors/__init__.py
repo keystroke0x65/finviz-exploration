@@ -8,6 +8,7 @@ function (plus tests) and listing it here.
 from typing import Callable
 
 from app.finviz_client import Bar, Interval
+from app.patterns.detectors.doubles import DOUBLE_DETECTORS
 from app.patterns.detectors.flags import FLAG_DETECTORS
 from app.patterns.detectors.flat_levels import FLAT_LEVEL_DETECTORS
 from app.patterns.detectors.level_breaks import LEVEL_BREAK_DETECTORS
@@ -21,6 +22,7 @@ DETECTORS: list[tuple[Detector, frozenset[Interval]]] = [
     *FLAG_DETECTORS,
     *FLAT_LEVEL_DETECTORS,
     *TRIANGLE_DETECTORS,
+    *DOUBLE_DETECTORS,
 ]
 
 
