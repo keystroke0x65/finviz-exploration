@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from app.patterns.trade_plan import TARGET_R, TradePlan
 from app.patterns.types import TIMEFRAME_ORDER, PatternMatch, SetupState
+from app.setups.track_record import PatternStats, has_enough_history
 
 WEIGHTS = {
     "reward_risk": 0.40,
@@ -13,6 +14,9 @@ WEIGHTS = {
     "timeframe_agreement": 0.10,
 }
 CONFLICT_PENALTY = 0.20
+# A pattern's own history moves its score by up to this many points either way,
+# once it has enough trades: +15 at an average of +1R or better, -15 at -1R or worse.
+TRACK_RECORD_POINTS = 15.0
 FULL_VOLUME_RELATIVE = 3.0
 EXTENDED_FRESHNESS = 0.3
 SCALE = 100
@@ -36,12 +40,20 @@ def _has_conflict(match: PatternMatch, others: list[PatternMatch]) -> bool:
     )
 
 
+def _track_record_points(track_record: PatternStats | None) -> float:
+    if not has_enough_history(track_record) or track_record.average_r is None:
+        return 0.0
+    return round(max(min(track_record.average_r, 1.0), -1.0) * TRACK_RECORD_POINTS, 1)
+
+
 def score_setup(
     match: PatternMatch,
     plan: TradePlan,
     state: SetupState,
     relative_volume: float | None,
     other_matches: list[PatternMatch],
+    track_record: PatternStats | None = None,
+    candle_points: float = 0.0,
 ) -> ScoreBreakdown:
     raw = {
         "reward_risk": min(plan.available_reward_risk, TARGET_R) / TARGET_R,
@@ -52,5 +64,7 @@ def score_setup(
     }
     parts = {name: round(WEIGHTS[name] * value * SCALE, 1) for name, value in raw.items()}
     parts["conflict"] = -CONFLICT_PENALTY * SCALE if _has_conflict(match, other_matches) else 0.0
+    parts["track_record"] = _track_record_points(track_record)
+    parts["candles"] = candle_points
     total = round(min(max(sum(parts.values()), 0.0), SCALE), 1)
     return ScoreBreakdown(total=total, parts=parts)

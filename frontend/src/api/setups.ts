@@ -40,7 +40,23 @@ export interface Setup {
   last_seen_at: string;
   has_conflict: boolean;
   verdict?: Verdict | null;
+  track_record?: TrackRecordSummary | null;
 }
+
+export interface TrackRecordSummary {
+  trades: number;
+  win_rate: number | null;
+  average_r: number | null;
+  average_win_r: number | null;
+  tickers: number;
+  trading_days: number;
+  has_enough_history: boolean;
+}
+
+// History counts in scores at this many trades over this many trading days. The backend
+// decides (has_enough_history); these mirror it only for the explanatory text.
+export const MIN_TRADES_FOR_TRACK_RECORD = 30;
+export const MIN_TRADING_DAYS_FOR_TRACK_RECORD = 5;
 
 // A bearish pattern shown while short setups are off: no stop, targets or R:R.
 export interface Warning {
@@ -98,6 +114,22 @@ export const PATTERN_NAMES: Record<string, string> = {
   micro_pullback: "Micro pullback",
   first_pullback: "First pullback",
   first_bounce_fail: "First bounce fail",
+  bull_pennant: "Bull pennant",
+  bear_pennant: "Bear pennant",
+  symmetrical_triangle_up: "Symmetrical triangle (up)",
+  symmetrical_triangle_down: "Symmetrical triangle (down)",
+  falling_wedge: "Falling wedge",
+  rising_wedge: "Rising wedge",
+  range_breakout: "Range breakout",
+  range_breakdown: "Range breakdown",
+  cup_and_handle: "Cup and handle",
+  inverted_cup_and_handle: "Inverted cup and handle",
+  head_and_shoulders: "Head and shoulders",
+  inverse_head_and_shoulders: "Inverse head and shoulders",
+  triple_bottom: "Triple bottom",
+  triple_top: "Triple top",
+  rounding_bottom: "Rounding bottom",
+  rounding_top: "Rounding top",
 };
 
 export const SCORE_PART_NAMES: Record<string, string> = {
@@ -107,6 +139,8 @@ export const SCORE_PART_NAMES: Record<string, string> = {
   freshness: "Freshness",
   timeframe_agreement: "Other timeframes agree",
   conflict: "Opposite pattern",
+  track_record: "Track record",
+  candles: "Candlestick at a key level",
 };
 
 export function patternName(pattern: string): string {

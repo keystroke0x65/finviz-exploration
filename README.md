@@ -2,10 +2,9 @@
 
 A personal financial dashboard built on a Finviz Elite subscription.
 
-**Current status:** Phase 2 milestones 1, 2a and 2b: screens, an auto-fed watchlist,
-pattern detection with entry/stop/target plans, a per-stock long/short verdict, outcome
-tracking, and a candle chart. Continuation/reversal/candlestick patterns and a track-record
-view (milestone 3) are next. See
+**Current status:** Phase 2 complete: screens, an auto-fed watchlist, pattern detection
+with entry/stop/target plans, a per-stock long/short verdict, outcome tracking with a
+track-record view, candlestick confirmation, and a candle chart. See
 [the phase 2 design](docs/superpowers/specs/2026-10-20-screener-watchlist-patterns-design.md)
 and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-phase1-design.md).
 
@@ -60,7 +59,31 @@ Patterns so far:
   breakout/breakdown, red-to-green / green-to-red, VWAP reclaim/rejection, ABCD / inverse
   ABCD, micro pullback, first pullback after a gap up / first bounce fail after a gap down.
 - All timeframes: bull/bear flag, flat-top breakout / flat-bottom breakdown, ascending /
-  descending triangle, double bottom / double top.
+  descending triangle, double bottom / double top, bull/bear pennant, symmetrical triangle
+  (called toward the edge price is near), falling / rising wedge, range breakout /
+  breakdown, cup and handle / inverted cup and handle.
+- Reversals (5m and daily only): head and shoulders / inverse, triple top / bottom,
+  rounding top / bottom.
+
+Candlestick signals (engulfing, hammer / shooting star, morning / evening star, doji) never
+create setups on their own. A supporting candle whose wick tags a setup's stop or entry adds
+5 points to its score; an opposing candle at its entry takes 5 away.
+
+### Track record
+
+The **Track record** tab shows how each pattern has actually played out on your stocks, per
+timeframe, filterable by float size and session: number of trades, win rate, average R,
+average win (so a high win rate made of tiny capped wins is visible), the average best move
+after entry, how many stocks the trades came from, and over how many trading days (hover for
+the dates). Only trades you could have taken count: a setup counts once price reached its
+entry, then it scores its reward:risk if it hit the target, −1R at the stop, and 0R if it
+expired (the exit price isn't recorded). The same pattern re-detected on the same stock and
+exiting on the same bar counts as one trade. Setups that never filled, were first seen already
+past entry, or lost their bars are listed separately.
+
+Once a pattern has 30 or more trades on a timeframe, from at least 5 different trading days,
+its average R moves each new setup's score by up to 15 points either way, and the score
+details say so. Until then the history is shown (muted) but doesn't affect scores.
 
 ### The verdict
 

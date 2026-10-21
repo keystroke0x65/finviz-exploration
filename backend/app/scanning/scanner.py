@@ -10,6 +10,7 @@ from app.bars.loader import load_bars
 from app.errors import FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError
 from app.finviz_client import Bar, Interval, ScreenRow, get_bars, get_snapshots
 from app.market_time import EASTERN
+from app.patterns.candles import candle_points
 from app.patterns.detectors import run_detectors
 from app.patterns.indicators import session_levels, session_vwap
 from app.patterns.levels import find_daily_levels
@@ -21,6 +22,7 @@ from app.scanning.active import select_active_tickers
 from app.scanning.snapshots import save_snapshots
 from app.scanning.verdicts import save_verdict
 from app.setups.resolver import has_deadline_passed, resolve_outcome
+from app.setups.track_record import PatternStats, stats_for
 from app.setups.store import (
     list_open_records,
     list_tickers_with_open_records,
@@ -36,6 +38,8 @@ logger = logging.getLogger(__name__)
 TIMEFRAMES: list[Interval] = ["daily", "5m", "1m"]
 # Enough recent bars to find a swing for the trailing stop.
 TRAILING_STOP_BARS = 30
+# Morning/evening stars need the last three bars.
+CANDLE_BARS = 3
 REGULAR_OPEN = time(9, 30)
 REGULAR_CLOSE = time(16, 0)
 SNAPSHOT_FAILURE_LABEL = "watchlist prices"
@@ -162,6 +166,7 @@ def _record_setups(
     conn: sqlite3.Connection,
     ticker: str,
     setups: list[_UsableSetup],
+    bars_by_timeframe: dict[Interval, list[Bar]],
     snapshot: ScreenRow | None,
     now: datetime,
     verdict_call: str | None,
@@ -169,9 +174,17 @@ def _record_setups(
     matches = [setup.match for setup in setups]
     relative_volume = snapshot.relative_volume if snapshot else None
     float_millions = snapshot.float_millions if snapshot else None
+    history: dict[tuple[str, str], PatternStats | None] = {}
     for setup in setups:
+        key = (setup.match.pattern, setup.match.timeframe)
+        if key not in history:
+            history[key] = stats_for(conn, *key)
         others = [other for other in matches if other is not setup.match]
-        score = score_setup(setup.match, setup.plan, setup.state, relative_volume, others)
+        recent_bars = bars_by_timeframe[setup.match.timeframe][-CANDLE_BARS:]
+        score = score_setup(
+            setup.match, setup.plan, setup.state, relative_volume, others,
+            track_record=history[key], candle_points=candle_points(setup.plan, recent_bars),
+        )
         record_match(
             conn, ticker, setup.match, setup.plan, setup.state, score, _session_label(setup.match),
             float_millions, now, verdict=verdict_call,
@@ -218,7 +231,7 @@ def scan_ticker(conn: sqlite3.Connection, ticker: str, snapshot: ScreenRow | Non
     relative_volume = snapshot.relative_volume if snapshot else None
     verdict = _verdict_for(bars_by_timeframe, [setup.match for setup in setups], now, relative_volume)
     save_verdict(conn, ticker, verdict, now)
-    recorded = _record_setups(conn, ticker, setups, snapshot, now, verdict.call)
+    recorded = _record_setups(conn, ticker, setups, bars_by_timeframe, snapshot, now, verdict.call)
     _resolve_open_records(conn, ticker, bars_by_timeframe, now)
     mark_ticker_scanned(conn, ticker, now)
     return recorded

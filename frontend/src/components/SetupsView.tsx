@@ -1,12 +1,15 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import {
   fetchSetups,
+  MIN_TRADES_FOR_TRACK_RECORD,
+  MIN_TRADING_DAYS_FOR_TRACK_RECORD,
   patternName,
   runScan,
   ScanResult,
   SCORE_PART_NAMES,
   Setup,
   SetupsResponse,
+  TrackRecordSummary,
 } from "../api/setups";
 import { saveSettings } from "../api/settings";
 import { formatPrice } from "../format";
@@ -242,6 +245,28 @@ function SetupRow({ setup, showDirection, isExpanded, onToggleScore, onOpenStock
   );
 }
 
+function formatSignedR(value: number | null): string {
+  if (value == null) return "—";
+  return `${value > 0 ? "+" : ""}${value.toFixed(2)}R`;
+}
+
+function describeTrackRecord(history: TrackRecordSummary | null | undefined): string {
+  if (!history || history.trades < MIN_TRADES_FOR_TRACK_RECORD) {
+    return `Track record: not enough history yet (${history?.trades ?? 0} of ${MIN_TRADES_FOR_TRACK_RECORD} trades)`;
+  }
+  if (!history.has_enough_history) {
+    return (
+      `Track record: not enough history yet (${history.trades} trades, but from only ` +
+      `${history.trading_days} of ${MIN_TRADING_DAYS_FOR_TRACK_RECORD} trading days)`
+    );
+  }
+  const winRate = history.win_rate == null ? "—" : `${Math.round(history.win_rate * 100)}%`;
+  return (
+    `Track record: ${history.trades} trades on ${history.tickers} stocks over ${history.trading_days} days, ` +
+    `${winRate} wins averaging ${formatSignedR(history.average_win_r)}, ${formatSignedR(history.average_r)} per trade`
+  );
+}
+
 function ScoreDetails({ setup }: { setup: Setup }) {
   return (
     <div className="score-details">
@@ -253,6 +278,7 @@ function ScoreDetails({ setup }: { setup: Setup }) {
           </div>
         ))}
       </dl>
+      <p className="muted">{describeTrackRecord(setup.track_record)}</p>
       <p className="muted">
         Partial profits at {formatPrice(setup.partial_1r)} (1R) and {formatPrice(setup.partial_2r)} (2R)
         {setup.trailing_stop != null && <>; trail the stop under {formatPrice(setup.trailing_stop)}</>}.

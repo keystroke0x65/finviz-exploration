@@ -235,6 +235,7 @@ class SetupOut(BaseModel):
     last_seen_at: datetime
     has_conflict: bool
     verdict: VerdictOut | None = None
+    track_record: "TrackRecordSummaryOut | None" = None
 
 
 class WarningOut(BaseModel):
@@ -254,6 +255,19 @@ class WarningOut(BaseModel):
     verdict: VerdictOut | None = None
 
 
+class TrackRecordSummaryOut(BaseModel):
+    trades: int
+    win_rate: float | None
+    average_r: float | None
+    average_win_r: float | None
+    tickers: int
+    trading_days: int
+    has_enough_history: bool  # whether this history is moving the setup's score
+
+
+SetupOut.model_rebuild()
+
+
 class SetupsOut(BaseModel):
     setups: list[SetupOut]
     warnings: list[WarningOut]
@@ -266,3 +280,32 @@ class SettingsOut(BaseModel):
 
 class SettingsIn(BaseModel):
     show_short_setups: Annotated[bool, Field(strict=True)]
+
+
+# --- Track record (phase 2, milestone 3) ---
+
+
+class PatternStatsOut(BaseModel):
+    pattern: str
+    timeframe: str
+    trades: int
+    wins: int
+    losses: int
+    expired_after_fill: int
+    win_rate: float | None
+    average_r: float | None
+    average_win_r: float | None
+    average_max_favorable_r: float | None
+    not_trades: int
+    still_open: int
+    tickers: int
+    trading_days: int
+    first_day: str | None
+    last_day: str | None
+    has_enough_history: bool
+
+
+class TrackRecordOut(BaseModel):
+    rows: list[PatternStatsOut]
+    min_trades: int
+    min_trading_days: int

@@ -108,3 +108,9 @@ def test_trailing_stop_dropped_when_below_initial_stop():
     bars = [make_bar(9, 30 + index, low + 0.02, low + 0.05, low, low + 0.03) for index, low in enumerate(lows)]
 
     assert build_trade_plan(match(), [], bars).trailing_stop is None
+
+
+def test_build_trade_plan_rejects_a_stop_too_close_to_trade():
+    # 2.3400 entry with a 2.3395 stop: 0.02% risk shows as entry = stop = target.
+    assert build_trade_plan(match(entry=2.34, stop=2.3395), [], []) is None
+    assert build_trade_plan(match(entry=2.34, stop=2.33), [], []) is not None  # 0.43%

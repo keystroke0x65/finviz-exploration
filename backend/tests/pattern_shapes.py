@@ -25,3 +25,20 @@ def shape(highs: list[float], lows: list[float], volumes: list[int] | None = Non
 def mirrored(highs: list[float], lows: list[float], pivot: float = 5.0) -> tuple[list[float], list[float]]:
     """Flips a shape upside down (price -> pivot - price) to build bearish twins."""
     return [pivot - low for low in lows], [pivot - high for high in highs]
+
+
+def zigzag(pivots: list[float], steps: int = 3, spread: float = 0.01, volume: int = 1000,
+           step_minutes: int = 1, start: datetime = START) -> list[Bar]:
+    """Bars walking in straight lines between turning points, `steps` bars per leg.
+
+    Each bar's high/low sit `spread` around its close, so every interior pivot
+    becomes a swing high or low."""
+    closes: list[float] = [pivots[0]]
+    for begin, end in zip(pivots, pivots[1:]):
+        closes += [begin + (end - begin) * step / steps for step in range(1, steps + 1)]
+    bars = []
+    for index, close in enumerate(closes):
+        previous = closes[index - 1] if index else close
+        bars.append(Bar(start + timedelta(minutes=index * step_minutes), previous,
+                        max(previous, close) + spread, min(previous, close) - spread, close, volume))
+    return bars

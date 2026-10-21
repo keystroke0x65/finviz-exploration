@@ -12,8 +12,9 @@ from app.scanning.scanner import finviz_scan_deps, run_scan
 from app.patterns.types import TIMEFRAME_ORDER
 from app.patterns.verdict import Verdict
 from app.scanning.verdicts import read_verdicts
-from app.schemas import ScanIn, ScanOut, SetupOut, SetupsOut, VerdictOut, WarningOut
+from app.schemas import ScanIn, ScanOut, SetupOut, SetupsOut, TrackRecordSummaryOut, VerdictOut, WarningOut
 from app.setups.store import SetupRecord, list_current_setups
+from app.setups.track_record import PatternStats, has_enough_history, stats_for
 from app.user_settings import get_show_short_setups
 
 router = APIRouter(prefix="/api", tags=["setups"])
@@ -66,11 +67,35 @@ def _to_setup_out(
     return SetupOut(**values, has_conflict=has_conflict, verdict=to_verdict_out(verdicts.get(record.ticker)))
 
 
+def _track_record_summary(stats: PatternStats | None) -> TrackRecordSummaryOut | None:
+    if stats is None:
+        return None
+    return TrackRecordSummaryOut(
+        trades=stats.trades,
+        win_rate=stats.win_rate,
+        average_r=stats.average_r,
+        average_win_r=stats.average_win_r,
+        tickers=stats.tickers,
+        trading_days=stats.trading_days,
+        has_enough_history=has_enough_history(stats),
+    )
+
+
 def _setups_response(conn: sqlite3.Connection, ticker: str | None) -> SetupsOut:
     records = list_current_setups(conn, ticker)
     show_shorts = get_show_short_setups(conn)
     verdicts = read_verdicts(conn)
-    setups = [_to_setup_out(record, records, verdicts) for record in records]
+    history: dict[tuple[str, str], PatternStats | None] = {}
+    for record in records:
+        key = (record.pattern, record.timeframe)
+        if key not in history:
+            history[key] = stats_for(conn, *key)
+    setups = [
+        _to_setup_out(record, records, verdicts).model_copy(
+            update={"track_record": _track_record_summary(history[(record.pattern, record.timeframe)])}
+        )
+        for record in records
+    ]
     # Shorts are never suggested as trades unless the user turned them on.
     return SetupsOut(
         setups=[setup for setup in setups if setup.direction == "long" or show_shorts],

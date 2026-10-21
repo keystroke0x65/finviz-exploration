@@ -11,6 +11,9 @@ from app.patterns.levels import PriceLevel, nearest_level_above, nearest_level_b
 from app.patterns.types import Direction, PatternMatch, SetupState
 
 TARGET_R = 3.0
+# A stop closer than this to entry is noise, not a plan: it shows as entry = stop =
+# target and turns any R maths meaningless.
+MIN_RISK_PERCENT = 0.2
 EXTENDED_AFTER_R = 1.0
 SWING_SIDE_BARS = 2
 # Prices are compared after rounding so float noise (2.0 - 1.9 = 0.10000000000000009)
@@ -62,7 +65,7 @@ def _bounded_trailing_stop(bars: list[Bar], direction: Direction, stop: float) -
 def build_trade_plan(match: PatternMatch, daily_levels: list[PriceLevel], recent_bars: list[Bar]) -> TradePlan | None:
     sign = 1 if match.direction == "long" else -1
     risk = _price((match.entry - match.stop) * sign)
-    if risk <= 0:
+    if risk <= 0 or risk / match.entry * 100 < MIN_RISK_PERCENT:
         return None
 
     target_3r = _price(match.entry + sign * TARGET_R * risk)

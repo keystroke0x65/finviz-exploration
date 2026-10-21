@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Setup, Warning } from "../api/setups";
+import type { Setup, TrackRecordSummary, Warning } from "../api/setups";
 import { SetupsView } from "./SetupsView";
 
 const api = { fetchSetups: vi.fn(), runScan: vi.fn(), saveSettings: vi.fn() };
@@ -24,6 +24,13 @@ function setup(overrides: Partial<Setup> = {}): Setup {
 
 function respond(setups: Setup[], warnings: Warning[] = [], showShorts = false) {
   api.fetchSetups.mockResolvedValue({ setups, warnings, show_short_setups: showShorts });
+}
+
+function history(overrides: Partial<TrackRecordSummary>): TrackRecordSummary {
+  return {
+    trades: 42, win_rate: 20 / 42, average_r: 0.31, average_win_r: 2.1, tickers: 15, trading_days: 9,
+    has_enough_history: true, ...overrides,
+  };
 }
 
 describe("SetupsView", () => {
@@ -138,4 +145,29 @@ describe("SetupsView", () => {
 
     expect(await screen.findByText("Bullish pattern too")).toBeInTheDocument();
   });
+
+  it("shows the pattern's track record in the score details", async () => {
+    respond([
+      setup({ track_record: history({}) }),
+      setup({ id: 2, ticker: "WORX", track_record: history({ trades: 12, has_enough_history: false }) }),
+      setup({
+        id: 3, ticker: "ONEDAY", track_record: history({ trades: 40, trading_days: 2, has_enough_history: false }),
+      }),
+    ]);
+    render(<SetupsView onOpenStock={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Score details for HOST" }));
+    expect(
+      screen.getByText("Track record: 42 trades on 15 stocks over 9 days, 48% wins averaging +2.10R, +0.31R per trade"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Score details for WORX" }));
+    expect(screen.getByText("Track record: not enough history yet (12 of 30 trades)")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Score details for ONEDAY" }));
+    expect(
+      screen.getByText("Track record: not enough history yet (40 trades, but from only 2 of 5 trading days)"),
+    ).toBeInTheDocument();
+  });
+
 });
