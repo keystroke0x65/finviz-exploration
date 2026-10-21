@@ -1,10 +1,19 @@
 import io
+import threading
+import time
+from dataclasses import dataclass
+from typing import Callable
 
 import pandas as pd
 import requests
 
 from app.config import get_settings
-from app.errors import FinvizAuthError, TickerNotFoundError
+from app.errors import (
+    FinvizAuthError,
+    FinvizRateLimitError,
+    FinvizUnavailableError,
+    TickerNotFoundError,
+)
 
 # /export.ashx is a legacy alias that 301-redirects to /export/screener;
 # /export/stock (a different endpoint) returns historical price bars, not
@@ -15,31 +24,113 @@ FINVIZ_EXPORT_URL = "https://elite.finviz.com/export/screener"
 # Sector, Market Cap, P/E, Price, Change, Volume, etc.
 QUOTE_VIEW = "111"
 
+# Finviz's "Custom" view: returns exactly the column ids passed in `c`.
+CUSTOM_VIEW = "152"
 
-def get_quote(ticker: str) -> dict:
+# Ticker, Company, Country, Market Cap, Shares Float, Average Volume,
+# Relative Volume, Price, Change, Volume, After-Hours Close, After-Hours
+# Change, News Time, News URL, News Title. Finviz returns them in id order
+# whatever order is requested, so rows are read by header name.
+SCREEN_COLUMN_IDS = "1,2,5,6,25,63,64,65,66,67,71,72,135,136,137"
+
+# Finviz silently ignores filter/signal codes it doesn't recognise and
+# returns the whole market (~10,400 rows) instead of an error. No real
+# screen the user runs comes near this, so a larger result means a code
+# was probably ignored.
+UNFILTERED_ROW_THRESHOLD = 5000
+
+MIN_SECONDS_BETWEEN_REQUESTS = 1.0
+REQUEST_TIMEOUT_SECONDS = 10
+
+
+class _RequestPacer:
+    """Keeps at least `min_interval_seconds` between Finviz requests."""
+
+    def __init__(
+        self,
+        min_interval_seconds: float,
+        clock: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
+    ):
+        self._min_interval_seconds = min_interval_seconds
+        self._clock = clock
+        self._sleep = sleep
+        self._last_request_at: float | None = None
+        self._lock = threading.Lock()
+
+    def wait_for_turn(self) -> None:
+        with self._lock:
+            now = self._clock()
+            if self._last_request_at is not None:
+                remaining = self._min_interval_seconds - (now - self._last_request_at)
+                if remaining > 0:
+                    self._sleep(remaining)
+                    now += remaining
+            self._last_request_at = now
+
+
+# Module-level on purpose: Finviz has no documented rate limits and the whole
+# process (routes + background feeder) shares one Elite account, so pacing
+# has to be process-wide rather than per caller.
+_request_pacer = _RequestPacer(MIN_SECONDS_BETWEEN_REQUESTS)
+
+
+@dataclass(frozen=True)
+class ScreenRow:
+    ticker: str
+    company: str | None
+    country: str | None
+    market_cap_millions: float | None
+    float_millions: float | None
+    average_volume_thousands: float | None
+    relative_volume: float | None
+    price: float | None
+    change_percent: float | None
+    volume: int | None
+    after_hours_close: float | None
+    after_hours_change_percent: float | None
+    news_time: str | None
+    news_url: str | None
+    news_title: str | None
+
+
+@dataclass(frozen=True)
+class ScreenResult:
+    rows: list[ScreenRow]
+    is_possibly_unfiltered: bool
+
+
+def _fetch_export_csv(params: dict[str, str], operation: str) -> str:
     settings = get_settings()
-    response = requests.get(
-        FINVIZ_EXPORT_URL,
-        params={
-            "v": QUOTE_VIEW,
-            "t": ticker,
-            "auth": settings.finviz_api_token,
-        },
-        timeout=10,
-    )
+    _request_pacer.wait_for_turn()
+    try:
+        response = requests.get(
+            FINVIZ_EXPORT_URL,
+            params={**params, "auth": settings.finviz_api_token},
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+    except requests.RequestException as exc:
+        # requests' messages include the full URL, auth token and all, so the
+        # original exception is deliberately not chained or echoed.
+        raise FinvizUnavailableError(operation, type(exc).__name__) from None
 
     if response.status_code == 401:
         raise FinvizAuthError()
-    response.raise_for_status()
+    if response.status_code == 429:
+        raise FinvizRateLimitError(operation)
+    if not response.ok:
+        raise FinvizUnavailableError(operation, f"HTTP {response.status_code}")
+    return response.text
 
+
+def _read_csv_as_strings(csv_text: str) -> pd.DataFrame:
     # dtype=str keeps every column as the raw Finviz string (e.g. "1.35%",
     # "3.45T"); default dtype inference produces a dict with inconsistent
     # value types per ticker, since only some columns are pure numbers.
-    df = pd.read_csv(io.StringIO(response.text), dtype=str)
-    if df.empty:
-        raise TickerNotFoundError(ticker)
+    return pd.read_csv(io.StringIO(csv_text), dtype=str)
 
-    row = df.iloc[0].to_dict()
+
+def _clean_missing(row: dict) -> dict:
     # pandas represents missing cells as float NaN even in a dtype=str frame,
     # and on pandas's newer "str" extension dtype (3.0+), DataFrame.where(...,
     # None) silently leaves those NaNs in place instead of casting them —
@@ -48,3 +139,55 @@ def get_quote(ticker: str) -> dict:
     # the already-extracted row per-value with pd.isna() sidesteps the
     # dtype-cast quirk entirely.
     return {key: (None if pd.isna(value) else value) for key, value in row.items()}
+
+
+def get_quote(ticker: str) -> dict:
+    csv_text = _fetch_export_csv({"v": QUOTE_VIEW, "t": ticker}, f"quote {ticker}")
+    df = _read_csv_as_strings(csv_text)
+    if df.empty:
+        raise TickerNotFoundError(ticker)
+    return _clean_missing(df.iloc[0].to_dict())
+
+
+def _parse_number(raw: str | None) -> float | None:
+    if raw is None:
+        return None
+    return float(raw.rstrip("%").replace(",", ""))
+
+
+def _parse_integer(raw: str | None) -> int | None:
+    number = _parse_number(raw)
+    return None if number is None else int(number)
+
+
+def _to_screen_row(row: dict) -> ScreenRow:
+    return ScreenRow(
+        ticker=row["Ticker"],
+        company=row.get("Company"),
+        country=row.get("Country"),
+        market_cap_millions=_parse_number(row.get("Market Cap")),
+        float_millions=_parse_number(row.get("Shares Float")),
+        average_volume_thousands=_parse_number(row.get("Average Volume")),
+        relative_volume=_parse_number(row.get("Relative Volume")),
+        price=_parse_number(row.get("Price")),
+        change_percent=_parse_number(row.get("Change")),
+        volume=_parse_integer(row.get("Volume")),
+        after_hours_close=_parse_number(row.get("After-Hours Close")),
+        after_hours_change_percent=_parse_number(row.get("After-Hours Change")),
+        news_time=row.get("News Time"),
+        news_url=row.get("News URL"),
+        news_title=row.get("News Title"),
+    )
+
+
+def run_screen(filters: list[str], signal: str | None, order: str | None) -> ScreenResult:
+    params = {"v": CUSTOM_VIEW, "c": SCREEN_COLUMN_IDS, "f": ",".join(filters)}
+    if signal:
+        params["s"] = signal
+    if order:
+        params["o"] = order
+
+    csv_text = _fetch_export_csv(params, "screen")
+    df = _read_csv_as_strings(csv_text)
+    rows = [_to_screen_row(_clean_missing(record)) for record in df.to_dict("records")]
+    return ScreenResult(rows=rows, is_possibly_unfiltered=len(rows) > UNFILTERED_ROW_THRESHOLD)
