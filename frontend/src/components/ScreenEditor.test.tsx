@@ -98,4 +98,19 @@ describe("ScreenEditor", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("price_under=17 is not one of");
   });
+
+  it("keeps and shows a pasted signal the form doesn't list", async () => {
+    parseScreenerUrl.mockResolvedValue({
+      form: {}, extra_filters: [], signal: "ta_p_channelup", order: null,
+    });
+    const onSave = renderEditor();
+
+    fireEvent.change(screen.getByLabelText("Finviz screener URL"), { target: { value: "x" } });
+    fireEvent.click(screen.getByRole("button", { name: "Import" }));
+
+    await waitFor(() => expect(screen.getByLabelText("Signal")).toHaveValue("ta_p_channelup"));
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Channel" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ signal: "ta_p_channelup" })));
+  });
 });

@@ -156,6 +156,9 @@ export function ScreenEditor({ initial, formFields, onSave, onCancel }: ScreenEd
         Signal
         <select value={signal} onChange={(event) => setSignal(event.target.value)}>
           <option value="">None</option>
+          {/* A pasted signal the form doesn't offer is kept and shown as its raw
+              code; otherwise the select would silently display "None". */}
+          {signal && !(signal in formFields.signals) && <option value={signal}>{signal}</option>}
           {Object.entries(formFields.signals).map(([code, label]) => (
             <option key={code} value={code}>
               {label}
