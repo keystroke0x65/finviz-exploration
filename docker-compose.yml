@@ -1,12 +1,17 @@
 services:
   backend:
     build: ./backend
+    # Run as the host user so the database and __pycache__ files written into the
+    # bind-mounted folders stay owned by you, not root.
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     ports:
       - "8000:8000"
     volumes:
       - ./backend/app:/app/app
       - ./backend/scripts:/app/scripts
-      - db-data:/data
+      # The SQLite database lives in the project's data/ folder (gitignored) so it's
+      # easy to find, back up, or delete, rather than inside a Docker volume.
+      - ./data:/data
     env_file:
       - .env
     environment:
@@ -15,13 +20,11 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "5173:5173"
+      # FRONTEND_PORT lets the app run when another dev server already uses 5173.
+      - "${FRONTEND_PORT:-5173}:5173"
     volumes:
       - ./frontend/src:/app/src
     environment:
       - BACKEND_URL=http://backend:8000
     depends_on:
       - backend
-
-volumes:
-  db-data:

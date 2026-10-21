@@ -29,8 +29,10 @@ backend/*.egg-info/
 frontend/node_modules/
 frontend/dist/
 *.tsbuildinfo
-# Database
+# Database (data/ is kept, its contents aren't)
 *.db
+data/*
+!data/.gitkeep
 # Worktrees
 .worktrees/
 # Subagent-driven-development scratch workspace

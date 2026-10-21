@@ -2,10 +2,32 @@
 
 A personal financial dashboard built on a Finviz Elite subscription.
 
-**Current status:** Phase 1 (Foundation + Stock Lookup) only — ticker search and a
-quote table. See [docs/superpowers/specs/2026-09-17-finviz-dashboard-phase1-design.md](docs/superpowers/specs/2026-09-17-finviz-dashboard-phase1-design.md)
-for the full 8-phase roadmap (screener, options, watchlists/alerts, insider feed,
-news/sentiment, portfolio tracking are all planned but not built yet).
+**Current status:** Phase 1 (stock lookup) and Phase 2 milestone 1 (screens + watchlist).
+Pattern detection and trade setups (milestones 2–3) are next. See
+[the phase 2 design](docs/superpowers/specs/2026-10-20-screener-watchlist-patterns-design.md)
+and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-phase1-design.md).
+
+## What it does
+
+- The header shows the US market session (pre-market, regular hours, after-hours) on a
+  4 AM to 8 PM Eastern strip with a marker for now. Exchange holidays aren't shown.
+- **Screens** tab: saved Finviz screens. Paste a Finviz screener URL (build it on
+  finviz.com, copy the address bar) or use the form for country, price, float, market cap,
+  volume and relative volume. Running a screen shows price, change, after-hours change,
+  volume, relative volume, float, market cap and the latest headline, with links to Finviz
+  and an "add to watchlist" button. Two screens are created on first start: "Top gainers —
+  low float" (feeds the watchlist) and "After-hours".
+- **Watchlist** tab: filled automatically from every screen marked "feeds watchlist".
+  While the backend runs, the feeder runs every 15 minutes on weekdays from 04:00 to 20:00
+  US Eastern (pre-market through after-hours), and keeps one history line per stock per
+  day it showed up. Auto-added stocks drop off 90 days after they last showed up; pinned
+  and manually added stocks never expire. "Refresh from feeder" runs it immediately.
+  The tab shows when the feeder last ran and which screens failed (e.g. an expired
+  token or Finviz rate limiting); failures are also logged as warnings.
+- **Lookup** tab: single-ticker quote (Phase 1).
+
+Finviz silently ignores filter codes it doesn't recognise, so saving a screen checks any
+pasted codes with Finviz first and rejects ones it would ignore.
 
 ## Prerequisites
 
@@ -21,7 +43,14 @@ news/sentiment, portfolio tracking are all planned but not built yet).
    ```
 
    Edit `.env` and replace `FINVIZ_API_TOKEN` with your real token, found in your
-   Finviz Elite account settings under the export/API section.
+   Finviz Elite account settings under the export/API section. Optional settings:
+
+   | Variable | Default | Meaning |
+   |---|---|---|
+   | `QUOTE_CACHE_TTL_MINUTES` | 15 | How long a looked-up quote is cached |
+   | `FEEDER_INTERVAL_MINUTES` | 15 | Minutes between watchlist feeder runs |
+   | `WATCHLIST_RETENTION_DAYS` | 90 | Days after its last feeder hit before an auto-added stock is dropped |
+   | `IS_FEEDER_ENABLED` | true | Set to `false` to stop the background feeder |
 
 2. Start the stack:
 
@@ -29,12 +58,23 @@ news/sentiment, portfolio tracking are all planned but not built yet).
    docker compose up --build
    ```
 
+   If port 5173 is already used by another dev server, set `FRONTEND_PORT=5174` (or any
+   free port) in `.env` and use that port below.
+
 3. Open the app:
 
    - Frontend: http://localhost:5173
    - Backend health check: http://localhost:8000/health
 
 Enter a ticker (e.g. `AAPL`) in the search box to look up a quote.
+
+## Where the data lives
+
+Everything is stored in one SQLite file, `data/finviz_dashboard.db`, inside this project
+folder (the folder is gitignored apart from a placeholder). Back it up by copying the
+file; delete it to start fresh (the default screens are recreated on the next start).
+Docker runs the backend as user `1000:1000` so the file stays owned by you; set
+`HOST_UID`/`HOST_GID` in `.env` if your user id differs (`id -u`, `id -g`).
 
 ## Running tests
 
@@ -63,4 +103,6 @@ debugging an unexpected error from `/api/stocks/{ticker}`:
 ```bash
 cd backend
 FINVIZ_API_TOKEN=<your real token> python -m scripts.finviz_sanity_check AAPL
+# Screens: runs the default screens and checks Finviz recognises every form code
+FINVIZ_API_TOKEN=<your real token> python -m scripts.finviz_sanity_check --screens
 ```

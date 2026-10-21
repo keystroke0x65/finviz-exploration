@@ -8,11 +8,15 @@ interface QuoteTableProps {
 
 export function QuoteTable({ quote, error, isLoading }: QuoteTableProps) {
   if (isLoading) {
-    return <p>Loading...</p>;
+    return <p className="muted">Looking up quote…</p>;
   }
 
   if (error) {
-    return <p role="alert">{error}</p>;
+    return (
+      <p role="alert" className="alert">
+        {error}
+      </p>
+    );
   }
 
   if (!quote) {
@@ -24,7 +28,7 @@ export function QuoteTable({ quote, error, isLoading }: QuoteTableProps) {
   const rows = Object.entries(quote).filter(([, value]) => value != null);
 
   return (
-    <table>
+    <table className="quote-table">
       <tbody>
         {rows.map(([key, value]) => (
           <tr key={key}>

@@ -88,10 +88,15 @@ Domain quirks the builder must handle (and document in code):
   AM/PM suffix. Parse the 24-hour part and ignore the suffix. Times appear to be US
   Eastern (session starts 04:00); confirm with the sanity script.
 - Daily dates are `MM/DD/YYYY`.
-- **Unknown filter or signal codes are silently ignored**: a typo returns the whole
-  market (~10,400 rows) instead of an error. Flag any screen result over 5,000 rows as
-  "filters may have been ignored", and have the sanity script check that every code the
-  form can produce actually narrows results.
+- **Unknown filter or signal codes are silently ignored, one by one**: Finviz drops a
+  code it doesn't recognise (typo, or a value it doesn't offer such as `sh_price_u17`)
+  and applies the rest, with no error. A typo next to valid filters just widens the
+  screen, so row counts can't reveal it (and valid broad screens are large anyway: US
+  only is ~10,400 rows; the whole market ~11,750). So: when a screen is saved, each
+  pasted extra code and the signal is checked on its own against the whole-market count;
+  one that doesn't narrow it is rejected, naming the code. The sanity script checks every
+  code the form can produce the same way. (Corrected 2026-10-20 after a live check; an
+  earlier draft flagged results over 5,000 rows instead.)
 - Wide-column exports (`v=152&c=<ids>`) return columns in ascending id order regardless
   of the order requested, and omit `No.` unless id 0 is requested. Map columns by header
   name, not position.
@@ -409,7 +414,7 @@ Same principle as Phase 1: never show empty or misleading data silently.
 
 - Finviz auth failure, rate limiting and timeouts are distinct, visible errors.
 - A scan that couldn't fetch some tickers lists them ("12 scanned, 3 failed: …").
-- A screen result over 5,000 rows is flagged as "filters may have been ignored".
+- Saving a screen with a code Finviz doesn't recognise is rejected, naming the code.
 - Stale data is labelled with its fetch time.
 
 ## Testing
