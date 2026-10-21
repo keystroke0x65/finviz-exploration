@@ -28,6 +28,14 @@ CREATE TABLE IF NOT EXISTS watchlist_appearances (
     PRIMARY KEY (ticker, seen_on, screen_id)
 );
 
+CREATE TABLE IF NOT EXISTS bar_cache (
+    ticker TEXT NOT NULL,
+    interval TEXT NOT NULL,
+    fetched_at TEXT NOT NULL,
+    bars TEXT NOT NULL,
+    PRIMARY KEY (ticker, interval)
+);
+
 CREATE TABLE IF NOT EXISTS app_meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
