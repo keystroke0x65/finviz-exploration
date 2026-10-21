@@ -6,7 +6,8 @@
 ## Lessons
 <!-- empty: reusable strategies that worked, with the reason they work -->
 - [dev-environment-0002] root h=1 x=0 d=2026-10-20 labels=git,worktree,env src="worktree cleanup 2026-10-20" :: Feature worktrees under .worktrees/ can hold the only copy of gitignored local files (.env with FINVIZ_API_TOKEN, backend/finviz_dashboard.db). Before git worktree remove, check git status --ignored and copy .env to the main checkout.
-- [dev-environment-0003] root h=0 x=0 d=2026-10-21 labels=docker,wsl,ports,smoke-test src="phase 2 M1 smoke test 2026-10-20" :: Docker may be unavailable from WSL (Docker Desktop integration off) and port 5173 is often taken by another project's vite. Smoke-test instead with backend/.venv uvicorn --port 8000 (DB_PATH in scratchpad, env from .env) plus 'npx vite --port 5174 --strictPort'.
+- [dev-environment-0003] root h=1 x=0 d=2026-10-21 labels=docker,wsl,ports,smoke-test src="phase 2 M1 smoke test 2026-10-20" :: Docker may be unavailable from WSL (Docker Desktop integration off) and port 5173 is often taken by another project's vite. Smoke-test instead with backend/.venv uvicorn --port 8000 (DB_PATH in scratchpad, env from .env) plus 'npx vite --port 5174 --strictPort'.
+- [dev-environment-0005] root h=0 x=0 d=2026-10-21 labels=screenshots,playwright,ui src="session 2026-10-20" :: Visual UI checks: install playwright-core in a scratchpad dir and launch /usr/bin/google-chrome headless (browsers also cached in ~/.cache/ms-playwright); click through tabs and screenshot desktop 1440x900 and mobile 390x844. Caught table overflow (grid child needs min-width:0) that tests missed.
 
 ## Traps
 <!-- empty: approaches that failed: what was tried, what happened, what to do instead -->

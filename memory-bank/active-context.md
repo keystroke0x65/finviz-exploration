@@ -4,10 +4,10 @@
      to operations-only writes). Keep it under 80 lines. Durable facts belong in context/ or experience/. -->
 
 ## Current focus
-Phase 2 milestone 1 (screens + watchlist feeder) is built and reviewed on branch
-feat/phase2-m1-screens-watchlist (worktree .worktrees/feat-phase2-m1). Awaiting the
-user's choice: merge locally / PR / keep. Local smoke servers may still be running
-(uvicorn :8000 with scratch DB, vite :5174).
+Phase 2 milestone 1 (screens + watchlist feeder) is built, reviewed, and restyled on
+branch feat/phase2-m1-screens-watchlist (worktree .worktrees/feat-phase2-m1). DB moved to
+data/ (gitignored). Docker stack is running FROM THE WORKTREE (FRONTEND_PORT=5174), so its
+DB is currently .worktrees/feat-phase2-m1/data/. Awaiting merge/PR/keep choice.
 
 ## Open questions / blockers
 - Schwab developer API application not started (user's action; needed for phase 3).

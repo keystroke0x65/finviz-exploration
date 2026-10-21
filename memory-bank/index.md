@@ -9,13 +9,13 @@ or run `memory.py find <keywords>` to pull just the relevant root → delta chai
 |---|---|---|---|---|
 | context/project-brief.md | 4 (4/0/0) | Purpose, Users, Scope, Non-goals, Constraints, User background | audience, product, roadmap, trading | 2026-10-21 |
 | context/architecture.md | 0 (0/0/0) | Components, Data flow, Integrations, Invariants |  |  |
-| context/tech-stack.md | 5 (5/0/0) | Runtime and frameworks, Services and infrastructure, Dev environment, Commands, Storage, External APIs | api, python, fastapi, react, typescript | 2026-10-20 |
-| context/conventions.md | 0 (0/0/0) | Code style, Patterns, Testing, Workflow |  |  |
+| context/tech-stack.md | 6 (6/0/0) | Runtime and frameworks, Services and infrastructure, Dev environment, Commands, Storage, External APIs | docker, sqlite, api, python, fastapi | 2026-10-21 |
+| context/conventions.md | 1 (1/0/0) | Code style, Patterns, Testing, Workflow | ui, design, css | 2026-10-21 |
 | context/decisions.md | 3 (3/0/0) | Decisions, Architecture, Finviz client design | architecture, roadmap, phase2, patterns, security | 2026-10-21 |
 | progress.md | 4 (4/0/0) | Now, Next, Done, Known issues | status, phase2, phase1, schwab, options | 2026-10-21 |
-| experience/dev-environment.md | 4 (2/0/2) | Lessons, Traps | git, wsl, worktree, env, docker | 2026-10-21 |
+| experience/dev-environment.md | 5 (3/0/2) | Lessons, Traps | git, wsl, worktree, env, docker | 2026-10-21 |
 | experience/finviz.md | 4 (3/0/1) | Lessons, Traps | finviz, bars, intraday, columns, export | 2026-10-21 |
 
 Also: `active-context.md` (current focus, freeform), `history/archive.md` (superseded/deleted, not loaded by default), `ops-log.jsonl` (audit trail).
 
-Batches applied: 6. Bank created: 2026-09-17.
+Batches applied: 7. Bank created: 2026-09-17.

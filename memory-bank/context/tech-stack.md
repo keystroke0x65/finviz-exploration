@@ -18,6 +18,7 @@
 
 ## Storage
 - [stack-0002] root h=0 x=0 d=2026-09-17 labels=sqlite,database src="user decision 2026-09-17" :: SQLite for local persistence (response cache, later saved screens/watchlists/portfolio data). Chosen over Postgres since this is local-only single-user.
+- [stack-0007] root h=0 x=0 d=2026-10-21 labels=sqlite,docker,data src="docker-compose.yml" :: SQLite DB lives at <project>/data/finviz_dashboard.db (bind-mounted ./data:/data; data/* gitignored except .gitkeep), per user request. Backend container runs as HOST_UID:HOST_GID (default 1000) so files aren't root-owned. Frontend host port is FRONTEND_PORT (default 5173; user's machine has another vite on 5173, so use 5174).
 
 ## External APIs
 - [stack-0005] root h=0 x=0 d=2026-09-17 labels=schwab,options,api src="user" :: Schwab developer API (user has a Schwab/thinkorswim brokerage account) will supply options chains and greeks. Requires a developer app approval process that can take days, so should be started early/in parallel.
