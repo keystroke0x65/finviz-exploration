@@ -4,8 +4,8 @@ from datetime import datetime, timezone
 
 from app.config import Settings
 from app.db import connect
-from app.finviz_client import get_bars, get_snapshots, run_screen
-from app.scanning.scanner import ScanDeps, ScanResult, run_scan
+from app.finviz_client import run_screen
+from app.scanning.scanner import ScanDeps, ScanResult, finviz_scan_deps, run_scan
 from app.watchlist.feeder import FeederResult, RunScreenFunction, is_within_feeder_window, run_feeder
 
 logger = logging.getLogger(__name__)
@@ -68,9 +68,6 @@ def run_scheduled_scan(db_path: str, now: datetime, deps: ScanDeps) -> ScanResul
     return result
 
 
-FINVIZ_SCAN_DEPS = ScanDeps(fetch_bars=get_bars, fetch_snapshots=get_snapshots)
-
-
 async def feeder_loop(settings: Settings) -> None:
     while True:
         # Each tick feeds the watchlist first so the scan sees new names.
@@ -83,6 +80,6 @@ async def feeder_loop(settings: Settings) -> None:
         )
         if feeder_result is not None:
             await asyncio.to_thread(
-                run_scheduled_scan, settings.db_path, datetime.now(timezone.utc), FINVIZ_SCAN_DEPS
+                run_scheduled_scan, settings.db_path, datetime.now(timezone.utc), finviz_scan_deps()
             )
         await asyncio.sleep(settings.feeder_interval_minutes * SECONDS_PER_MINUTE)

@@ -99,6 +99,14 @@ class AppearanceOut(BaseModel):
     screen_id: int
 
 
+class SnapshotOut(BaseModel):
+    price: float | None
+    change_percent: float | None
+    after_hours_change_percent: float | None
+    relative_volume: float | None
+    fetched_at: datetime
+
+
 class WatchlistEntryOut(BaseModel):
     ticker: str
     source: Literal["auto", "manual"]
@@ -107,6 +115,7 @@ class WatchlistEntryOut(BaseModel):
     is_pinned: bool
     expires_at: datetime | None
     appearances: list[AppearanceOut]
+    snapshot: SnapshotOut | None = None
 
 
 class AddTickerIn(BaseModel):
@@ -132,3 +141,95 @@ class FeederResultOut(BaseModel):
 
 class FeederStatusOut(FeederResultOut):
     finished_at: datetime
+
+
+# --- Bars, scans, setups, settings (phase 2, milestone 2a) ---
+
+
+class BarOut(BaseModel):
+    time: datetime
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int
+
+
+class PriceLevelOut(BaseModel):
+    price: float
+    touches: int
+
+
+class SessionLevelsOut(BaseModel):
+    premarket_high: float | None
+    premarket_low: float | None
+    day_high: float | None
+    day_low: float | None
+    opening_range_high: float | None
+    opening_range_low: float | None
+    previous_close: float | None
+
+
+class BarsOut(BaseModel):
+    bars: list[BarOut]
+    fetched_at: datetime
+    daily_levels: list[PriceLevelOut]
+    session: SessionLevelsOut | None
+    vwap: list[float | None] | None
+
+
+class ScanIn(BaseModel):
+    ticker: Annotated[str, StringConstraints(strip_whitespace=True, pattern=TICKER_BODY_PATTERN)] | None = None
+
+
+class FailedTickerOut(BaseModel):
+    ticker: str
+    reason: str
+
+
+class ScanOut(BaseModel):
+    scanned: list[str]
+    failed: list[FailedTickerOut]
+    setups_found: int
+    scanned_at: datetime
+
+
+class SetupOut(BaseModel):
+    id: int
+    ticker: str
+    pattern: str
+    direction: Literal["long", "short"]
+    timeframe: Literal["1m", "5m", "daily"]
+    entry: float
+    stop: float
+    capped_target: float
+    target_3r: float
+    available_reward_risk: float
+    risk_percent: float
+    blocking_level: float | None
+    partial_1r: float
+    partial_2r: float
+    trailing_stop: float | None
+    quality: float
+    score: float
+    score_parts: dict[str, float]
+    key_points: list[tuple[datetime, float]]
+    state: Literal["forming", "triggered", "extended", "invalidated"]
+    session: str
+    detected_at: datetime
+    last_seen_at: datetime
+    has_conflict: bool
+
+
+class SetupsOut(BaseModel):
+    setups: list[SetupOut]
+    warnings: list[SetupOut]
+    show_short_setups: bool
+
+
+class SettingsOut(BaseModel):
+    show_short_setups: bool
+
+
+class SettingsIn(BaseModel):
+    show_short_setups: Annotated[bool, Field(strict=True)]

@@ -114,3 +114,21 @@ def test_feeder_status_reports_last_run_failures(api_client, db_conn):
         {"screen": "Broken", "reason": "Finviz request failed (screen): ReadTimeout"}
     ]
     assert "finished_at" in status
+
+
+def test_watchlist_entries_include_latest_snapshot(api_client, db_conn):
+    from app.scanning.snapshots import save_snapshots
+    from app.watchlist.store import add_manual_entry
+    from tests.scan_fixtures import snapshot
+
+    add_manual_entry(db_conn, "HOST", NOW)
+    add_manual_entry(db_conn, "WORX", NOW)
+    save_snapshots(db_conn, [snapshot("HOST", relative_volume=3.2, change=12.5, price=2.83)], NOW)
+
+    entries = {entry["ticker"]: entry for entry in api_client.get("/api/watchlist").json()}
+
+    assert entries["HOST"]["snapshot"] == {
+        "price": 2.83, "change_percent": 12.5, "after_hours_change_percent": 0.0,
+        "relative_volume": 3.2, "fetched_at": "2026-10-20T14:00:00Z",
+    }
+    assert entries["WORX"]["snapshot"] is None

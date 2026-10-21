@@ -7,7 +7,7 @@ from typing import Callable
 
 from app.bars.loader import load_bars
 from app.errors import FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError
-from app.finviz_client import Bar, Interval, ScreenRow
+from app.finviz_client import Bar, Interval, ScreenRow, get_bars, get_snapshots
 from app.market_time import EASTERN
 from app.patterns.detectors import run_detectors
 from app.patterns.indicators import session_levels, session_vwap
@@ -34,6 +34,10 @@ SNAPSHOT_FAILURE_LABEL = "watchlist prices"
 class ScanDeps:
     fetch_bars: Callable[[str, Interval], list[Bar]]
     fetch_snapshots: Callable[[list[str]], list[ScreenRow]]
+
+
+def finviz_scan_deps() -> ScanDeps:
+    return ScanDeps(fetch_bars=get_bars, fetch_snapshots=get_snapshots)
 
 
 @dataclass(frozen=True)
