@@ -67,7 +67,7 @@ describe("WatchlistView", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "History for HOST" }));
 
-    expect(screen.getByText("2026-10-03: 22.10%")).toBeInTheDocument();
+    expect(screen.getByText("+22.10%")).toBeInTheDocument();
   });
 
   it("toggles pin and re-renders the entry", async () => {
@@ -119,5 +119,16 @@ describe("WatchlistView", () => {
 
     expect(await screen.findByText(/^Last feeder run:/)).toHaveTextContent("0 added, 0 updated, 0 expired");
     expect(screen.getByRole("alert")).toHaveTextContent("Top gainers — low float: Finviz Elite API rejected");
+  });
+
+  it("summarises which of the last 30 days a stock ran", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-20T18:00:00Z"));
+    api.listWatchlist.mockResolvedValue([AUTO_ENTRY]);
+    render(<WatchlistView />);
+
+    // Oct 20 and Oct 3 are both within the 30 days ending Oct 20.
+    expect(await screen.findByRole("img", { name: "Ran on 2 of the last 30 days" })).toBeInTheDocument();
+    vi.useRealTimers();
   });
 });

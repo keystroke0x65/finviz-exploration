@@ -76,7 +76,7 @@ describe("ScreenEditor", () => {
     fireEvent.change(screen.getByLabelText("Relative volume over"), { target: { value: "1.5" } });
     fireEvent.click(screen.getByRole("button", { name: "Remove ta_rsi_os30" }));
     fireEvent.click(screen.getByLabelText("Feeds watchlist"));
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save screen" }));
 
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
     expect(onSave).toHaveBeenCalledWith({
@@ -94,7 +94,7 @@ describe("ScreenEditor", () => {
     renderEditor(vi.fn().mockRejectedValue(new Error("price_under=17 is not one of [5, 10, 20]")));
 
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Mine" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save screen" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("price_under=17 is not one of");
   });
@@ -110,7 +110,7 @@ describe("ScreenEditor", () => {
 
     await waitFor(() => expect(screen.getByLabelText("Signal")).toHaveValue("ta_p_channelup"));
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Channel" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save screen" }));
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ signal: "ta_p_channelup" })));
   });
 });

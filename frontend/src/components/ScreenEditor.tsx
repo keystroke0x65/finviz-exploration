@@ -64,6 +64,13 @@ function toScreenForm(values: FieldValues): ScreenForm {
   };
 }
 
+// Finviz order codes are a column name, with a leading "-" for descending.
+function describeOrder(order: string): string {
+  const isDescending = order.startsWith("-");
+  const column = order.replace(/^-/, "").replace(/_/g, " ");
+  return `Finviz sorts this screen by ${column}, ${isDescending ? "highest" : "lowest"} first.`;
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown error";
 }
@@ -77,6 +84,8 @@ export function ScreenEditor({ initial, formFields, onSave, onCancel }: ScreenEd
   const [feedsWatchlist, setFeedsWatchlist] = useState(initial?.feeds_watchlist ?? false);
   const [screenerUrl, setScreenerUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Saving can take a few seconds: pasted codes are checked with Finviz first.
+  const [isSaving, setIsSaving] = useState(false);
 
   async function handleImport() {
     setError(null);
@@ -94,6 +103,7 @@ export function ScreenEditor({ initial, formFields, onSave, onCancel }: ScreenEd
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    setIsSaving(true);
     try {
       await onSave({
         name,
@@ -105,105 +115,130 @@ export function ScreenEditor({ initial, formFields, onSave, onCancel }: ScreenEd
       });
     } catch (saveError) {
       setError(errorMessage(saveError));
+    } finally {
+      setIsSaving(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <fieldset>
-        <legend>Import from Finviz</legend>
-        <label>
-          Finviz screener URL
-          {/* Plain text, not type="url": the box sits inside the save form, and an
-              invalid URL left in it must not block saving the rest. The backend
-              validates the URL on import. */}
-          <input
-            type="text"
-            inputMode="url"
-            value={screenerUrl}
-            onChange={(event) => setScreenerUrl(event.target.value)}
-            placeholder="https://finviz.com/screener.ashx?v=111&f=..."
-          />
-        </label>
-        <button type="button" onClick={handleImport}>
-          Import
-        </button>
-      </fieldset>
+    <form className="editor" onSubmit={handleSubmit}>
+      <h2 className="results-title">{initial ? `Edit "${initial.name}"` : "New screen"}</h2>
 
-      <label>
-        Name
-        <input type="text" value={name} onChange={(event) => setName(event.target.value)} />
-      </label>
-
-      {FIELD_ORDER.map((field) => (
-        <label key={field}>
-          {FIELD_LABELS[field]}
-          <select
-            value={fieldValues[field]}
-            onChange={(event) => setFieldValues({ ...fieldValues, [field]: event.target.value })}
-          >
-            <option value="">Any</option>
-            {formFields.options[field].map((option) => (
-              <option key={option} value={String(option)}>
-                {TEXT_FIELDS.includes(field) ? OPTION_LABELS[option] ?? option : option}
-              </option>
-            ))}
-          </select>
-        </label>
-      ))}
-
-      <label>
-        Signal
-        <select value={signal} onChange={(event) => setSignal(event.target.value)}>
-          <option value="">None</option>
-          {/* A pasted signal the form doesn't offer is kept and shown as its raw
-              code; otherwise the select would silently display "None". */}
-          {signal && !(signal in formFields.signals) && <option value={signal}>{signal}</option>}
-          {Object.entries(formFields.signals).map(([code, label]) => (
-            <option key={code} value={code}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      {order && <p>Sorted by: {order}</p>}
-
-      {extraFilters.length > 0 && (
-        <div>
-          <p>Other Finviz filters</p>
-          <ul>
-            {extraFilters.map((code) => (
-              <li key={code}>
-                {code}{" "}
-                <button
-                  type="button"
-                  aria-label={`Remove ${code}`}
-                  onClick={() => setExtraFilters(extraFilters.filter((existing) => existing !== code))}
-                >
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
+      <div className="editor-section">
+        <h3 className="editor-section-title">Start from a Finviz screen</h3>
+        <p className="muted">
+          Build the screen on finviz.com, copy the address from your browser, and import it. Filters
+          below fill in automatically.
+        </p>
+        <div className="import-row">
+          <label className="field">
+            Finviz screener URL
+            {/* Plain text, not type="url": the box sits inside the save form, and an
+                invalid URL left in it must not block saving the rest. The backend
+                validates the URL on import. */}
+            <input
+              type="text"
+              inputMode="url"
+              value={screenerUrl}
+              onChange={(event) => setScreenerUrl(event.target.value)}
+              placeholder="https://finviz.com/screener.ashx?v=111&f=..."
+            />
+          </label>
+          <button type="button" onClick={handleImport} disabled={!screenerUrl.trim()}>
+            Import
+          </button>
         </div>
+      </div>
+
+      <div className="editor-section">
+        <h3 className="editor-section-title">Filters</h3>
+        <div className="filter-grid">
+          {FIELD_ORDER.map((field) => (
+            <label key={field} className="field">
+              {FIELD_LABELS[field]}
+              <select
+                value={fieldValues[field]}
+                onChange={(event) => setFieldValues({ ...fieldValues, [field]: event.target.value })}
+              >
+                <option value="">Any</option>
+                {formFields.options[field].map((option) => (
+                  <option key={option} value={String(option)}>
+                    {TEXT_FIELDS.includes(field) ? OPTION_LABELS[option] ?? option : option}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+          <label className="field">
+            Signal
+            <select value={signal} onChange={(event) => setSignal(event.target.value)}>
+              <option value="">None</option>
+              {/* A pasted signal the form doesn't offer is kept and shown as its raw
+                  code; otherwise the select would silently display "None". */}
+              {signal && !(signal in formFields.signals) && <option value={signal}>{signal}</option>}
+              {Object.entries(formFields.signals).map(([code, label]) => (
+                <option key={code} value={code}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {extraFilters.length > 0 && (
+          <div>
+            <p className="muted">Other Finviz filters from the imported screen</p>
+            <ul className="chips">
+              {extraFilters.map((code) => (
+                <li key={code} className="chip">
+                  {code}
+                  <button
+                    type="button"
+                    aria-label={`Remove ${code}`}
+                    onClick={() => setExtraFilters(extraFilters.filter((existing) => existing !== code))}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {order && <p className="muted">{describeOrder(order)}</p>}
+      </div>
+
+      <div className="editor-section">
+        <label className="field">
+          Name
+          <input type="text" value={name} onChange={(event) => setName(event.target.value)} />
+        </label>
+        <div className="checkbox-field">
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={feedsWatchlist}
+              onChange={(event) => setFeedsWatchlist(event.target.checked)}
+            />
+            Feeds watchlist
+          </label>
+          <span className="muted">Stocks it finds are added to the watchlist every 15 minutes.</span>
+        </div>
+      </div>
+
+      {error && (
+        <p role="alert" className="alert">
+          {error}
+        </p>
       )}
 
-      <label>
-        <input
-          type="checkbox"
-          checked={feedsWatchlist}
-          onChange={(event) => setFeedsWatchlist(event.target.checked)}
-        />
-        Feeds watchlist
-      </label>
-
-      {error && <p role="alert">{error}</p>}
-
-      <button type="submit">Save</button>
-      <button type="button" onClick={onCancel}>
-        Cancel
-      </button>
+      <div className="editor-actions">
+        <button type="submit" className="button-primary" disabled={isSaving}>
+          {isSaving ? "Saving…" : "Save screen"}
+        </button>
+        <button type="button" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
     </form>
   );
 }

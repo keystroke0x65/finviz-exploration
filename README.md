@@ -9,6 +9,8 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
 
 ## What it does
 
+- The header shows the US market session (pre-market, regular hours, after-hours) on a
+  4 AM to 8 PM Eastern strip with a marker for now. Exchange holidays aren't shown.
 - **Screens** tab: saved Finviz screens. Paste a Finviz screener URL (build it on
   finviz.com, copy the address bar) or use the form for country, price, float, market cap,
   volume and relative volume. Running a screen shows price, change, after-hours change,

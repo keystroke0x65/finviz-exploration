@@ -10,7 +10,8 @@ import {
   setPinned,
   WatchlistEntry,
 } from "../api/watchlist";
-import { finvizQuoteUrl, formatEasternDate, formatPercent } from "../format";
+import { changeClass, finvizQuoteUrl, formatEasternDate, formatSignedPercent } from "../format";
+import { RunDots } from "./RunDots";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown error";
@@ -90,26 +91,36 @@ export function WatchlistView() {
 
   return (
     <section>
-      <h2>Watchlist</h2>
-      <form onSubmit={handleAdd}>
-        <label>
-          Ticker
-          <input type="text" value={tickerInput} onChange={(event) => setTickerInput(event.target.value)} />
-        </label>
-        <button type="submit">Add</button>
-      </form>
-      <button type="button" onClick={handleRefresh} disabled={isRefreshing}>
-        Refresh from feeder
-      </button>
+      <div className="watchlist-toolbar">
+        <form className="add-form" onSubmit={handleAdd}>
+          <label className="field">
+            Ticker
+            <input
+              type="text"
+              value={tickerInput}
+              onChange={(event) => setTickerInput(event.target.value)}
+              placeholder="e.g. HOST"
+            />
+          </label>
+          <button type="submit" disabled={!tickerInput.trim()}>
+            Add
+          </button>
+        </form>
+        <div className="toolbar">
+          {feederStatus && (
+            <span className="muted">
+              Last feeder run: {new Date(feederStatus.finished_at).toLocaleString()} —{" "}
+              {summarizeFeederResult(feederStatus)}
+            </span>
+          )}
+          <button type="button" className="button-primary" onClick={handleRefresh} disabled={isRefreshing}>
+            {isRefreshing ? "Refreshing…" : "Refresh from feeder"}
+          </button>
+        </div>
+      </div>
 
-      {feederStatus && (
-        <p>
-          Last feeder run: {new Date(feederStatus.finished_at).toLocaleString()} —{" "}
-          {summarizeFeederResult(feederStatus)}
-        </p>
-      )}
       {feederStatus && feederStatus.failed_screens.length > 0 && (
-        <div role="alert">
+        <div role="alert" className="alert">
           {feederStatus.failed_screens.map((failure) => (
             <p key={failure.screen}>
               {failure.screen}: {failure.reason}
@@ -117,35 +128,47 @@ export function WatchlistView() {
           ))}
         </div>
       )}
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p role="alert" className="alert">
+          {error}
+        </p>
+      )}
 
       {entries.length === 0 ? (
-        <p>The watchlist is empty. Feeder screens add top gainers automatically.</p>
+        <p className="empty-state">
+          The watchlist is empty. Screens marked "feeds watchlist" add their stocks here every 15
+          minutes from 4:00 AM to 8:00 PM ET, or add a ticker above.
+        </p>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Ticker</th>
-              <th>Source</th>
-              <th>Added</th>
-              <th>Last seen</th>
-              <th>Pinned</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((entry) => (
-              <WatchlistRow
-                key={entry.ticker}
-                entry={entry}
-                isExpanded={expandedTicker === entry.ticker}
-                onToggleHistory={() => setExpandedTicker(expandedTicker === entry.ticker ? null : entry.ticker)}
-                onTogglePin={() => handleTogglePin(entry)}
-                onRemove={() => handleRemove(entry)}
-              />
-            ))}
-          </tbody>
-        </table>
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Source</th>
+                <th>Last 30 days</th>
+                <th>Last seen</th>
+                <th>Added</th>
+                <th>Pin</th>
+                <th>
+                  <span className="visually-hidden">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <WatchlistRow
+                  key={entry.ticker}
+                  entry={entry}
+                  isExpanded={expandedTicker === entry.ticker}
+                  onToggleHistory={() => setExpandedTicker(expandedTicker === entry.ticker ? null : entry.ticker)}
+                  onTogglePin={() => handleTogglePin(entry)}
+                  onRemove={() => handleRemove(entry)}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );
@@ -164,21 +187,28 @@ function WatchlistRow({ entry, isExpanded, onToggleHistory, onTogglePin, onRemov
     <>
       <tr>
         <td>
-          <a href={finvizQuoteUrl(entry.ticker)} target="_blank" rel="noreferrer">
+          <a className="ticker" href={finvizQuoteUrl(entry.ticker)} target="_blank" rel="noreferrer">
             {entry.ticker}
           </a>
         </td>
-        <td>{entry.source}</td>
-        <td>{formatEasternDate(entry.added_at)}</td>
+        <td>
+          <span className="badge" data-source={entry.source}>
+            {entry.source}
+          </span>
+        </td>
+        <td>
+          <RunDots appearances={entry.appearances} />
+        </td>
         <td>
           {entry.last_seen_in_feeder_at ? formatEasternDate(entry.last_seen_in_feeder_at) : "never"}
           {entry.expires_at && (
             <>
               {" "}
-              <small>expires {formatEasternDate(entry.expires_at)}</small>
+              <small className="muted">expires {formatEasternDate(entry.expires_at)}</small>
             </>
           )}
         </td>
+        <td>{formatEasternDate(entry.added_at)}</td>
         <td>
           <input
             type="checkbox"
@@ -188,24 +218,35 @@ function WatchlistRow({ entry, isExpanded, onToggleHistory, onTogglePin, onRemov
           />
         </td>
         <td>
-          <button type="button" aria-label={`History for ${entry.ticker}`} onClick={onToggleHistory}>
-            History ({entry.appearances.length})
-          </button>{" "}
-          <button type="button" onClick={onRemove}>
-            Remove
-          </button>
+          <div className="row-actions">
+            <button
+              type="button"
+              className="button-quiet"
+              aria-label={`History for ${entry.ticker}`}
+              aria-expanded={isExpanded}
+              onClick={onToggleHistory}
+            >
+              History ({entry.appearances.length})
+            </button>
+            <button type="button" className="button-quiet" onClick={onRemove}>
+              Remove
+            </button>
+          </div>
         </td>
       </tr>
       {isExpanded && (
         <tr>
-          <td colSpan={6}>
+          <td colSpan={7}>
             {entry.appearances.length === 0 ? (
-              "No feeder runs yet."
+              <span className="muted">No feeder runs yet.</span>
             ) : (
-              <ul>
+              <ul className="history-list">
                 {entry.appearances.map((appearance) => (
                   <li key={`${appearance.seen_on}-${appearance.screen_id}`}>
-                    {appearance.seen_on}: {formatPercent(appearance.change_percent)}
+                    {appearance.seen_on}:{" "}
+                    <span className={changeClass(appearance.change_percent)}>
+                      {formatSignedPercent(appearance.change_percent)}
+                    </span>
                   </li>
                 ))}
               </ul>

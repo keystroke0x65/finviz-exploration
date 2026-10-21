@@ -24,7 +24,7 @@ export function LookupView() {
   }
 
   return (
-    <section>
+    <section className="lookup">
       <StockSearch onSearch={handleSearch} />
       <QuoteTable quote={quote} error={error} isLoading={isLoading} />
     </section>

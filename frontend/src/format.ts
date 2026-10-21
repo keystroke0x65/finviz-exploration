@@ -35,3 +35,17 @@ export function isWebUrl(url: string | null): url is string {
 export function formatEasternDate(isoTimestamp: string): string {
   return new Date(isoTimestamp).toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 }
+
+export function formatSignedPercent(value: number | null): string {
+  if (value == null) {
+    return MISSING_VALUE;
+  }
+  return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+
+export function changeClass(value: number | null): string {
+  if (value == null || value === 0) {
+    return "";
+  }
+  return value > 0 ? "gain" : "loss";
+}

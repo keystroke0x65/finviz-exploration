@@ -24,7 +24,9 @@ export function StockSearch({ onSearch }: StockSearchProps) {
         placeholder="Enter ticker (e.g. AAPL)"
         aria-label="Stock ticker"
       />
-      <button type="submit">Look up</button>
+      <button type="submit" className="button-primary">
+        Look up
+      </button>
     </form>
   );
 }
