@@ -152,3 +152,29 @@ def test_setups_include_ticker_verdict(api_client, db_conn):
     setup = api_client.get("/api/setups").json()["setups"][0]
 
     assert setup["verdict"]["call"] == "no_clear_edge"
+
+
+def test_second_scan_request_gets_409(api_client):
+    from app.scanning.lock import scan_lock
+
+    assert scan_lock.acquire(blocking=False)
+    try:
+        response = api_client.post("/api/scans", json={})
+    finally:
+        scan_lock.release()
+
+    assert response.status_code == 409
+    assert "already running" in response.json()["detail"]
+
+
+def test_scan_lock_released_after_error(api_client):
+    import pytest
+
+    from app.scanning.lock import scan_lock
+
+    with patch("app.routes.setups.run_scan", side_effect=RuntimeError("boom")):
+        with pytest.raises(RuntimeError):
+            api_client.post("/api/scans", json={})
+
+    assert scan_lock.acquire(blocking=False)
+    scan_lock.release()

@@ -1,11 +1,14 @@
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.config import Settings
 from app.db import connect
 from app.finviz_client import run_screen
+from app.scanning.lock import try_scan_lock
 from app.scanning.scanner import ScanDeps, ScanResult, finviz_scan_deps, run_scan
+from app.watchlist.run_status import get_last_feeder_run
+from app.watchlist.store import expire_stale_entries
 from app.watchlist.feeder import FeederResult, RunScreenFunction, is_within_feeder_window, run_feeder
 
 logger = logging.getLogger(__name__)
@@ -51,16 +54,20 @@ def run_scheduled_feeder_tick(
 def run_scheduled_scan(db_path: str, now: datetime, deps: ScanDeps) -> ScanResult | None:
     if not is_within_feeder_window(now):
         return None
-    try:
-        conn = connect(db_path)
+    with try_scan_lock() as is_acquired:
+        if not is_acquired:
+            logger.info("scan skipped: another scan is running")
+            return None
         try:
-            result = run_scan(conn, now, deps)
-        finally:
-            conn.close()
-    except Exception:
-        # Same recovery point as the feeder: log and let the next tick retry.
-        logger.exception("scan failed")
-        return None
+            conn = connect(db_path)
+            try:
+                result = run_scan(conn, now, deps)
+            finally:
+                conn.close()
+        except Exception:
+            # Same recovery point as the feeder: log and let the next tick retry.
+            logger.exception("scan failed")
+            return None
 
     logger.info("scan: %d tickers scanned, %d setups", len(result.scanned), result.setups_found)
     if result.failed:
@@ -68,8 +75,45 @@ def run_scheduled_scan(db_path: str, now: datetime, deps: ScanDeps) -> ScanResul
     return result
 
 
+def run_scheduled_expiry(db_path: str, now: datetime, retention_days: int) -> list[str]:
+    """Expire stale watchlist entries; runs every tick, not only in market hours."""
+    conn = connect(db_path)
+    try:
+        return expire_stale_entries(conn, now, retention_days)
+    finally:
+        conn.close()
+
+
+def seconds_until_first_tick(last_run_at: datetime | None, now: datetime, interval: timedelta) -> float:
+    # uvicorn --reload restarts the lifespan on every code change; without this
+    # each reload would run a feeder tick and a full scan straight away.
+    if last_run_at is None:
+        return 0
+    return max((last_run_at + interval - now).total_seconds(), 0)
+
+
+def _last_feeder_run_at(db_path: str) -> datetime | None:
+    conn = connect(db_path)
+    try:
+        last_run = get_last_feeder_run(conn)
+    finally:
+        conn.close()
+    return last_run.finished_at if last_run else None
+
+
 async def feeder_loop(settings: Settings) -> None:
+    interval = timedelta(minutes=settings.feeder_interval_minutes)
+    delay = seconds_until_first_tick(_last_feeder_run_at(settings.db_path), datetime.now(timezone.utc), interval)
+    if delay:
+        logger.info("feeder: last run was recent, first tick in %d s", delay)
+        await asyncio.sleep(delay)
     while True:
+        try:
+            await asyncio.to_thread(
+                run_scheduled_expiry, settings.db_path, datetime.now(timezone.utc), settings.watchlist_retention_days
+            )
+        except Exception:
+            logger.exception("watchlist expiry failed")
         # Each tick feeds the watchlist first so the scan sees new names.
         feeder_result = await asyncio.to_thread(
             run_scheduled_feeder_tick,

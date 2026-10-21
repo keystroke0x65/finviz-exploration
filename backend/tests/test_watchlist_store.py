@@ -160,3 +160,17 @@ def test_feeder_hits_are_committed_by_the_caller(db_conn, tmp_path):
     other_conn = connect(str(tmp_path / "test.db"))
     assert other_conn.execute("SELECT COUNT(*) FROM watchlist_entries").fetchone()[0] == 1
     other_conn.close()
+
+
+def test_appearances_name_their_screen(db_conn):
+    from app.screens.finviz_url import ScreenCriteria
+    from app.screens.store import ScreenInput, create_screen, delete_screen
+
+    screen = create_screen(db_conn, ScreenInput("Top gainers", ScreenCriteria(["geo_usa"], None, None), True), NOW)
+    record_feeder_hit(db_conn, "HOST", 5.0, screen.id, NOW)
+    record_feeder_hit(db_conn, "HOST", 6.0, 999, NOW)  # screen since deleted / unknown
+    db_conn.commit()
+
+    names = {appearance.screen_id: appearance.screen_name for appearance in get_entry(db_conn, "HOST").appearances}
+
+    assert names == {screen.id: "Top gainers", 999: None}

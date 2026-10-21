@@ -16,6 +16,8 @@ class Appearance:
     seen_on: date
     change_percent: float | None
     screen_id: int
+    # None once the screen has been deleted.
+    screen_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -45,13 +47,15 @@ def _eastern_date(moment: datetime) -> date:
 def _load_appearances(conn: sqlite3.Connection, ticker: str) -> list[Appearance]:
     rows = conn.execute(
         """
-        SELECT seen_on, change_percent, screen_id FROM watchlist_appearances
-        WHERE ticker = ? ORDER BY seen_on DESC, screen_id
+        SELECT appearances.seen_on, appearances.change_percent, appearances.screen_id, screens.name AS screen_name
+        FROM watchlist_appearances AS appearances
+        LEFT JOIN screens ON screens.id = appearances.screen_id
+        WHERE appearances.ticker = ? ORDER BY appearances.seen_on DESC, appearances.screen_id
         """,
         (ticker,),
     )
     return [
-        Appearance(date.fromisoformat(row["seen_on"]), row["change_percent"], row["screen_id"])
+        Appearance(date.fromisoformat(row["seen_on"]), row["change_percent"], row["screen_id"], row["screen_name"])
         for row in rows
     ]
 

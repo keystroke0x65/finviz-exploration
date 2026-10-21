@@ -51,7 +51,9 @@ those the feeder just found, or with relative volume of 1.5 or more, or moving 5
 records what it finds. "Scan watchlist" on the Setups tab and "Scan this stock" on the
 Stock tab run a scan on demand; a full scan takes about two minutes because Finviz is
 called at most once a second. If Finviz starts rate limiting, the scan stops and lists the
-stocks it skipped.
+stocks it skipped. Only one scan runs at a time: "Scan watchlist" says so if a scheduled scan is
+already running. Expired watchlist entries are cleared on every 15-minute tick, including
+evenings and weekends.
 
 Patterns so far:
 - Momentum (1m and 5m): high/low of day break, pre-market high/low break, opening range

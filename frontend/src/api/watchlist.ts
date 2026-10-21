@@ -5,6 +5,7 @@ export interface Appearance {
   seen_on: string;
   change_percent: number | null;
   screen_id: number;
+  screen_name?: string | null;
 }
 
 export interface PriceSnapshot {

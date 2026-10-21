@@ -26,7 +26,7 @@ const AUTO_ENTRY: WatchlistEntry = {
     computed_at: "2026-10-20T14:00:00Z" },
   appearances: [
     { seen_on: "2026-10-20", change_percent: 47.4, screen_id: 1 },
-    { seen_on: "2026-10-03", change_percent: 22.1, screen_id: 1 },
+    { seen_on: "2026-10-03", change_percent: 22.1, screen_id: 1, screen_name: "Top gainers — low float" },
   ],
 };
 const MANUAL_ENTRY: WatchlistEntry = {
@@ -72,6 +72,7 @@ describe("WatchlistView", () => {
     fireEvent.click(await screen.findByRole("button", { name: "History for HOST" }));
 
     expect(screen.getByText("+22.10%")).toBeInTheDocument();
+    expect(screen.getByText("(Top gainers — low float)")).toBeInTheDocument();
   });
 
   it("toggles pin and re-renders the entry", async () => {

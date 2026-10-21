@@ -161,3 +161,33 @@ def test_scheduled_scan_logs_failed_tickers(tmp_path, caplog):
 
     assert "scan failures" in caplog.text
     assert "HTTP 500" in caplog.text
+
+
+def test_expiry_runs_outside_the_feeder_window(tmp_path):
+    from datetime import timedelta
+
+    from app.watchlist.scheduler import run_scheduled_expiry
+    from app.watchlist.store import get_entry, record_feeder_hit
+
+    db_path = _seeded_db_path(tmp_path)
+    conn = connect(db_path)
+    record_feeder_hit(conn, "OLD", 5.0, 1, SATURDAY_10AM_ET - timedelta(days=91))
+    conn.commit()
+    conn.close()
+
+    assert run_scheduled_expiry(db_path, SATURDAY_10AM_ET, RETENTION_DAYS) == ["OLD"]
+    conn = connect(db_path)
+    assert get_entry(conn, "OLD") is None
+    conn.close()
+
+
+def test_startup_tick_skipped_when_recent_run_exists():
+    from datetime import timedelta
+
+    from app.watchlist.scheduler import seconds_until_first_tick
+
+    interval = timedelta(minutes=15)
+
+    assert seconds_until_first_tick(None, TUESDAY_10AM_ET, interval) == 0
+    assert seconds_until_first_tick(TUESDAY_10AM_ET - timedelta(minutes=5), TUESDAY_10AM_ET, interval) == 600
+    assert seconds_until_first_tick(TUESDAY_10AM_ET - timedelta(minutes=20), TUESDAY_10AM_ET, interval) == 0

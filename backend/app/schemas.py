@@ -102,6 +102,7 @@ class AppearanceOut(BaseModel):
     seen_on: date
     change_percent: float | None
     screen_id: int
+    screen_name: str | None = None
 
 
 class VerdictOut(BaseModel):
