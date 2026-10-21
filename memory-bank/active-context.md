@@ -4,22 +4,20 @@
      to operations-only writes). Keep it under 80 lines. Durable facts belong in context/ or experience/. -->
 
 ## Current focus
-Phase 2 milestone 1 (screens + watchlist feeder) is built, reviewed, and restyled on
-branch feat/phase2-m1-screens-watchlist (worktree .worktrees/feat-phase2-m1). DB moved to
-data/ (gitignored). Docker stack is running FROM THE WORKTREE (FRONTEND_PORT=5174), so its
-DB is currently .worktrees/feat-phase2-m1/data/. Awaiting merge/PR/keep choice.
+Phase 2 M1 merged into main (05d8327) on 2026-10-21; not yet pushed (main ahead of origin).
+DB at data/finviz_dashboard.db (gitignored). Docker stack runs from main with
+FRONTEND_PORT=5174 (user's other project holds 5173; FRONTEND_PORT not yet in .env).
+Now: writing the M2 plan (bars, core+momentum patterns, trade plans, verdict, outcomes).
 
 ## Open questions / blockers
 - Schwab developer API application not started (user's action; needed for phase 3).
-- Docker not reachable from WSL right now (Docker Desktop integration) — Docker run of
-  M1 not verified; local uvicorn+vite smoke test passed against live Finviz.
-- 9 deferred minor review findings (see M1 final report in conversation; e.g. re-checking
-  codes on every save, expiry only inside feeder window, no screen name in history).
+- 9 deferred minor review findings from M1 (re-check codes on every save, expiry only
+  inside feeder window, no screen name in history, order code unvalidated, etc.).
 
 ## Recent changes
-- 2026-10-20: Built M1 (10 plan tasks + 3 review fixes). Spec deviation: replaced
-  ">5,000 rows = ignored filters" with save-time code validation after a live check.
-- 2026-10-20: Phase 2 spec + M1 plan committed on main.
+- 2026-10-21: Removed old phase1/branch Docker containers, volume, images, network.
+- 2026-10-21: Merged M1, copied DB into main data/, removed worktree + branch.
+- 2026-10-20: Built M1 + UI redesign; spec deviation (save-time code validation).
 
 ## Next steps
-- Integrate the M1 branch, then write the M2 plan.
+- Write + execute M2 plan. Watchlist should gain today's price/change (wide-column batch).
