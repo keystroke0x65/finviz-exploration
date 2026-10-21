@@ -130,3 +130,12 @@ def test_list_current_setups_drops_tickers_not_scanned_recently(db_conn):
     mark_ticker_scanned(db_conn, "WORX", days_later)
 
     assert [setup.ticker for setup in list_current_setups(db_conn)] == ["WORX"]
+
+
+def test_setup_keeps_verdict_from_first_detection(db_conn):
+    first = record_match(db_conn, "HOST", match(), plan(), "forming", SCORE, "regular", 5.0, SCAN_1,
+                         verdict="leans_long")
+    second = record_match(db_conn, "HOST", match(), plan(), "forming", SCORE, "regular", 5.0, SCAN_2,
+                          verdict="leans_short")
+
+    assert first.verdict == second.verdict == "leans_long"

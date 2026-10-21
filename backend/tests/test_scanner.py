@@ -141,3 +141,15 @@ def test_scan_resolves_open_setups_of_tickers_no_longer_active(db_conn):
     run_scan(db_conn, after_close, deps(forming), tickers=["OTHER"])
 
     assert list_open_records(db_conn, "HOST") == []
+
+
+def test_scan_ticker_saves_verdict(db_conn):
+    from app.scanning.verdicts import read_verdicts
+
+    scan_ticker(db_conn, "HOST", snapshot("HOST"), NOW, deps())
+
+    verdict, computed_at = read_verdicts(db_conn)["HOST"]
+    assert verdict.call in {"leans_long", "leans_short", "no_clear_edge"}
+    assert verdict.reasons
+    assert computed_at == NOW
+    assert all(setup.verdict == verdict.call for setup in list_current_setups(db_conn, "HOST"))

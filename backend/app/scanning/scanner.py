@@ -16,8 +16,10 @@ from app.patterns.levels import find_daily_levels
 from app.patterns.ranking import score_setup
 from app.patterns.trade_plan import build_trade_plan, classify_state
 from app.patterns.types import DetectorContext, PatternMatch
+from app.patterns.verdict import Verdict, compute_verdict
 from app.scanning.active import select_active_tickers
 from app.scanning.snapshots import save_snapshots
+from app.scanning.verdicts import save_verdict
 from app.setups.resolver import has_deadline_passed, resolve_outcome
 from app.setups.store import (
     list_open_records,
@@ -94,6 +96,24 @@ def _detect_all(bars_by_timeframe: dict[Interval, list[Bar]], now: datetime) -> 
     return matches
 
 
+def _todays_bars(bars: list[Bar], now: datetime) -> list[Bar]:
+    today = now.astimezone(EASTERN).date()
+    return [bar for bar in bars if bar.time.astimezone(EASTERN).date() == today]
+
+
+def _verdict_for(
+    bars_by_timeframe: dict[Interval, list[Bar]], matches: list[PatternMatch], now: datetime
+) -> Verdict:
+    # Only today's intraday bars say anything about how the stock is trading now.
+    one_minute = _todays_bars(bars_by_timeframe["1m"], now)
+    five_minute = _todays_bars(bars_by_timeframe["5m"], now)
+    daily = bars_by_timeframe["daily"]
+    return compute_verdict(
+        one_minute, five_minute, daily, session_vwap(one_minute) if one_minute else None,
+        find_daily_levels(daily), matches,
+    )
+
+
 def _record_matches(
     conn: sqlite3.Connection,
     ticker: str,
@@ -101,6 +121,7 @@ def _record_matches(
     bars_by_timeframe: dict[Interval, list[Bar]],
     snapshot: ScreenRow | None,
     now: datetime,
+    verdict_call: str | None,
 ) -> int:
     daily_levels = find_daily_levels(bars_by_timeframe["daily"])
     recorded = 0
@@ -117,7 +138,9 @@ def _record_matches(
         others = [other for other in matches if other is not match]
         score = score_setup(match, plan, state, snapshot.relative_volume if snapshot else None, others)
         float_millions = snapshot.float_millions if snapshot else None
-        record_match(conn, ticker, match, plan, state, score, _session_label(match), float_millions, now)
+        record_match(
+            conn, ticker, match, plan, state, score, _session_label(match), float_millions, now, verdict=verdict_call
+        )
         recorded += 1
     return recorded
 
@@ -158,7 +181,9 @@ def scan_ticker(conn: sqlite3.Connection, ticker: str, snapshot: ScreenRow | Non
         timeframe: load_bars(conn, ticker, timeframe, now, deps.fetch_bars).bars for timeframe in TIMEFRAMES
     }
     matches = _detect_all(bars_by_timeframe, now)
-    recorded = _record_matches(conn, ticker, matches, bars_by_timeframe, snapshot, now)
+    verdict = _verdict_for(bars_by_timeframe, matches, now)
+    save_verdict(conn, ticker, verdict, now)
+    recorded = _record_matches(conn, ticker, matches, bars_by_timeframe, snapshot, now, verdict.call)
     _resolve_open_records(conn, ticker, bars_by_timeframe, now)
     mark_ticker_scanned(conn, ticker, now)
     return recorded
