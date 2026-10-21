@@ -14,6 +14,10 @@ FEEDER_WINDOW_START = time(4, 0)
 FEEDER_WINDOW_END = time(20, 0)
 SATURDAY = 5
 
+# A broad screen marked as a feeder would otherwise flood the watchlist (and
+# every later scan) with thousands of names; Finviz's order decides who gets in.
+MAX_FEEDER_HITS_PER_SCREEN = 100
+
 RunScreenFunction = Callable[[list[str], str | None, str | None], ScreenResult]
 
 
@@ -50,7 +54,14 @@ def run_feeder(
         if failure_reason is not None:
             failed_screens.append((screen.name, failure_reason))
             continue
-        for row in result.rows:
+        rows = result.rows[:MAX_FEEDER_HITS_PER_SCREEN]
+        if len(result.rows) > MAX_FEEDER_HITS_PER_SCREEN:
+            failed_screens.append((
+                screen.name,
+                f"returned {len(result.rows)} stocks; only the first {MAX_FEEDER_HITS_PER_SCREEN} were added"
+                " — narrow the screen",
+            ))
+        for row in rows:
             outcome = record_feeder_hit(conn, row.ticker, row.change_percent, screen.id, now)
             already_counted = row.ticker in tickers_added or row.ticker in tickers_updated
             if not already_counted:

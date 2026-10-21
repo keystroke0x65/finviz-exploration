@@ -144,8 +144,9 @@ def test_broad_valid_screen_over_5000_rows_still_feeds_watchlist(db_conn, monkey
 
     result = run_feeder(db_conn, run_screen, NOW, RETENTION_DAYS)
 
-    assert result.failed_screens == []
-    assert len(result.tickers_added) == 6000
+    # Not rejected as "unfiltered" (the old bug); capped at the feeder limit instead.
+    assert len(result.tickers_added) == 100
+    assert result.failed_screens[0][1].startswith("returned 6000 stocks")
     get_settings.cache_clear()
 
 
@@ -183,3 +184,19 @@ def test_run_feeder_saves_last_run_summary(db_conn):
     assert last_run.finished_at == NOW
     assert last_run.result.tickers_added == ["WORX"]
     assert last_run.result.failed_screens[0][0] == "First"
+
+
+def test_feeder_caps_hits_per_screen(db_conn):
+    from app.watchlist.feeder import MAX_FEEDER_HITS_PER_SCREEN
+
+    _add_screen(db_conn, "Broad", ["geo_usa"])
+    rows = [_row(f"T{index:03d}", 1.0) for index in range(150)]
+
+    result = run_feeder(db_conn, lambda *args: ScreenResult(rows), NOW, RETENTION_DAYS)
+
+    assert MAX_FEEDER_HITS_PER_SCREEN == 100
+    assert len(result.tickers_added) == 100
+    assert result.tickers_added[0] == "T000"
+    assert result.failed_screens == [
+        ("Broad", "returned 150 stocks; only the first 100 were added — narrow the screen")
+    ]

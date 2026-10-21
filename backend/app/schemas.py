@@ -52,6 +52,11 @@ class ScreenDraft(BaseModel):
     order: str | None
 
 
+class ParsedScreenDraft(ScreenDraft):
+    # URL parameters the saved screen won't keep, shown so the user knows.
+    ignored_params: list[str]
+
+
 class ScreenOut(ScreenDraft):
     id: int
     name: str

@@ -11,6 +11,7 @@ from app.routes.dependencies import finviz_error_to_http, get_db_connection
 from app.schemas import (
     FormFieldsOut,
     ParseUrlIn,
+    ParsedScreenDraft,
     ScreenDraft,
     ScreenFormModel,
     ScreenIn,
@@ -29,6 +30,7 @@ from app.screens.finviz_url import (
     InvalidScreenerUrlError,
     ScreenCriteria,
     build_finviz_screener_url,
+    find_ignored_params,
     parse_finviz_screener_url,
 )
 from app.screens.store import (
@@ -82,9 +84,16 @@ def _to_screen_input(body: ScreenIn) -> ScreenInput:
     )
 
 
-def _reject_unrecognised_codes(body: ScreenIn) -> None:
+def _reject_unrecognised_codes(body: ScreenIn, existing: ScreenCriteria | None = None) -> None:
+    # Codes already saved on this screen were checked when they were added, so
+    # a rename or feeder toggle costs no Finviz requests.
+    known_codes = set(existing.filters) if existing else set()
+    new_codes = [code for code in body.extra_filters if code not in known_codes]
+    new_signal = body.signal if body.signal and (existing is None or body.signal != existing.signal) else None
+    if not new_codes and not new_signal:
+        return
     try:
-        unrecognised = find_unrecognised_codes(body.extra_filters, body.signal)
+        unrecognised = find_unrecognised_codes(new_codes, new_signal)
     except (FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError) as exc:
         raise finviz_error_to_http(exc) from exc
     if unrecognised:
@@ -120,20 +129,20 @@ def get_form_fields() -> FormFieldsOut:
     return FormFieldsOut(options=FORM_OPTIONS, signals=SIGNAL_OPTIONS)
 
 
-@router.post("/parse-url", response_model=ScreenDraft)
-def post_parse_url(body: ParseUrlIn) -> ScreenDraft:
+@router.post("/parse-url", response_model=ParsedScreenDraft)
+def post_parse_url(body: ParseUrlIn) -> ParsedScreenDraft:
     try:
         criteria = parse_finviz_screener_url(body.url)
     except InvalidScreenerUrlError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return _to_draft(criteria)
+    return ParsedScreenDraft(**_to_draft(criteria).model_dump(), ignored_params=find_ignored_params(body.url))
 
 
 @router.put("/{screen_id}", response_model=ScreenOut)
 def put_screen(screen_id: int, body: ScreenIn, conn: DbConnection) -> ScreenOut:
-    _require_screen(conn, screen_id)
+    existing = _require_screen(conn, screen_id)
     screen_input = _to_screen_input(body)
-    _reject_unrecognised_codes(body)
+    _reject_unrecognised_codes(body, existing.criteria)
     screen = update_screen(conn, screen_id, screen_input, datetime.now(timezone.utc))
     if screen is None:
         raise HTTPException(status_code=404, detail=f"Screen {screen_id} not found")

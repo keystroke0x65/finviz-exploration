@@ -113,4 +113,17 @@ describe("ScreenEditor", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save screen" }));
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ signal: "ta_p_channelup" })));
   });
+
+  it("names Finviz URL parts the screen won't keep", async () => {
+    parseScreenerUrl.mockResolvedValue({
+      form: {}, extra_filters: [], signal: null, order: "-change", ignored_params: ["t", "r"],
+    });
+    renderEditor();
+
+    fireEvent.change(screen.getByLabelText("Finviz screener URL"), { target: { value: "x" } });
+    fireEvent.click(screen.getByRole("button", { name: "Import" }));
+
+    expect(await screen.findByText("Finviz URL parts not used: t, r")).toBeInTheDocument();
+    expect(screen.getByText("Sort order isn't checked with Finviz.")).toBeInTheDocument();
+  });
 });

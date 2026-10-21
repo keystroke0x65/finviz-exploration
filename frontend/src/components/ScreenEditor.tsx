@@ -83,6 +83,7 @@ export function ScreenEditor({ initial, formFields, onSave, onCancel }: ScreenEd
   const [extraFilters, setExtraFilters] = useState<string[]>(initial?.extra_filters ?? []);
   const [feedsWatchlist, setFeedsWatchlist] = useState(initial?.feeds_watchlist ?? false);
   const [screenerUrl, setScreenerUrl] = useState("");
+  const [ignoredParams, setIgnoredParams] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   // Saving can take a few seconds: pasted codes are checked with Finviz first.
   const [isSaving, setIsSaving] = useState(false);
@@ -95,6 +96,7 @@ export function ScreenEditor({ initial, formFields, onSave, onCancel }: ScreenEd
       setSignal(draft.signal ?? "");
       setOrder(draft.order);
       setExtraFilters(draft.extra_filters);
+      setIgnoredParams(draft.ignored_params ?? []);
     } catch (importError) {
       setError(errorMessage(importError));
     }
@@ -204,7 +206,14 @@ export function ScreenEditor({ initial, formFields, onSave, onCancel }: ScreenEd
             </ul>
           </div>
         )}
-        {order && <p className="muted">{describeOrder(order)}</p>}
+        {order && (
+          <p className="muted">
+            {describeOrder(order)} <span>Sort order isn't checked with Finviz.</span>
+          </p>
+        )}
+        {ignoredParams.length > 0 && (
+          <p className="muted">Finviz URL parts not used: {ignoredParams.join(", ")}</p>
+        )}
       </div>
 
       <div className="editor-section">
