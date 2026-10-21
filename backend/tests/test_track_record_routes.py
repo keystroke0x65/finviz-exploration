@@ -7,9 +7,12 @@ def test_track_record_route_returns_rows(api_client, db_conn):
 
     body = api_client.get("/api/track-record").json()
 
-    assert body["min_trades"] == 30
+    assert (body["min_trades"], body["min_trading_days"]) == (30, 5)
     [row] = body["rows"]
     assert (row["pattern"], row["timeframe"], row["trades"], row["win_rate"]) == ("abcd", "5m", 2, 0.5)
+    assert (row["average_win_r"], row["tickers"], row["trading_days"]) == (3.0, 1, 1)
+    assert (row["first_day"], row["last_day"]) == ("2026-10-20", "2026-10-20")
+    assert row["has_enough_history"] is False
 
 
 def test_track_record_route_filters(api_client, db_conn):

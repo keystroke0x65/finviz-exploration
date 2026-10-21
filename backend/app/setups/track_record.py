@@ -6,6 +6,10 @@ expired after their entry filled. Setups that never filled, were first seen past
 
 R per trade: a target hit earns the plan's available reward:risk, a stop loses 1R, and
 an expiry after filling counts as 0R because the exit price isn't recorded.
+
+One trade can leave several records (the same pattern re-detected on the same stock with a
+slightly different entry). Records with the same stock, pattern, timeframe, outcome and exit
+bar are counted once so they don't inflate the sample.
 """
 
 import sqlite3
@@ -22,8 +26,11 @@ FLOAT_BUCKETS: list[tuple[float, FloatBucket]] = [
     (50.0, "20m_to_50m"),
 ]
 NOT_A_TRADE = {"not_tracked", "unresolved"}
-# History only starts to move scores once a pattern has this many trades.
+# History only moves scores once a pattern has this many trades, spread over this many
+# trading days: one busy (or buggy) day mustn't decide how a pattern scores.
 MIN_TRADES_FOR_TRACK_RECORD = 30
+MIN_TRADING_DAYS_FOR_TRACK_RECORD = 5
+DATE_LENGTH = len("2026-10-20")  # stored times are Eastern, so the prefix is the trading day
 
 
 def classify_float(float_millions: float | None) -> FloatBucket:
@@ -45,9 +52,22 @@ class PatternStats:
     expired_after_fill: int
     win_rate: float | None
     average_r: float | None
+    average_win_r: float | None
     average_max_favorable_r: float | None
     not_trades: int
     still_open: int
+    tickers: int
+    trading_days: int
+    first_day: str | None
+    last_day: str | None
+
+
+def has_enough_history(stats: PatternStats | None) -> bool:
+    return (
+        stats is not None
+        and stats.trades >= MIN_TRADES_FOR_TRACK_RECORD
+        and stats.trading_days >= MIN_TRADING_DAYS_FOR_TRACK_RECORD
+    )
 
 
 def _trade_r(row: sqlite3.Row) -> float | None:
@@ -61,27 +81,49 @@ def _trade_r(row: sqlite3.Row) -> float | None:
     return None
 
 
+def _distinct_trades(rows: list[sqlite3.Row]) -> list[sqlite3.Row]:
+    seen: set[tuple] = set()
+    distinct = []
+    for row in rows:
+        key = (row["ticker"], row["pattern"], row["timeframe"], row["outcome"], row["resolved_at"])
+        if row["resolved_at"] is not None and key in seen:
+            continue
+        seen.add(key)
+        distinct.append(row)
+    return distinct
+
+
+def _average(values: list[float]) -> float | None:
+    return sum(values) / len(values) if values else None
+
+
 def _summarise(pattern: str, timeframe: str, rows: list[sqlite3.Row]) -> PatternStats:
-    trade_rows = [row for row in rows if _trade_r(row) is not None]
-    trade_rs = [_trade_r(row) for row in trade_rows]
-    excursions = [row["max_favorable_r"] for row in trade_rows if row["max_favorable_r"] is not None]
-    wins = sum(1 for row in trade_rows if row["outcome"] == "target")
+    trade_rows = _distinct_trades([row for row in rows if _trade_r(row) is not None])
+    win_rows = [row for row in trade_rows if row["outcome"] == "target"]
+    days = sorted({row["detected_at"][:DATE_LENGTH] for row in trade_rows})
     trades = len(trade_rows)
     return PatternStats(
         pattern=pattern,
         timeframe=timeframe,
         trades=trades,
-        wins=wins,
+        wins=len(win_rows),
         losses=sum(1 for row in trade_rows if row["outcome"] == "stop"),
         expired_after_fill=sum(1 for row in trade_rows if row["outcome"] == "expired"),
-        win_rate=wins / trades if trades else None,
-        average_r=sum(trade_rs) / trades if trades else None,
-        average_max_favorable_r=sum(excursions) / len(excursions) if excursions else None,
+        win_rate=len(win_rows) / trades if trades else None,
+        average_r=_average([_trade_r(row) for row in trade_rows]),
+        average_win_r=_average([_trade_r(row) for row in win_rows]),
+        average_max_favorable_r=_average(
+            [row["max_favorable_r"] for row in trade_rows if row["max_favorable_r"] is not None]
+        ),
         not_trades=sum(
             1 for row in rows
             if row["outcome"] in NOT_A_TRADE or (row["outcome"] == "expired" and row["max_favorable_r"] is None)
         ),
         still_open=sum(1 for row in rows if row["outcome"] == "open"),
+        tickers=len({row["ticker"] for row in trade_rows}),
+        trading_days=len(days),
+        first_day=days[0] if days else None,
+        last_day=days[-1] if days else None,
     )
 
 
@@ -95,7 +137,8 @@ def compute_track_record(
 ) -> list[PatternStats]:
     rows = conn.execute(
         """
-        SELECT pattern, timeframe, outcome, available_reward_risk, max_favorable_r, float_at_detection
+        SELECT ticker, pattern, timeframe, outcome, resolved_at, detected_at, available_reward_risk, max_favorable_r,
+            float_at_detection
         FROM setup_records
         WHERE (? IS NULL OR pattern = ?) AND (? IS NULL OR timeframe = ?) AND (? IS NULL OR session = ?)
         """,

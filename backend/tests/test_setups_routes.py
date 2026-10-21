@@ -200,4 +200,7 @@ def test_setups_include_pattern_track_record(api_client, db_conn):
 
     setup = api_client.get("/api/setups").json()["setups"][0]
 
-    assert setup["track_record"] == {"trades": 3, "win_rate": 1.0, "average_r": 3.0}
+    assert setup["track_record"] == {
+        "trades": 3, "win_rate": 1.0, "average_r": 3.0, "average_win_r": 3.0, "tickers": 1, "trading_days": 1,
+        "has_enough_history": False,
+    }

@@ -47,10 +47,16 @@ export interface TrackRecordSummary {
   trades: number;
   win_rate: number | null;
   average_r: number | null;
+  average_win_r: number | null;
+  tickers: number;
+  trading_days: number;
+  has_enough_history: boolean;
 }
 
-// History starts to count in scores at this many trades (mirrors the backend).
+// History counts in scores at this many trades over this many trading days. The backend
+// decides (has_enough_history); these mirror it only for the explanatory text.
 export const MIN_TRADES_FOR_TRACK_RECORD = 30;
+export const MIN_TRADING_DAYS_FOR_TRACK_RECORD = 5;
 
 // A bearish pattern shown while short setups are off: no stop, targets or R:R.
 export interface Warning {

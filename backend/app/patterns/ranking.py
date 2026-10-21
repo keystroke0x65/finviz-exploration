@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from app.patterns.trade_plan import TARGET_R, TradePlan
 from app.patterns.types import TIMEFRAME_ORDER, PatternMatch, SetupState
-from app.setups.track_record import MIN_TRADES_FOR_TRACK_RECORD, PatternStats
+from app.setups.track_record import PatternStats, has_enough_history
 
 WEIGHTS = {
     "reward_risk": 0.40,
@@ -41,7 +41,7 @@ def _has_conflict(match: PatternMatch, others: list[PatternMatch]) -> bool:
 
 
 def _track_record_points(track_record: PatternStats | None) -> float:
-    if track_record is None or track_record.trades < MIN_TRADES_FOR_TRACK_RECORD or track_record.average_r is None:
+    if not has_enough_history(track_record) or track_record.average_r is None:
         return 0.0
     return round(max(min(track_record.average_r, 1.0), -1.0) * TRACK_RECORD_POINTS, 1)
 

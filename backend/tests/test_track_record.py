@@ -1,23 +1,30 @@
 import pytest
 
-from app.setups.track_record import classify_float, compute_track_record, stats_for
+from app.setups.track_record import classify_float, compute_track_record, has_enough_history, stats_for
 
 DETECTED = "2026-10-20T10:00:00-04:00"
 
 
 def add_record(conn, outcome, pattern="bull_flag", timeframe="1m", available_rr=3.0, filled=True,
-               float_millions=5.0, session="regular", entry=None):
-    entry = entry if entry is not None else 2.0 + conn.execute("SELECT COUNT(*) FROM setup_records").fetchone()[0] / 100
+               float_millions=5.0, session="regular", entry=None, ticker="HOST", detected_at=DETECTED,
+               resolved_at=None):
+    count = conn.execute("SELECT COUNT(*) FROM setup_records").fetchone()[0]
+    entry = entry if entry is not None else 2.0 + count / 100
+    # Each record exits on its own bar unless a test says otherwise.
+    if resolved_at is None and outcome in ("target", "stop", "expired"):
+        resolved_at = f"2026-10-20T11:{count:02d}:00-04:00"
     conn.execute(
         """
         INSERT INTO setup_records (ticker, pattern, direction, timeframe, entry, stop, capped_target, target_3r,
             available_reward_risk, risk_percent, partial_1r, partial_2r, quality, score, score_parts, key_points,
-            state, first_state, session, float_at_detection, detected_at, last_seen_at, outcome, max_favorable_r,
-            max_adverse_r)
-        VALUES ('HOST', ?, 'long', ?, ?, ?, ?, ?, ?, 5, 0, 0, 0.7, 70, '{}', '[]', 'forming', 'forming', ?, ?, ?, ?, ?, ?, ?)
+            state, first_state, session, float_at_detection, detected_at, last_seen_at, outcome, resolved_at,
+            max_favorable_r, max_adverse_r)
+        VALUES (?, ?, 'long', ?, ?, ?, ?, ?, ?, 5, 0, 0, 0.7, 70, '{}', '[]', 'forming', 'forming', ?, ?, ?, ?, ?, ?,
+            ?, ?)
         """,
-        (pattern, timeframe, entry, entry - 0.1, entry + 0.1 * available_rr, entry + 0.3, available_rr, session,
-         float_millions, DETECTED, DETECTED, outcome, 1.5 if filled else None, -0.5 if filled else None),
+        (ticker, pattern, timeframe, entry, entry - 0.1, entry + 0.1 * available_rr, entry + 0.3, available_rr,
+         session, float_millions, detected_at, detected_at, outcome, resolved_at, 1.5 if filled else None,
+         -0.5 if filled else None),
     )
     conn.commit()
 
@@ -93,3 +100,72 @@ def test_stats_for_one_pattern(db_conn):
 ])
 def test_float_bucket_boundaries(value, bucket):
     assert classify_float(value) == bucket
+
+
+def test_one_trade_detected_twice_counts_once(db_conn):
+    # Two records of the same pattern on one ticker that exit on the same bar are one trade
+    # (e.g. re-detected with a nudged entry), so they mustn't double the sample.
+    exit_bar = "2026-10-20T11:30:00-04:00"
+    add_record(db_conn, "target", entry=2.00, resolved_at=exit_bar)
+    add_record(db_conn, "target", entry=2.01, resolved_at=exit_bar)
+    add_record(db_conn, "target", ticker="OTHER", resolved_at=exit_bar)
+    add_record(db_conn, "stop")
+
+    [stats] = compute_track_record(db_conn)
+
+    assert (stats.trades, stats.wins, stats.losses) == (3, 2, 1)
+
+
+def test_reports_tickers_trading_days_and_date_span(db_conn):
+    add_record(db_conn, "target", ticker="AAA", detected_at="2026-10-14T09:45:00-04:00")
+    add_record(db_conn, "stop", ticker="AAA", detected_at="2026-10-20T15:00:00-04:00")
+    add_record(db_conn, "stop", ticker="BBB", detected_at="2026-10-20T19:30:00-04:00")
+    add_record(db_conn, "open", ticker="CCC", filled=False, detected_at="2026-10-21T10:00:00-04:00")
+
+    [stats] = compute_track_record(db_conn)
+
+    assert (stats.tickers, stats.trading_days) == (2, 2)
+    assert (stats.first_day, stats.last_day) == ("2026-10-14", "2026-10-20")
+
+
+def test_average_win_shows_how_big_the_wins_were(db_conn):
+    add_record(db_conn, "target", available_rr=0.5)
+    add_record(db_conn, "target", available_rr=1.5)
+    add_record(db_conn, "stop")
+
+    [stats] = compute_track_record(db_conn)
+
+    assert stats.average_win_r == pytest.approx(1.0)
+
+
+def test_average_win_is_none_without_wins(db_conn):
+    add_record(db_conn, "stop")
+
+    [stats] = compute_track_record(db_conn)
+
+    assert stats.average_win_r is None
+
+
+def _record_trades(conn, count, days):
+    for index in range(count):
+        day = 10 + index % days
+        add_record(conn, "stop", ticker=f"T{index}", detected_at=f"2026-09-{day:02d}T10:00:00-04:00",
+                   resolved_at=f"2026-09-{day:02d}T11:00:00-04:00")
+
+
+def test_enough_history_needs_thirty_trades_over_five_trading_days(db_conn):
+    _record_trades(db_conn, 30, days=5)
+
+    assert has_enough_history(stats_for(db_conn, "bull_flag", "1m"))
+
+
+def test_thirty_trades_from_too_few_days_is_not_enough_history(db_conn):
+    _record_trades(db_conn, 40, days=4)
+
+    assert not has_enough_history(stats_for(db_conn, "bull_flag", "1m"))
+
+
+def test_twenty_nine_trades_is_not_enough_history(db_conn):
+    _record_trades(db_conn, 29, days=10)
+
+    assert not has_enough_history(stats_for(db_conn, "bull_flag", "1m"))

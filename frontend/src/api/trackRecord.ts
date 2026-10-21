@@ -13,9 +13,15 @@ export interface PatternStats {
   expired_after_fill: number;
   win_rate: number | null;
   average_r: number | null;
+  average_win_r: number | null;
   average_max_favorable_r: number | null;
   not_trades: number;
   still_open: number;
+  tickers: number;
+  trading_days: number;
+  first_day: string | null;
+  last_day: string | null;
+  has_enough_history: boolean;
 }
 
 export interface TrackRecordFilters {
@@ -27,6 +33,7 @@ export interface TrackRecordFilters {
 export interface TrackRecordResponse {
   rows: PatternStats[];
   min_trades: number;
+  min_trading_days: number;
 }
 
 export function fetchTrackRecord(filters: TrackRecordFilters): Promise<TrackRecordResponse> {

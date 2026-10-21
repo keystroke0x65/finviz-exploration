@@ -73,14 +73,17 @@ create setups on their own. A supporting candle whose wick tags a setup's stop o
 
 The **Track record** tab shows how each pattern has actually played out on your stocks, per
 timeframe, filterable by float size and session: number of trades, win rate, average R,
-and the average best move after entry. Only trades you could have taken count: a setup
-counts once price reached its entry, then it scores its reward:risk if it hit the target,
-−1R at the stop, and 0R if it expired (the exit price isn't recorded). Setups that never
-filled, were first seen already past entry, or lost their bars are listed separately.
+average win (so a high win rate made of tiny capped wins is visible), the average best move
+after entry, how many stocks the trades came from, and over how many trading days (hover for
+the dates). Only trades you could have taken count: a setup counts once price reached its
+entry, then it scores its reward:risk if it hit the target, −1R at the stop, and 0R if it
+expired (the exit price isn't recorded). The same pattern re-detected on the same stock and
+exiting on the same bar counts as one trade. Setups that never filled, were first seen already
+past entry, or lost their bars are listed separately.
 
-Once a pattern has 30 or more trades on a timeframe, its average R moves each new setup's
-score by up to 15 points either way, and the score details say so. Below 30 trades the
-history is shown but doesn't affect scores.
+Once a pattern has 30 or more trades on a timeframe, from at least 5 different trading days,
+its average R moves each new setup's score by up to 15 points either way, and the score
+details say so. Until then the history is shown (muted) but doesn't affect scores.
 
 ### The verdict
 

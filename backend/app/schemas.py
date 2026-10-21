@@ -259,6 +259,10 @@ class TrackRecordSummaryOut(BaseModel):
     trades: int
     win_rate: float | None
     average_r: float | None
+    average_win_r: float | None
+    tickers: int
+    trading_days: int
+    has_enough_history: bool  # whether this history is moving the setup's score
 
 
 SetupOut.model_rebuild()
@@ -290,11 +294,18 @@ class PatternStatsOut(BaseModel):
     expired_after_fill: int
     win_rate: float | None
     average_r: float | None
+    average_win_r: float | None
     average_max_favorable_r: float | None
     not_trades: int
     still_open: int
+    tickers: int
+    trading_days: int
+    first_day: str | None
+    last_day: str | None
+    has_enough_history: bool
 
 
 class TrackRecordOut(BaseModel):
     rows: list[PatternStatsOut]
     min_trades: int
+    min_trading_days: int

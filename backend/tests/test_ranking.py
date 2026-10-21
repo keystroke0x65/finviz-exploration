@@ -68,11 +68,13 @@ def test_parts_sum_to_total():
     assert sum(breakdown.parts.values()) == pytest.approx(breakdown.total, abs=0.1)
 
 
-def stats(trades, average_r):
+def stats(trades, average_r, trading_days=10):
     from app.setups.track_record import PatternStats
 
     return PatternStats(pattern="bull_flag", timeframe="1m", trades=trades, wins=0, losses=0, expired_after_fill=0,
-                        win_rate=0.5, average_r=average_r, average_max_favorable_r=1.0, not_trades=0, still_open=0)
+                        win_rate=0.5, average_r=average_r, average_win_r=2.0, average_max_favorable_r=1.0,
+                        not_trades=0, still_open=0, tickers=12, trading_days=trading_days,
+                        first_day="2026-10-01", last_day="2026-10-20")
 
 
 def test_track_record_ignored_below_thirty_trades():
@@ -81,6 +83,12 @@ def test_track_record_ignored_below_thirty_trades():
 
     assert thin.parts["track_record"] == 0.0
     assert thin.total == base.total
+
+
+def test_track_record_ignored_when_trades_come_from_too_few_days():
+    one_day = score_setup(match(), plan(), "forming", 2.0, [], track_record=stats(60, 1.0, trading_days=1))
+
+    assert one_day.parts["track_record"] == 0.0
 
 
 def test_good_history_raises_and_bad_history_lowers_the_score():

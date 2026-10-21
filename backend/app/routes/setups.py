@@ -14,7 +14,7 @@ from app.patterns.verdict import Verdict
 from app.scanning.verdicts import read_verdicts
 from app.schemas import ScanIn, ScanOut, SetupOut, SetupsOut, TrackRecordSummaryOut, VerdictOut, WarningOut
 from app.setups.store import SetupRecord, list_current_setups
-from app.setups.track_record import PatternStats, stats_for
+from app.setups.track_record import PatternStats, has_enough_history, stats_for
 from app.user_settings import get_show_short_setups
 
 router = APIRouter(prefix="/api", tags=["setups"])
@@ -70,7 +70,15 @@ def _to_setup_out(
 def _track_record_summary(stats: PatternStats | None) -> TrackRecordSummaryOut | None:
     if stats is None:
         return None
-    return TrackRecordSummaryOut(trades=stats.trades, win_rate=stats.win_rate, average_r=stats.average_r)
+    return TrackRecordSummaryOut(
+        trades=stats.trades,
+        win_rate=stats.win_rate,
+        average_r=stats.average_r,
+        average_win_r=stats.average_win_r,
+        tickers=stats.tickers,
+        trading_days=stats.trading_days,
+        has_enough_history=has_enough_history(stats),
+    )
 
 
 def _setups_response(conn: sqlite3.Connection, ticker: str | None) -> SetupsOut:

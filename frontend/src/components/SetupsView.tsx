@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import {
   fetchSetups,
   MIN_TRADES_FOR_TRACK_RECORD,
+  MIN_TRADING_DAYS_FOR_TRACK_RECORD,
   patternName,
   runScan,
   ScanResult,
@@ -244,13 +245,26 @@ function SetupRow({ setup, showDirection, isExpanded, onToggleScore, onOpenStock
   );
 }
 
+function formatSignedR(value: number | null): string {
+  if (value == null) return "—";
+  return `${value > 0 ? "+" : ""}${value.toFixed(2)}R`;
+}
+
 function describeTrackRecord(history: TrackRecordSummary | null | undefined): string {
   if (!history || history.trades < MIN_TRADES_FOR_TRACK_RECORD) {
     return `Track record: not enough history yet (${history?.trades ?? 0} of ${MIN_TRADES_FOR_TRACK_RECORD} trades)`;
   }
+  if (!history.has_enough_history) {
+    return (
+      `Track record: not enough history yet (${history.trades} trades, but from only ` +
+      `${history.trading_days} of ${MIN_TRADING_DAYS_FOR_TRACK_RECORD} trading days)`
+    );
+  }
   const winRate = history.win_rate == null ? "—" : `${Math.round(history.win_rate * 100)}%`;
-  const averageR = history.average_r == null ? "—" : `${history.average_r > 0 ? "+" : ""}${history.average_r.toFixed(2)}R`;
-  return `Track record: ${history.trades} trades, ${winRate} wins, ${averageR} on average`;
+  return (
+    `Track record: ${history.trades} trades on ${history.tickers} stocks over ${history.trading_days} days, ` +
+    `${winRate} wins averaging ${formatSignedR(history.average_win_r)}, ${formatSignedR(history.average_r)} per trade`
+  );
 }
 
 function ScoreDetails({ setup }: { setup: Setup }) {

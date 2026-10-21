@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { patternName, Timeframe } from "../api/setups";
+import {
+  MIN_TRADES_FOR_TRACK_RECORD,
+  MIN_TRADING_DAYS_FOR_TRACK_RECORD,
+  patternName,
+  Timeframe,
+} from "../api/setups";
 import {
   fetchTrackRecord,
   FloatBucket,
@@ -35,6 +40,11 @@ function formatR(value: number | null, isSigned = false): string {
   return `${sign}${value.toFixed(2)}R`;
 }
 
+function dateSpan(firstDay: string | null, lastDay: string | null): string | undefined {
+  if (!firstDay || !lastDay) return undefined;
+  return firstDay === lastDay ? firstDay : `${firstDay} to ${lastDay}`;
+}
+
 export function TrackRecordView() {
   const [filters, setFilters] = useState<TrackRecordFilters>({ timeframe: null, float_bucket: null, session: null });
   const [response, setResponse] = useState<TrackRecordResponse | null>(null);
@@ -65,7 +75,9 @@ export function TrackRecordView() {
         <p className="muted setups-intro">
           How each pattern has actually played out on your stocks. Only trades you could have taken count: a
           setup counts once price reached its entry, then it scores its reward:risk if it hit the target, −1R if
-          it hit the stop, 0R if it expired.
+          it hit the stop, 0R if it expired. A pattern's history starts to move its setups' scores once it has{" "}
+          {response?.min_trades ?? MIN_TRADES_FOR_TRACK_RECORD} trades from at least{" "}
+          {response?.min_trading_days ?? MIN_TRADING_DAYS_FOR_TRACK_RECORD} different trading days.
         </p>
         <div className="toolbar">
           <label className="field">
@@ -128,14 +140,17 @@ export function TrackRecordView() {
                 <th className="number">Trades</th>
                 <th className="number">Win rate</th>
                 <th className="number">Average R</th>
+                <th className="number">Average win</th>
                 <th className="number">Average best move</th>
+                <th className="number">Stocks</th>
+                <th className="number">Days</th>
                 <th className="number">Not trades</th>
                 <th className="number">Open</th>
               </tr>
             </thead>
             <tbody>
               {response.rows.map((row) => {
-                const isThin = row.trades < response.min_trades;
+                const isThin = !row.has_enough_history;
                 return (
                   <tr key={`${row.pattern}-${row.timeframe}`} data-thin={isThin}>
                     <td>
@@ -148,7 +163,12 @@ export function TrackRecordView() {
                     <td className={`number ${row.average_r != null && row.average_r < 0 ? "loss" : "gain"}`}>
                       {formatR(row.average_r, true)}
                     </td>
+                    <td className="number">{formatR(row.average_win_r, true)}</td>
                     <td className="number">{formatR(row.average_max_favorable_r)}</td>
+                    <td className="number">{row.tickers}</td>
+                    <td className="number" title={dateSpan(row.first_day, row.last_day)}>
+                      {row.trading_days}
+                    </td>
                     <td className="number">{row.not_trades}</td>
                     <td className="number">{row.still_open}</td>
                   </tr>
