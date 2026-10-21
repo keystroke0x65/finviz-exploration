@@ -1,15 +1,21 @@
 import { useState } from "react";
-import { LookupView } from "./components/LookupView";
 import { ScreensView } from "./components/ScreensView";
-import { SetupsView } from "./components/SetupsView";
 import { SessionStrip } from "./components/SessionStrip";
+import { SetupsView } from "./components/SetupsView";
+import { StockView } from "./components/StockView";
 import { WatchlistView } from "./components/WatchlistView";
 
-const TABS = ["Setups", "Screens", "Watchlist", "Lookup"] as const;
+const TABS = ["Setups", "Screens", "Watchlist", "Stock"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("Setups");
+  const [stockTicker, setStockTicker] = useState<string | null>(null);
+
+  function openStock(ticker: string) {
+    setStockTicker(ticker);
+    setActiveTab("Stock");
+  }
 
   return (
     <>
@@ -32,10 +38,10 @@ export default function App() {
         </nav>
       </header>
       <main className="app-main">
-        {activeTab === "Setups" && <SetupsView onOpenStock={() => setActiveTab("Lookup")} />}
-        {activeTab === "Screens" && <ScreensView />}
-        {activeTab === "Watchlist" && <WatchlistView />}
-        {activeTab === "Lookup" && <LookupView />}
+        {activeTab === "Setups" && <SetupsView onOpenStock={openStock} />}
+        {activeTab === "Screens" && <ScreensView onOpenStock={openStock} />}
+        {activeTab === "Watchlist" && <WatchlistView onOpenStock={openStock} />}
+        {activeTab === "Stock" && <StockView ticker={stockTicker} onTickerChange={setStockTicker} />}
       </main>
     </>
   );

@@ -14,6 +14,7 @@ interface ScreenResultsTableProps {
   run: ScreenRun;
   onAddToWatchlist: (ticker: string) => void;
   watchlistTickers: Set<string>;
+  onOpenStock: (ticker: string) => void;
 }
 
 type SortableColumn = keyof Pick<
@@ -60,7 +61,7 @@ function compareRows(left: ScreenRow, right: ScreenRow, sort: SortState): number
   return sort.isDescending ? -order : order;
 }
 
-export function ScreenResultsTable({ run, onAddToWatchlist, watchlistTickers }: ScreenResultsTableProps) {
+export function ScreenResultsTable({ run, onAddToWatchlist, watchlistTickers, onOpenStock }: ScreenResultsTableProps) {
   // Null keeps Finviz's own order (the screen's sort setting).
   const [sort, setSort] = useState<SortState | null>(null);
 
@@ -112,14 +113,17 @@ export function ScreenResultsTable({ run, onAddToWatchlist, watchlistTickers }: 
           {rows.map((row) => (
             <tr key={row.ticker}>
               <td>
+                <button type="button" className="ticker-button" onClick={() => onOpenStock(row.ticker)}>
+                  {row.ticker}
+                </button>{" "}
                 <a
-                  className="ticker"
+                  className="small-link"
                   href={finvizQuoteUrl(row.ticker)}
                   target="_blank"
                   rel="noreferrer"
                   aria-label={`Open ${row.ticker} on Finviz`}
                 >
-                  {row.ticker}
+                  Finviz
                 </a>
                 <div className="company muted" title={row.company ?? undefined}>
                   {row.company ?? MISSING_VALUE}

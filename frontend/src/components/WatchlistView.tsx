@@ -10,7 +10,15 @@ import {
   setPinned,
   WatchlistEntry,
 } from "../api/watchlist";
-import { changeClass, finvizQuoteUrl, formatEasternDate, formatSignedPercent } from "../format";
+import {
+  changeClass,
+  finvizQuoteUrl,
+  formatEasternDate,
+  formatNumber,
+  formatPrice,
+  formatSignedPercent,
+  MISSING_VALUE,
+} from "../format";
 import { RunDots } from "./RunDots";
 
 function errorMessage(error: unknown): string {
@@ -21,7 +29,11 @@ function summarizeFeederResult(result: FeederResult): string {
   return `${result.tickers_added.length} added, ${result.tickers_updated.length} updated, ${result.tickers_expired.length} expired`;
 }
 
-export function WatchlistView() {
+interface WatchlistViewProps {
+  onOpenStock: (ticker: string) => void;
+}
+
+export function WatchlistView({ onOpenStock }: WatchlistViewProps) {
   const [entries, setEntries] = useState<WatchlistEntry[]>([]);
   const [tickerInput, setTickerInput] = useState("");
   const [expandedTicker, setExpandedTicker] = useState<string | null>(null);
@@ -145,6 +157,10 @@ export function WatchlistView() {
             <thead>
               <tr>
                 <th>Ticker</th>
+                <th className="number">Price</th>
+                <th className="number">Change</th>
+                <th className="number">After-hours</th>
+                <th className="number">Rel vol</th>
                 <th>Source</th>
                 <th>Last 30 days</th>
                 <th>Last seen</th>
@@ -164,6 +180,7 @@ export function WatchlistView() {
                   onToggleHistory={() => setExpandedTicker(expandedTicker === entry.ticker ? null : entry.ticker)}
                   onTogglePin={() => handleTogglePin(entry)}
                   onRemove={() => handleRemove(entry)}
+                  onOpenStock={onOpenStock}
                 />
               ))}
             </tbody>
@@ -180,17 +197,38 @@ interface WatchlistRowProps {
   onToggleHistory: () => void;
   onTogglePin: () => void;
   onRemove: () => void;
+  onOpenStock: (ticker: string) => void;
 }
 
-function WatchlistRow({ entry, isExpanded, onToggleHistory, onTogglePin, onRemove }: WatchlistRowProps) {
+function WatchlistRow({ entry, isExpanded, onToggleHistory, onTogglePin, onRemove, onOpenStock }: WatchlistRowProps) {
+  const snapshot = entry.snapshot;
   return (
     <>
       <tr>
         <td>
-          <a className="ticker" href={finvizQuoteUrl(entry.ticker)} target="_blank" rel="noreferrer">
+          <button type="button" className="ticker-button" onClick={() => onOpenStock(entry.ticker)}>
             {entry.ticker}
+          </button>{" "}
+          <a
+            className="small-link"
+            href={finvizQuoteUrl(entry.ticker)}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Open ${entry.ticker} on Finviz`}
+          >
+            Finviz
           </a>
         </td>
+        <td className="number" title={snapshot ? `as of ${new Date(snapshot.fetched_at).toLocaleTimeString()}` : undefined}>
+          {snapshot ? formatPrice(snapshot.price) : MISSING_VALUE}
+        </td>
+        <td className={`number ${changeClass(snapshot?.change_percent ?? null)}`}>
+          {formatSignedPercent(snapshot?.change_percent ?? null)}
+        </td>
+        <td className={`number ${changeClass(snapshot?.after_hours_change_percent ?? null)}`}>
+          {formatSignedPercent(snapshot?.after_hours_change_percent ?? null)}
+        </td>
+        <td className="number">{formatNumber(snapshot?.relative_volume ?? null)}</td>
         <td>
           <span className="badge" data-source={entry.source}>
             {entry.source}
@@ -236,7 +274,7 @@ function WatchlistRow({ entry, isExpanded, onToggleHistory, onTogglePin, onRemov
       </tr>
       {isExpanded && (
         <tr>
-          <td colSpan={7}>
+          <td colSpan={11}>
             {entry.appearances.length === 0 ? (
               <span className="muted">No feeder runs yet.</span>
             ) : (

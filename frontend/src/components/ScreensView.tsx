@@ -35,7 +35,11 @@ function describeCriteria(screen: Screen, signalNames: Record<string, string>): 
   return `${signalNames[screen.signal] ?? screen.signal}, ${filters}`;
 }
 
-export function ScreensView() {
+interface ScreensViewProps {
+  onOpenStock: (ticker: string) => void;
+}
+
+export function ScreensView({ onOpenStock }: ScreensViewProps) {
   const [screens, setScreens] = useState<Screen[]>([]);
   const [formFields, setFormFields] = useState<FormFields | null>(null);
   const [watchlistTickers, setWatchlistTickers] = useState<Set<string>>(new Set());
@@ -177,6 +181,7 @@ export function ScreensView() {
             onDelete={handleDelete}
             onAddToWatchlist={handleAddToWatchlist}
             watchlistTickers={watchlistTickers}
+            onOpenStock={onOpenStock}
           />
         )}
       </section>
@@ -191,9 +196,18 @@ interface ScreenResultsProps {
   onDelete: (screen: Screen) => void;
   onAddToWatchlist: (ticker: string) => void;
   watchlistTickers: Set<string>;
+  onOpenStock: (ticker: string) => void;
 }
 
-function ScreenResults({ runState, onRunAgain, onEdit, onDelete, onAddToWatchlist, watchlistTickers }: ScreenResultsProps) {
+function ScreenResults({
+  runState,
+  onRunAgain,
+  onEdit,
+  onDelete,
+  onAddToWatchlist,
+  watchlistTickers,
+  onOpenStock,
+}: ScreenResultsProps) {
   if (runState.status === "idle") {
     return <p className="empty-state">Pick a screen on the left to run it against Finviz.</p>;
   }
@@ -226,7 +240,12 @@ function ScreenResults({ runState, onRunAgain, onEdit, onDelete, onAddToWatchlis
       {runState.status === "running" ? (
         <p className="muted">Running {screen.name} on Finviz…</p>
       ) : (
-        <ScreenResultsTable run={runState.run} onAddToWatchlist={onAddToWatchlist} watchlistTickers={watchlistTickers} />
+        <ScreenResultsTable
+          run={runState.run}
+          onAddToWatchlist={onAddToWatchlist}
+          watchlistTickers={watchlistTickers}
+          onOpenStock={onOpenStock}
+        />
       )}
     </>
   );

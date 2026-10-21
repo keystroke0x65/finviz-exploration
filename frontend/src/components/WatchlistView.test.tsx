@@ -20,6 +20,8 @@ const AUTO_ENTRY: WatchlistEntry = {
   ticker: "HOST", source: "auto", added_at: "2026-10-03T14:00:00+00:00",
   last_seen_in_feeder_at: "2026-10-20T14:00:00+00:00", is_pinned: false,
   expires_at: "2027-01-18T14:00:00Z",
+  snapshot: { price: 2.83, change_percent: 47.4, after_hours_change_percent: -3.53, relative_volume: 14.22,
+    fetched_at: "2026-10-20T14:00:00Z" },
   appearances: [
     { seen_on: "2026-10-20", change_percent: 47.4, screen_id: 1 },
     { seen_on: "2026-10-03", change_percent: 22.1, screen_id: 1 },
@@ -27,7 +29,7 @@ const AUTO_ENTRY: WatchlistEntry = {
 };
 const MANUAL_ENTRY: WatchlistEntry = {
   ticker: "WORX", source: "manual", added_at: "2026-10-19T14:00:00+00:00",
-  last_seen_in_feeder_at: null, is_pinned: false, expires_at: null, appearances: [],
+  last_seen_in_feeder_at: null, is_pinned: false, expires_at: null, appearances: [], snapshot: null,
 };
 
 describe("WatchlistView", () => {
@@ -42,7 +44,7 @@ describe("WatchlistView", () => {
 
   it("lists entries with source and last seen", async () => {
     api.listWatchlist.mockResolvedValue([AUTO_ENTRY, MANUAL_ENTRY]);
-    render(<WatchlistView />);
+    render(<WatchlistView onOpenStock={vi.fn()} />);
 
     const hostRow = await screen.findByRole("row", { name: /HOST/ });
     expect(within(hostRow).getByText("auto")).toBeInTheDocument();
@@ -54,7 +56,7 @@ describe("WatchlistView", () => {
 
   it("shows an expiry date for unpinned auto entries only", async () => {
     api.listWatchlist.mockResolvedValue([AUTO_ENTRY, MANUAL_ENTRY, { ...AUTO_ENTRY, ticker: "PIN", is_pinned: true, expires_at: null }]);
-    render(<WatchlistView />);
+    render(<WatchlistView onOpenStock={vi.fn()} />);
 
     expect(within(await screen.findByRole("row", { name: /HOST/ })).getByText("expires 2027-01-18")).toBeInTheDocument();
     expect(within(screen.getByRole("row", { name: /WORX/ })).queryByText(/expires/)).not.toBeInTheDocument();
@@ -63,7 +65,7 @@ describe("WatchlistView", () => {
 
   it("shows run history when a row is expanded", async () => {
     api.listWatchlist.mockResolvedValue([AUTO_ENTRY]);
-    render(<WatchlistView />);
+    render(<WatchlistView onOpenStock={vi.fn()} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "History for HOST" }));
 
@@ -73,7 +75,7 @@ describe("WatchlistView", () => {
   it("toggles pin and re-renders the entry", async () => {
     api.listWatchlist.mockResolvedValue([AUTO_ENTRY]);
     api.setPinned.mockResolvedValue({ ...AUTO_ENTRY, is_pinned: true, expires_at: null });
-    render(<WatchlistView />);
+    render(<WatchlistView onOpenStock={vi.fn()} />);
 
     fireEvent.click(await screen.findByRole("checkbox", { name: "Pin HOST" }));
 
@@ -85,7 +87,7 @@ describe("WatchlistView", () => {
   it("shows the backend error when adding an unknown ticker", async () => {
     api.listWatchlist.mockResolvedValue([]);
     api.addToWatchlist.mockRejectedValue(new Error("No Finviz data found for ticker 'ZZZZ'"));
-    render(<WatchlistView />);
+    render(<WatchlistView onOpenStock={vi.fn()} />);
 
     fireEvent.change(await screen.findByLabelText("Ticker"), { target: { value: "zzzz" } });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
@@ -100,7 +102,7 @@ describe("WatchlistView", () => {
       screens_run: 2, tickers_added: ["HOST"], tickers_updated: [], tickers_expired: [],
       failed_screens: [{ screen: "After-hours", reason: "Finviz request failed (screen): ReadTimeout" }],
     });
-    render(<WatchlistView />);
+    render(<WatchlistView onOpenStock={vi.fn()} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Refresh from feeder" }));
 
@@ -115,7 +117,7 @@ describe("WatchlistView", () => {
       tickers_expired: [],
       failed_screens: [{ screen: "Top gainers — low float", reason: "Finviz Elite API rejected the configured auth token." }],
     });
-    render(<WatchlistView />);
+    render(<WatchlistView onOpenStock={vi.fn()} />);
 
     expect(await screen.findByText(/^Last feeder run:/)).toHaveTextContent("0 added, 0 updated, 0 expired");
     expect(screen.getByRole("alert")).toHaveTextContent("Top gainers — low float: Finviz Elite API rejected");
@@ -125,10 +127,30 @@ describe("WatchlistView", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-20T18:00:00Z"));
     api.listWatchlist.mockResolvedValue([AUTO_ENTRY]);
-    render(<WatchlistView />);
+    render(<WatchlistView onOpenStock={vi.fn()} />);
 
     // Oct 20 and Oct 3 are both within the 30 days ending Oct 20.
     expect(await screen.findByRole("img", { name: "Ran on 2 of the last 30 days" })).toBeInTheDocument();
     vi.useRealTimers();
+  });
+
+  it("shows price and change from the latest snapshot", async () => {
+    api.listWatchlist.mockResolvedValue([AUTO_ENTRY, MANUAL_ENTRY]);
+    render(<WatchlistView onOpenStock={vi.fn()} />);
+
+    const hostRow = await screen.findByRole("row", { name: /HOST/ });
+    expect(within(hostRow).getByText("2.83")).toBeInTheDocument();
+    expect(within(hostRow).getByText("+47.40%")).toBeInTheDocument();
+    expect(within(hostRow).getByText("-3.53%")).toBeInTheDocument();
+  });
+
+  it("opens the stock view from a ticker", async () => {
+    api.listWatchlist.mockResolvedValue([AUTO_ENTRY]);
+    const onOpenStock = vi.fn();
+    render(<WatchlistView onOpenStock={onOpenStock} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "HOST" }));
+
+    expect(onOpenStock).toHaveBeenCalledWith("HOST");
   });
 });
