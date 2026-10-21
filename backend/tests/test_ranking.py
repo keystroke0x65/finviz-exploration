@@ -89,3 +89,11 @@ def test_good_history_raises_and_bad_history_lowers_the_score():
 
     assert good.parts["track_record"] == pytest.approx(7.5)
     assert bad.parts["track_record"] == pytest.approx(-15.0)  # capped at -1R
+
+
+def test_candle_confirmation_adds_its_points():
+    confirmed = score_setup(match(), plan(available=2.0), "forming", 2.0, [], candle_points=5.0)
+    plain = score_setup(match(), plan(available=2.0), "forming", 2.0, [])
+
+    assert confirmed.parts["candles"] == 5.0
+    assert confirmed.total == pytest.approx(plain.total + 5.0)

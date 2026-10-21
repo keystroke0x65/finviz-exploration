@@ -53,6 +53,7 @@ def score_setup(
     relative_volume: float | None,
     other_matches: list[PatternMatch],
     track_record: PatternStats | None = None,
+    candle_points: float = 0.0,
 ) -> ScoreBreakdown:
     raw = {
         "reward_risk": min(plan.available_reward_risk, TARGET_R) / TARGET_R,
@@ -64,5 +65,6 @@ def score_setup(
     parts = {name: round(WEIGHTS[name] * value * SCALE, 1) for name, value in raw.items()}
     parts["conflict"] = -CONFLICT_PENALTY * SCALE if _has_conflict(match, other_matches) else 0.0
     parts["track_record"] = _track_record_points(track_record)
+    parts["candles"] = candle_points
     total = round(min(max(sum(parts.values()), 0.0), SCALE), 1)
     return ScoreBreakdown(total=total, parts=parts)
