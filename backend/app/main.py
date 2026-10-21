@@ -6,7 +6,9 @@ from fastapi import FastAPI
 
 from app.config import get_settings
 from app.db import connect
+from app.routes.screens import router as screens_router
 from app.routes.stocks import router as stocks_router
+from app.routes.watchlist import router as watchlist_router
 from app.screens.store import seed_default_screens
 from app.watchlist.scheduler import feeder_loop
 
@@ -30,6 +32,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Finviz Dashboard API", lifespan=lifespan)
 app.include_router(stocks_router)
+app.include_router(screens_router)
+app.include_router(watchlist_router)
 
 
 @app.get("/health")

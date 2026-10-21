@@ -1,4 +1,10 @@
-from pydantic import BaseModel, ConfigDict
+from datetime import date, datetime
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+
+from app.screens.filter_form import MarketCapOption
+from app.screens.finviz_url import CODE_PATTERN, MAX_FILTER_CODES, MAX_URL_LENGTH
 
 
 class QuoteResponse(BaseModel):
@@ -7,3 +13,118 @@ class QuoteResponse(BaseModel):
     Ticker: str
     Company: str | None = None
     Price: str | None = None
+
+
+MAX_SCREEN_NAME_LENGTH = 80
+# Same shape as Phase 1's ticker path parameter (letters plus '.'/'-').
+TICKER_BODY_PATTERN = r"^[A-Za-z.\-]{1,10}$"
+
+FinvizCode = Annotated[str, StringConstraints(pattern=CODE_PATTERN)]
+
+
+class ScreenFormModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    country: Literal["usa"] | None = None
+    price_under: float | None = None
+    float_under_millions: float | None = None
+    market_cap: MarketCapOption | None = None
+    volume_over_thousands: int | None = None
+    relative_volume_over: float | None = None
+
+
+class ScreenIn(BaseModel):
+    name: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_SCREEN_NAME_LENGTH),
+    ]
+    form: ScreenFormModel = ScreenFormModel()
+    extra_filters: Annotated[list[FinvizCode], Field(max_length=MAX_FILTER_CODES)] = []
+    signal: FinvizCode | None = None
+    order: FinvizCode | None = None
+    feeds_watchlist: bool = False
+
+
+class ScreenDraft(BaseModel):
+    form: ScreenFormModel
+    extra_filters: list[str]
+    signal: str | None
+    order: str | None
+
+
+class ScreenOut(ScreenDraft):
+    id: int
+    name: str
+    feeds_watchlist: bool
+    finviz_url: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class ParseUrlIn(BaseModel):
+    url: Annotated[str, StringConstraints(max_length=MAX_URL_LENGTH)]
+
+
+class ScreenRowOut(BaseModel):
+    ticker: str
+    company: str | None
+    country: str | None
+    market_cap_millions: float | None
+    float_millions: float | None
+    average_volume_thousands: float | None
+    relative_volume: float | None
+    price: float | None
+    change_percent: float | None
+    volume: int | None
+    after_hours_close: float | None
+    after_hours_change_percent: float | None
+    news_time: str | None
+    news_url: str | None
+    news_title: str | None
+
+
+class ScreenRunOut(BaseModel):
+    rows: list[ScreenRowOut]
+    is_possibly_unfiltered: bool
+    fetched_at: datetime
+
+
+class FormFieldsOut(BaseModel):
+    options: dict[str, list]
+    signals: dict[str, str]
+
+
+class AppearanceOut(BaseModel):
+    seen_on: date
+    change_percent: float | None
+    screen_id: int
+
+
+class WatchlistEntryOut(BaseModel):
+    ticker: str
+    source: Literal["auto", "manual"]
+    added_at: datetime
+    last_seen_in_feeder_at: datetime | None
+    is_pinned: bool
+    appearances: list[AppearanceOut]
+
+
+class AddTickerIn(BaseModel):
+    ticker: Annotated[str, StringConstraints(strip_whitespace=True, pattern=TICKER_BODY_PATTERN)]
+
+
+class PinIn(BaseModel):
+    is_pinned: bool
+
+
+class FailedScreenOut(BaseModel):
+    screen: str
+    reason: str
+
+
+class FeederResultOut(BaseModel):
+    screens_run: int
+    tickers_added: list[str]
+    tickers_updated: list[str]
+    tickers_expired: list[str]
+    failed_screens: list[FailedScreenOut]

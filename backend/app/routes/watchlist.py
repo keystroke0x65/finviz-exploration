@@ -1,0 +1,82 @@
+import sqlite3
+from dataclasses import asdict
+from datetime import datetime, timezone
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Response
+
+from app.config import get_settings
+from app.errors import (
+    FinvizAuthError,
+    FinvizRateLimitError,
+    FinvizUnavailableError,
+    TickerNotFoundError,
+)
+from app.finviz_client import get_quote, run_screen
+from app.routes.dependencies import finviz_error_to_http, get_db_connection
+from app.routes.stocks import TickerPath
+from app.schemas import AddTickerIn, FeederResultOut, PinIn, WatchlistEntryOut
+from app.watchlist.feeder import run_feeder
+from app.watchlist.store import (
+    WatchlistEntry,
+    add_manual_entry,
+    list_entries,
+    remove_entry,
+    set_pinned,
+)
+
+router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
+
+DbConnection = Annotated[sqlite3.Connection, Depends(get_db_connection)]
+
+
+def _to_entry_out(entry: WatchlistEntry) -> WatchlistEntryOut:
+    return WatchlistEntryOut(**asdict(entry))
+
+
+@router.get("", response_model=list[WatchlistEntryOut])
+def get_watchlist(conn: DbConnection) -> list[WatchlistEntryOut]:
+    return [_to_entry_out(entry) for entry in list_entries(conn)]
+
+
+@router.post("", response_model=WatchlistEntryOut, status_code=201)
+def post_watchlist_entry(body: AddTickerIn, conn: DbConnection) -> WatchlistEntryOut:
+    ticker = body.ticker.upper()
+    try:
+        get_quote(ticker)
+    except TickerNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError) as exc:
+        raise finviz_error_to_http(exc) from exc
+    return _to_entry_out(add_manual_entry(conn, ticker, datetime.now(timezone.utc)))
+
+
+@router.post("/refresh", response_model=FeederResultOut)
+def post_refresh(conn: DbConnection) -> FeederResultOut:
+    result = run_feeder(
+        conn, run_screen, datetime.now(timezone.utc), get_settings().watchlist_retention_days
+    )
+    return FeederResultOut(
+        screens_run=result.screens_run,
+        tickers_added=result.tickers_added,
+        tickers_updated=result.tickers_updated,
+        tickers_expired=result.tickers_expired,
+        failed_screens=[
+            {"screen": name, "reason": reason} for name, reason in result.failed_screens
+        ],
+    )
+
+
+@router.delete("/{ticker}", status_code=204)
+def delete_watchlist_entry(ticker: TickerPath, conn: DbConnection) -> Response:
+    if not remove_entry(conn, ticker.upper()):
+        raise HTTPException(status_code=404, detail=f"{ticker.upper()} is not on the watchlist")
+    return Response(status_code=204)
+
+
+@router.patch("/{ticker}", response_model=WatchlistEntryOut)
+def patch_watchlist_entry(ticker: TickerPath, body: PinIn, conn: DbConnection) -> WatchlistEntryOut:
+    entry = set_pinned(conn, ticker.upper(), body.is_pinned)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=f"{ticker.upper()} is not on the watchlist")
+    return _to_entry_out(entry)
