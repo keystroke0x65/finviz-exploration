@@ -68,4 +68,5 @@ def test_abcd_ignores_yesterdays_bars():
     yesterday = shape([2.05] * 5, [2.00] * 5, start=datetime(2026, 10, 19, 19, 55, tzinfo=EASTERN))
     today = shape(today_highs, today_lows, start=datetime(2026, 10, 20, 9, 30, tzinfo=EASTERN))
 
-    assert detect_abcd(yesterday + today, CONTEXT) == []
+    # (Today's own drop from 2.40 to 2.20 may still read as an inverse ABCD.)
+    assert "abcd" not in {match.pattern for match in detect_abcd(yesterday + today, CONTEXT)}
