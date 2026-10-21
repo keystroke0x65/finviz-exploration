@@ -22,6 +22,10 @@ MAX_FIRST_PULLBACK_RETRACE = 0.6
 REGULAR_OPEN = time(9, 30)
 
 
+def _eastern_day(bar: Bar):
+    return bar.time.astimezone(EASTERN).date()
+
+
 def _average_volume(bars: list[Bar]) -> float:
     return sum(bar.volume for bar in bars) / len(bars) if bars else 0.0
 
@@ -31,7 +35,13 @@ def _micro_pullback(bars: list[Bar], pullback_length: int, timeframe: Interval) 
     before = bars[:-pullback_length]
     run_end = len(before) - 1
     run_start = run_end
-    while run_start > 0 and before[run_start].close > before[run_start - 1].close:
+    # The run stops at the overnight boundary: yesterday's close to today's
+    # first print is a gap, not part of a run.
+    while (
+        run_start > 0
+        and before[run_start].close > before[run_start - 1].close
+        and _eastern_day(before[run_start]) == _eastern_day(before[run_start - 1])
+    ):
         run_start -= 1
     run = before[run_start : run_end + 1]
     if len(run) < MIN_RUN_BARS:
@@ -40,6 +50,8 @@ def _micro_pullback(bars: list[Bar], pullback_length: int, timeframe: Interval) 
         return None  # not a dip
     top = max(bar.high for bar in run)
     base = min(bar.low for bar in run)
+    if any(bar.high > top for bar in pullback):
+        return None  # a new high is a breakout, not a pullback
     gain_percent = (top - base) / base * 100
     threshold = MIN_RUN_GAIN_PERCENT[timeframe]
     if gain_percent < threshold:

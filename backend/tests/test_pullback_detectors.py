@@ -123,3 +123,21 @@ def test_first_pullback_in_premarket_before_the_open():
     [match] = detect_first_pullbacks(bars, with_previous_close(2.00))
 
     assert match.entry == 2.42
+
+
+def test_micro_pullback_run_does_not_cross_into_yesterday():
+    from datetime import datetime
+
+    from app.market_time import EASTERN
+
+    yesterday = shape([2.01, 2.03, 2.05], [1.99, 2.01, 2.03], start=datetime(2026, 10, 19, 19, 57, tzinfo=EASTERN))
+    today = shape([2.12, 2.115], [2.08, 2.085], last_close=2.09, start=datetime(2026, 10, 20, 4, 0, tzinfo=EASTERN))
+
+    assert detect_micro_pullbacks(yesterday + today, PLAIN) == []
+
+
+def test_breakout_bar_is_not_part_of_a_micro_pullback():
+    # Run, a one-bar dip, then a bar that breaks to a new high above the run.
+    bars = shape(RUN_HIGHS + [2.08, 2.15], RUN_LOWS + [2.06, 2.10], last_close=2.14)
+
+    assert detect_micro_pullbacks(bars, PLAIN) == []
