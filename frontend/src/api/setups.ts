@@ -108,6 +108,22 @@ export const PATTERN_NAMES: Record<string, string> = {
   micro_pullback: "Micro pullback",
   first_pullback: "First pullback",
   first_bounce_fail: "First bounce fail",
+  bull_pennant: "Bull pennant",
+  bear_pennant: "Bear pennant",
+  symmetrical_triangle_up: "Symmetrical triangle (up)",
+  symmetrical_triangle_down: "Symmetrical triangle (down)",
+  falling_wedge: "Falling wedge",
+  rising_wedge: "Rising wedge",
+  range_breakout: "Range breakout",
+  range_breakdown: "Range breakdown",
+  cup_and_handle: "Cup and handle",
+  inverted_cup_and_handle: "Inverted cup and handle",
+  head_and_shoulders: "Head and shoulders",
+  inverse_head_and_shoulders: "Inverse head and shoulders",
+  triple_bottom: "Triple bottom",
+  triple_top: "Triple top",
+  rounding_bottom: "Rounding bottom",
+  rounding_top: "Rounding top",
 };
 
 export const SCORE_PART_NAMES: Record<string, string> = {
