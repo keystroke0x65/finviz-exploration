@@ -82,3 +82,44 @@ def test_pullbacks_return_nothing_on_short_or_flat_bars():
     assert detect_micro_pullbacks(shape([2.0] * 20, [1.9] * 20), PLAIN) == []
     assert detect_first_pullbacks(shape([2.0] * 20, [1.9] * 20), with_previous_close(1.5)) == []
     assert detect_first_pullbacks(shape(GAP_HIGHS, GAP_LOWS), PLAIN) == []
+
+
+def premarket_then(highs, lows, premarket_price=2.0):
+    from datetime import datetime
+
+    from app.market_time import EASTERN
+
+    premarket = shape([premarket_price + 0.01] * 3 + [premarket_price + 0.03, premarket_price + 0.02,
+                       premarket_price + 0.015, premarket_price + 0.02, premarket_price + 0.01],
+                      [premarket_price - 0.01] * 8,
+                      start=datetime(2026, 10, 20, 4, 0, tzinfo=EASTERN))
+    return premarket + shape(highs, lows)
+
+
+def test_first_pullback_measured_from_the_regular_open_when_premarket_is_flat():
+    # Flat pre-market at the previous close, then a 9:30 gap-up open: the gap and
+    # "first pullback" belong to the regular session.
+    bars = premarket_then(GAP_HIGHS, GAP_LOWS, premarket_price=2.0)
+
+    [match] = detect_first_pullbacks(bars, with_previous_close(2.00))
+
+    assert match.entry == 2.42
+
+
+def test_premarket_dip_does_not_block_the_regular_session_first_pullback():
+    # The pre-market fixture contains its own 2-bar dip (lower highs after a high).
+    bars = premarket_then(GAP_HIGHS, GAP_LOWS, premarket_price=2.15)
+
+    assert [match.pattern for match in detect_first_pullbacks(bars, with_previous_close(2.00))] == ["first_pullback"]
+
+
+def test_first_pullback_in_premarket_before_the_open():
+    from datetime import datetime
+
+    from app.market_time import EASTERN
+
+    bars = shape(GAP_HIGHS, GAP_LOWS, start=datetime(2026, 10, 20, 7, 0, tzinfo=EASTERN))
+
+    [match] = detect_first_pullbacks(bars, with_previous_close(2.00))
+
+    assert match.entry == 2.42

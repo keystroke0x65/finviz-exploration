@@ -1,6 +1,8 @@
 """Micro pullbacks (a 1-2 bar dip inside a strong run) and the first pullback of the
 day after a gap (first bounce fail after a gap down)."""
 
+from datetime import time
+
 from app.finviz_client import Bar, Interval
 from app.market_time import EASTERN
 from app.patterns.types import DetectorContext, Direction, PatternMatch
@@ -17,6 +19,7 @@ FULL_GAP_SCORE_PERCENT = 8.0
 MIN_PUSH_PERCENT = 2.0
 MIN_FIRST_PULLBACK_BARS = 2
 MAX_FIRST_PULLBACK_RETRACE = 0.6
+REGULAR_OPEN = time(9, 30)
 
 
 def _average_volume(bars: list[Bar]) -> float:
@@ -100,12 +103,24 @@ def _is_pullback_bar(bar: Bar, previous: Bar, direction: Direction) -> bool:
     return bar.high < previous.high if direction == "long" else bar.low > previous.low
 
 
+def _current_session_bars(bars: list[Bar]) -> list[Bar]:
+    """Today's bars from the regular open once it has happened, else today's pre-market.
+
+    The 9:30 open is the gap a momentum trader trades; pre-market prints and dips
+    before it would otherwise set the "open" and use up the "first" pullback.
+    """
+    last = bars[-1].time.astimezone(EASTERN)
+    today = [bar for bar in bars if bar.time.astimezone(EASTERN).date() == last.date()]
+    if last.time() < REGULAR_OPEN:
+        return today
+    return [bar for bar in today if bar.time.astimezone(EASTERN).time() >= REGULAR_OPEN]
+
+
 def _first_pullback(bars: list[Bar], context: DetectorContext, direction: Direction) -> PatternMatch | None:
     previous_close = context.session.previous_close if context.session else None
     if previous_close is None or not bars:
         return None
-    today_date = bars[-1].time.astimezone(EASTERN).date()
-    today = [bar for bar in bars if bar.time.astimezone(EASTERN).date() == today_date]
+    today = _current_session_bars(bars)
     if len(today) < MIN_FIRST_PULLBACK_BARS + 2:
         return None
     sign = 1 if direction == "long" else -1
