@@ -76,12 +76,21 @@ def run_scheduled_scan(db_path: str, now: datetime, deps: ScanDeps) -> ScanResul
 
 
 def run_scheduled_expiry(db_path: str, now: datetime, retention_days: int) -> list[str]:
-    """Expire stale watchlist entries; runs every tick, not only in market hours."""
+    """Expire stale watchlist entries outside the feeder window (evenings, weekends).
+
+    Inside the window the feeder run expires them itself and reports the count in
+    its summary; expiring here first would make that summary always say 0.
+    """
+    if is_within_feeder_window(now):
+        return []
     conn = connect(db_path)
     try:
-        return expire_stale_entries(conn, now, retention_days)
+        expired = expire_stale_entries(conn, now, retention_days)
     finally:
         conn.close()
+    if expired:
+        logger.warning("watchlist expired outside market hours: %s", ", ".join(expired))
+    return expired
 
 
 def seconds_until_first_tick(last_run_at: datetime | None, now: datetime, interval: timedelta) -> float:
@@ -89,15 +98,23 @@ def seconds_until_first_tick(last_run_at: datetime | None, now: datetime, interv
     # each reload would run a feeder tick and a full scan straight away.
     if last_run_at is None:
         return 0
-    return max((last_run_at + interval - now).total_seconds(), 0)
+    # Capped at one interval: if the clock jumped backwards (WSL/Docker drift) a
+    # "future" last run must not pause the feeder for hours.
+    return min(max((last_run_at + interval - now).total_seconds(), 0), interval.total_seconds())
 
 
 def _last_feeder_run_at(db_path: str) -> datetime | None:
-    conn = connect(db_path)
+    # Runs before the loop's own error handling; a bad stored value must not
+    # kill the feeder task, so it's treated as "no recent run".
     try:
-        last_run = get_last_feeder_run(conn)
-    finally:
-        conn.close()
+        conn = connect(db_path)
+        try:
+            last_run = get_last_feeder_run(conn)
+        finally:
+            conn.close()
+    except Exception:
+        logger.exception("could not read the last feeder run; starting the feeder now")
+        return None
     return last_run.finished_at if last_run else None
 
 

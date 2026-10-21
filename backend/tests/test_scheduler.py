@@ -191,3 +191,45 @@ def test_startup_tick_skipped_when_recent_run_exists():
     assert seconds_until_first_tick(None, TUESDAY_10AM_ET, interval) == 0
     assert seconds_until_first_tick(TUESDAY_10AM_ET - timedelta(minutes=5), TUESDAY_10AM_ET, interval) == 600
     assert seconds_until_first_tick(TUESDAY_10AM_ET - timedelta(minutes=20), TUESDAY_10AM_ET, interval) == 0
+
+
+def test_expiry_inside_the_window_is_left_to_the_feeder(tmp_path):
+    # The feeder expires (and reports) entries itself inside the window; expiring
+    # them first would make every feeder summary say "0 expired".
+    from datetime import timedelta
+
+    from app.watchlist.scheduler import run_scheduled_expiry
+    from app.watchlist.store import get_entry, record_feeder_hit
+
+    db_path = _seeded_db_path(tmp_path)
+    conn = connect(db_path)
+    record_feeder_hit(conn, "OLD", 5.0, 1, TUESDAY_10AM_ET - timedelta(days=91))
+    conn.commit()
+    conn.close()
+
+    assert run_scheduled_expiry(db_path, TUESDAY_10AM_ET, RETENTION_DAYS) == []
+    result = run_scheduled_feeder_tick(db_path, TUESDAY_10AM_ET, RETENTION_DAYS, lambda *args: ScreenResult([]))
+    assert result.tickers_expired == ["OLD"]
+
+
+def test_startup_delay_is_capped_at_one_interval():
+    from datetime import timedelta
+
+    from app.watchlist.scheduler import seconds_until_first_tick
+
+    interval = timedelta(minutes=15)
+    clock_jumped_back = TUESDAY_10AM_ET + timedelta(hours=3)  # last run "in the future"
+
+    assert seconds_until_first_tick(clock_jumped_back, TUESDAY_10AM_ET, interval) == 900
+
+
+def test_unreadable_last_run_does_not_stop_the_feeder(tmp_path):
+    from app.watchlist.scheduler import _last_feeder_run_at
+
+    db_path = _seeded_db_path(tmp_path)
+    conn = connect(db_path)
+    conn.execute("INSERT INTO app_meta (key, value) VALUES ('last_feeder_run', 'not json')")
+    conn.commit()
+    conn.close()
+
+    assert _last_feeder_run_at(db_path) is None
