@@ -127,3 +127,28 @@ def test_bearish_pattern_on_lower_timeframe_is_not_a_conflict(api_client, db_con
     body = api_client.get("/api/setups").json()
 
     assert body["setups"][0]["has_conflict"] is False
+
+
+def test_stock_verdict_route(api_client, db_conn):
+    from app.patterns.verdict import Verdict
+    from app.scanning.verdicts import save_verdict
+
+    save_verdict(db_conn, "HOST", Verdict("leans_long", 0.41, {"trend": 1.0}, ["Above 5 of 5 trend lines"]), NOW)
+
+    body = api_client.get("/api/stocks/host/verdict").json()
+
+    assert body["call"] == "leans_long"
+    assert body["reasons"] == ["Above 5 of 5 trend lines"]
+    assert api_client.get("/api/stocks/WORX/verdict").json() is None
+
+
+def test_setups_include_ticker_verdict(api_client, db_conn):
+    from app.patterns.verdict import Verdict
+    from app.scanning.verdicts import save_verdict
+
+    store_setup(db_conn, "HOST")
+    save_verdict(db_conn, "HOST", Verdict("no_clear_edge", 0.05, {}, ["Volume balanced"]), NOW)
+
+    setup = api_client.get("/api/setups").json()["setups"][0]
+
+    assert setup["verdict"]["call"] == "no_clear_edge"

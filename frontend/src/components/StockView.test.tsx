@@ -6,6 +6,7 @@ import { StockView } from "./StockView";
 const api = vi.hoisted(() => ({
   fetchBars: vi.fn(),
   fetchStockSetups: vi.fn(),
+  fetchStockVerdict: vi.fn(),
   runScan: vi.fn(),
   fetchQuote: vi.fn(),
   chartProps: [] as { levels: { price: number; kind: string }[] }[],
@@ -14,6 +15,7 @@ vi.mock("../api/bars", () => ({ fetchBars: (...args: unknown[]) => api.fetchBars
 vi.mock("../api/setups", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/setups")>()),
   fetchStockSetups: (ticker: string) => api.fetchStockSetups(ticker),
+  fetchStockVerdict: (ticker: string) => api.fetchStockVerdict(ticker),
   runScan: (ticker?: string) => api.runScan(ticker),
 }));
 vi.mock("../api/stocks", () => ({ fetchQuote: (ticker: string) => api.fetchQuote(ticker) }));
@@ -45,6 +47,7 @@ describe("StockView", () => {
     api.fetchBars.mockResolvedValue(BARS_RESPONSE);
     api.fetchStockSetups.mockResolvedValue({ setups: [SETUP], warnings: [], show_short_setups: false });
     api.fetchQuote.mockResolvedValue({ Ticker: "HOST", Company: "Host Digital Inc" });
+    api.fetchStockVerdict.mockResolvedValue(null);
     api.chartProps = [];
   });
 
@@ -117,5 +120,17 @@ describe("StockView", () => {
       expect(kinds).not.toContain("stop");
       expect(kinds).not.toContain("target");
     });
+  });
+
+  it("shows the verdict and its reasons on the stock view", async () => {
+    api.fetchStockVerdict.mockResolvedValue({
+      call: "leans_short", score: -0.4, parts: {}, computed_at: "2026-10-20T14:00:00Z",
+      reasons: ["Below 4 of 5 trend lines", "Volume heavier on down bars"],
+    });
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+
+    expect(await screen.findByText("Leans short")).toBeInTheDocument();
+    expect(screen.getByText("Volume heavier on down bars")).toBeInTheDocument();
+    expect(screen.getByText(/^Scored /)).toBeInTheDocument();
   });
 });

@@ -22,6 +22,8 @@ const AUTO_ENTRY: WatchlistEntry = {
   expires_at: "2027-01-18T14:00:00Z",
   snapshot: { price: 2.83, change_percent: 47.4, after_hours_change_percent: -3.53, relative_volume: 14.22,
     fetched_at: "2026-10-20T14:00:00Z" },
+  verdict: { call: "no_clear_edge", score: 0.1, parts: {}, reasons: ["Volume balanced between up and down bars"],
+    computed_at: "2026-10-20T14:00:00Z" },
   appearances: [
     { seen_on: "2026-10-20", change_percent: 47.4, screen_id: 1 },
     { seen_on: "2026-10-03", change_percent: 22.1, screen_id: 1 },
@@ -29,7 +31,7 @@ const AUTO_ENTRY: WatchlistEntry = {
 };
 const MANUAL_ENTRY: WatchlistEntry = {
   ticker: "WORX", source: "manual", added_at: "2026-10-19T14:00:00+00:00",
-  last_seen_in_feeder_at: null, is_pinned: false, expires_at: null, appearances: [], snapshot: null,
+  last_seen_in_feeder_at: null, is_pinned: false, expires_at: null, appearances: [], snapshot: null, verdict: null,
 };
 
 describe("WatchlistView", () => {
@@ -152,5 +154,13 @@ describe("WatchlistView", () => {
     fireEvent.click(await screen.findByRole("button", { name: "HOST" }));
 
     expect(onOpenStock).toHaveBeenCalledWith("HOST");
+  });
+
+  it("shows verdicts on the watchlist", async () => {
+    api.listWatchlist.mockResolvedValue([AUTO_ENTRY, MANUAL_ENTRY]);
+    render(<WatchlistView onOpenStock={vi.fn()} />);
+
+    const hostRow = await screen.findByRole("row", { name: /HOST/ });
+    expect(within(hostRow).getByText("No clear edge")).toBeInTheDocument();
   });
 });

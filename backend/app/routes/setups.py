@@ -9,7 +9,9 @@ from app.routes.dependencies import get_db_connection
 from app.routes.stocks import TickerPath
 from app.scanning.scanner import finviz_scan_deps, run_scan
 from app.patterns.types import TIMEFRAME_ORDER
-from app.schemas import ScanIn, ScanOut, SetupOut, SetupsOut
+from app.patterns.verdict import Verdict
+from app.scanning.verdicts import read_verdicts
+from app.schemas import ScanIn, ScanOut, SetupOut, SetupsOut, VerdictOut
 from app.setups.store import SetupRecord, list_current_setups
 from app.user_settings import get_show_short_setups
 
@@ -32,7 +34,16 @@ def post_scan(body: ScanIn, conn: DbConnection) -> ScanOut:
     )
 
 
-def _to_setup_out(record: SetupRecord, records: list[SetupRecord]) -> SetupOut:
+def to_verdict_out(stored: tuple[Verdict, datetime] | None) -> VerdictOut | None:
+    if stored is None:
+        return None
+    verdict, computed_at = stored
+    return VerdictOut(
+        call=verdict.call, score=verdict.score, parts=verdict.parts, reasons=verdict.reasons, computed_at=computed_at
+    )
+
+
+def _to_setup_out(record: SetupRecord, records: list[SetupRecord], verdicts: dict) -> SetupOut:
     # Same rule as the ranking penalty: only an opposite pattern on the same
     # or a higher timeframe counts; a 1m wiggle against a 5m setup doesn't.
     has_conflict = any(
@@ -42,15 +53,18 @@ def _to_setup_out(record: SetupRecord, records: list[SetupRecord]) -> SetupOut:
         for other in records
     )
     values = asdict(record)
-    for field in ("float_at_detection", "outcome", "resolved_at", "max_favorable_r", "max_adverse_r"):
+    # The setup's own `verdict` column is the call at detection; the API shows the
+    # stock's current verdict instead.
+    for field in ("float_at_detection", "outcome", "resolved_at", "max_favorable_r", "max_adverse_r", "verdict"):
         values.pop(field)
-    return SetupOut(**values, has_conflict=has_conflict)
+    return SetupOut(**values, has_conflict=has_conflict, verdict=to_verdict_out(verdicts.get(record.ticker)))
 
 
 def _setups_response(conn: sqlite3.Connection, ticker: str | None) -> SetupsOut:
     records = list_current_setups(conn, ticker)
     show_shorts = get_show_short_setups(conn)
-    setups = [_to_setup_out(record, records) for record in records]
+    verdicts = read_verdicts(conn)
+    setups = [_to_setup_out(record, records, verdicts) for record in records]
     # Shorts are never suggested as trades unless the user turned them on.
     return SetupsOut(
         setups=[setup for setup in setups if setup.direction == "long" or show_shorts],
@@ -67,3 +81,8 @@ def get_setups(conn: DbConnection) -> SetupsOut:
 @router.get("/stocks/{ticker}/setups", response_model=SetupsOut)
 def get_stock_setups(ticker: TickerPath, conn: DbConnection) -> SetupsOut:
     return _setups_response(conn, ticker.upper())
+
+
+@router.get("/stocks/{ticker}/verdict", response_model=VerdictOut | None)
+def get_stock_verdict(ticker: TickerPath, conn: DbConnection) -> VerdictOut | None:
+    return to_verdict_out(read_verdicts(conn).get(ticker.upper()))

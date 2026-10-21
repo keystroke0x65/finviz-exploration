@@ -99,6 +99,14 @@ class AppearanceOut(BaseModel):
     screen_id: int
 
 
+class VerdictOut(BaseModel):
+    call: Literal["leans_long", "leans_short", "no_clear_edge"]
+    score: float
+    parts: dict[str, float]
+    reasons: list[str]
+    computed_at: datetime
+
+
 class SnapshotOut(BaseModel):
     price: float | None
     change_percent: float | None
@@ -116,6 +124,7 @@ class WatchlistEntryOut(BaseModel):
     expires_at: datetime | None
     appearances: list[AppearanceOut]
     snapshot: SnapshotOut | None = None
+    verdict: VerdictOut | None = None
 
 
 class AddTickerIn(BaseModel):
@@ -219,6 +228,7 @@ class SetupOut(BaseModel):
     detected_at: datetime
     last_seen_at: datetime
     has_conflict: bool
+    verdict: VerdictOut | None = None
 
 
 class SetupsOut(BaseModel):

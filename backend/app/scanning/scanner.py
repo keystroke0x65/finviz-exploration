@@ -14,10 +14,12 @@ from app.patterns.detectors import run_detectors
 from app.patterns.indicators import session_levels, session_vwap
 from app.patterns.levels import find_daily_levels
 from app.patterns.ranking import score_setup
-from app.patterns.trade_plan import build_trade_plan, classify_state
-from app.patterns.types import DetectorContext, PatternMatch
+from app.patterns.trade_plan import TradePlan, build_trade_plan, classify_state
+from app.patterns.types import DetectorContext, PatternMatch, SetupState
+from app.patterns.verdict import Verdict, compute_verdict
 from app.scanning.active import select_active_tickers
 from app.scanning.snapshots import save_snapshots
+from app.scanning.verdicts import save_verdict
 from app.setups.resolver import has_deadline_passed, resolve_outcome
 from app.setups.store import (
     list_open_records,
@@ -94,16 +96,38 @@ def _detect_all(bars_by_timeframe: dict[Interval, list[Bar]], now: datetime) -> 
     return matches
 
 
-def _record_matches(
-    conn: sqlite3.Connection,
-    ticker: str,
-    matches: list[PatternMatch],
-    bars_by_timeframe: dict[Interval, list[Bar]],
-    snapshot: ScreenRow | None,
-    now: datetime,
-) -> int:
+def _todays_bars(bars: list[Bar], now: datetime) -> list[Bar]:
+    today = now.astimezone(EASTERN).date()
+    return [bar for bar in bars if bar.time.astimezone(EASTERN).date() == today]
+
+
+def _verdict_for(
+    bars_by_timeframe: dict[Interval, list[Bar]], matches: list[PatternMatch], now: datetime
+) -> Verdict:
+    # Only today's intraday bars say anything about how the stock is trading now.
+    one_minute = _todays_bars(bars_by_timeframe["1m"], now)
+    five_minute = _todays_bars(bars_by_timeframe["5m"], now)
+    daily = bars_by_timeframe["daily"]
+    return compute_verdict(
+        one_minute, five_minute, daily, session_vwap(one_minute) if one_minute else None,
+        find_daily_levels(daily), matches,
+    )
+
+
+@dataclass(frozen=True)
+class _UsableSetup:
+    match: PatternMatch
+    plan: TradePlan
+    state: SetupState
+
+
+def _usable_setups(matches: list[PatternMatch], bars_by_timeframe: dict[Interval, list[Bar]]) -> list[_UsableSetup]:
+    """Matches that give a valid plan and aren't already past their stop.
+
+    Only these become setups, and only these count as evidence in the verdict.
+    """
     daily_levels = find_daily_levels(bars_by_timeframe["daily"])
-    recorded = 0
+    usable: list[_UsableSetup] = []
     for match in matches:
         bars = bars_by_timeframe[match.timeframe]
         plan = build_trade_plan(match, daily_levels, bars[-TRAILING_STOP_BARS:])
@@ -112,14 +136,30 @@ def _record_matches(
         state = classify_state(plan, bars[-1].close)
         # A setup already past its stop isn't a setup; recording it would also
         # skew outcome stats with trades nobody could have taken.
-        if state == "invalidated":
-            continue
-        others = [other for other in matches if other is not match]
-        score = score_setup(match, plan, state, snapshot.relative_volume if snapshot else None, others)
-        float_millions = snapshot.float_millions if snapshot else None
-        record_match(conn, ticker, match, plan, state, score, _session_label(match), float_millions, now)
-        recorded += 1
-    return recorded
+        if state != "invalidated":
+            usable.append(_UsableSetup(match, plan, state))
+    return usable
+
+
+def _record_setups(
+    conn: sqlite3.Connection,
+    ticker: str,
+    setups: list[_UsableSetup],
+    snapshot: ScreenRow | None,
+    now: datetime,
+    verdict_call: str | None,
+) -> int:
+    matches = [setup.match for setup in setups]
+    relative_volume = snapshot.relative_volume if snapshot else None
+    float_millions = snapshot.float_millions if snapshot else None
+    for setup in setups:
+        others = [other for other in matches if other is not setup.match]
+        score = score_setup(setup.match, setup.plan, setup.state, relative_volume, others)
+        record_match(
+            conn, ticker, setup.match, setup.plan, setup.state, score, _session_label(setup.match),
+            float_millions, now, verdict=verdict_call,
+        )
+    return len(setups)
 
 
 def _resolve_open_records(
@@ -157,8 +197,10 @@ def scan_ticker(conn: sqlite3.Connection, ticker: str, snapshot: ScreenRow | Non
     bars_by_timeframe = {
         timeframe: load_bars(conn, ticker, timeframe, now, deps.fetch_bars).bars for timeframe in TIMEFRAMES
     }
-    matches = _detect_all(bars_by_timeframe, now)
-    recorded = _record_matches(conn, ticker, matches, bars_by_timeframe, snapshot, now)
+    setups = _usable_setups(_detect_all(bars_by_timeframe, now), bars_by_timeframe)
+    verdict = _verdict_for(bars_by_timeframe, [setup.match for setup in setups], now)
+    save_verdict(conn, ticker, verdict, now)
+    recorded = _record_setups(conn, ticker, setups, snapshot, now, verdict.call)
     _resolve_open_records(conn, ticker, bars_by_timeframe, now)
     mark_ticker_scanned(conn, ticker, now)
     return recorded

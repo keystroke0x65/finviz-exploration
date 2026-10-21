@@ -132,3 +132,16 @@ def test_watchlist_entries_include_latest_snapshot(api_client, db_conn):
         "relative_volume": 3.2, "fetched_at": "2026-10-20T14:00:00Z",
     }
     assert entries["WORX"]["snapshot"] is None
+
+
+def test_watchlist_entries_include_verdict(api_client, db_conn):
+    from app.patterns.verdict import Verdict
+    from app.scanning.verdicts import save_verdict
+    from app.watchlist.store import add_manual_entry
+
+    add_manual_entry(db_conn, "HOST", NOW)
+    save_verdict(db_conn, "HOST", Verdict("leans_short", -0.3, {}, ["Volume heavier on down bars"]), NOW)
+
+    entry = api_client.get("/api/watchlist").json()[0]
+
+    assert entry["verdict"]["call"] == "leans_short"

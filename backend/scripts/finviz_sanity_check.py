@@ -22,6 +22,7 @@ from app.db import connect
 from app.finviz_client import find_unrecognised_codes, get_bars, get_quote, run_screen
 from app.market_time import EASTERN
 from app.scanning.scanner import finviz_scan_deps, scan_ticker
+from app.scanning.verdicts import read_verdicts
 from app.setups.store import list_current_setups
 from app.screens.filter_form import FORM_OPTIONS, SIGNAL_OPTIONS, ScreenForm, form_to_codes
 from app.screens.store import DEFAULT_SCREENS
@@ -96,6 +97,10 @@ def check_bars(ticker: str) -> bool:
                 f"entry {setup.entry} stop {setup.stop} target {setup.capped_target} "
                 f"({setup.available_reward_risk:.1f}R) score {setup.score}"
             )
+        verdict, _ = read_verdicts(conn)[ticker]
+        print(f"Verdict: {verdict.call} (score {verdict.score})")
+        for reason in verdict.reasons:
+            print(f"  - {reason}")
         conn.close()
     print(f"{found} setups recorded.")
     return all_ok

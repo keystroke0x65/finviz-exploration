@@ -2,9 +2,10 @@
 
 A personal financial dashboard built on a Finviz Elite subscription.
 
-**Current status:** Phase 2 milestones 1 and 2a: screens, an auto-fed watchlist, pattern
-detection with entry/stop/target plans, outcome tracking, and a candle chart. More patterns
-and a per-stock long/short verdict (milestone 2b) are next. See
+**Current status:** Phase 2 milestones 1, 2a and 2b: screens, an auto-fed watchlist,
+pattern detection with entry/stop/target plans, a per-stock long/short verdict, outcome
+tracking, and a candle chart. Continuation/reversal/candlestick patterns and a track-record
+view (milestone 3) are next. See
 [the phase 2 design](docs/superpowers/specs/2026-10-20-screener-watchlist-patterns-design.md)
 and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-phase1-design.md).
 
@@ -52,9 +53,27 @@ Stock tab run a scan on demand; a full scan takes about two minutes because Finv
 called at most once a second. If Finviz starts rate limiting, the scan stops and lists the
 stocks it skipped.
 
-Patterns so far: high/low of day break, pre-market high/low break, opening range
-breakout/breakdown, red-to-green / green-to-red, VWAP reclaim/rejection, bull/bear flag,
-flat-top breakout / flat-bottom breakdown.
+Patterns so far:
+- Momentum (1m and 5m): high/low of day break, pre-market high/low break, opening range
+  breakout/breakdown, red-to-green / green-to-red, VWAP reclaim/rejection, ABCD / inverse
+  ABCD, micro pullback, first pullback after a gap up / first bounce fail after a gap down.
+- All timeframes: bull/bear flag, flat-top breakout / flat-bottom breakdown, ascending /
+  descending triangle, double bottom / double top.
+
+### The verdict
+
+Every scanned stock also gets one overall call: **Leans long**, **Leans short** or **No
+clear edge**, with the reasons listed on the Stock tab (and on hover elsewhere). It
+combines four things, each shown in the reasons:
+- trend: price against VWAP, the 9 and 20 EMAs on 1m and 5m, and the 20- and 50-day
+  averages;
+- volume: whether recent 1m volume is heavier on up bars or down bars;
+- room: distance to the nearest daily resistance above versus support below;
+- patterns: bullish versus bearish patterns found, weighted by quality.
+
+"No clear edge" is common and means the signals disagree; the app doesn't force a call.
+Inputs it doesn't have (e.g. no trades yet today) are left out and named in the reasons.
+The verdict is shown even when short setups are hidden.
 
 Every setup is recorded and later marked as having hit its target or stop first, expired
 (intraday setups at 8:00 PM ET, daily ones after 20 sessions), or unresolved (Finviz no

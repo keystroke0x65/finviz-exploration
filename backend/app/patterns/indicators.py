@@ -62,3 +62,24 @@ def session_levels(intraday_bars: list[Bar], daily_bars: list[Bar], today: date)
         opening_range_low=opening_range_low,
         previous_close=earlier_days[-1].close if earlier_days else None,
     )
+
+
+def sma(values: list[float], period: int) -> list[float | None]:
+    return [
+        sum(values[index - period + 1 : index + 1]) / period if index >= period - 1 else None
+        for index in range(len(values))
+    ]
+
+
+def ema(values: list[float], period: int) -> list[float | None]:
+    """Exponential moving average, seeded with the simple average of the first `period` values."""
+    if len(values) < period:
+        return [None] * len(values)
+    alpha = 2 / (period + 1)
+    averages: list[float | None] = [None] * (period - 1)
+    current = sum(values[:period]) / period
+    averages.append(current)
+    for value in values[period:]:
+        current += alpha * (value - current)
+        averages.append(current)
+    return averages

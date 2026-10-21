@@ -141,3 +141,42 @@ def test_scan_resolves_open_setups_of_tickers_no_longer_active(db_conn):
     run_scan(db_conn, after_close, deps(forming), tickers=["OTHER"])
 
     assert list_open_records(db_conn, "HOST") == []
+
+
+def test_scan_ticker_saves_verdict(db_conn):
+    from app.scanning.verdicts import read_verdicts
+
+    scan_ticker(db_conn, "HOST", snapshot("HOST"), NOW, deps())
+
+    verdict, computed_at = read_verdicts(db_conn)["HOST"]
+    assert verdict.call in {"leans_long", "leans_short", "no_clear_edge"}
+    assert verdict.reasons
+    assert computed_at == NOW
+    assert all(setup.verdict == verdict.call for setup in list_current_setups(db_conn, "HOST"))
+
+
+def test_verdict_counts_only_patterns_that_became_setups(db_conn):
+    import re
+
+    from app.scanning.verdicts import read_verdicts
+    from tests.pattern_shapes import shape
+
+    # A tight ascending triangle (top 2.50, latest swing low ~2.449) with the last
+    # close already under that stop: detected, but invalidated, so not a setup.
+    from tests.test_triangle_detectors import HIGHS, LOWS
+
+    def tighten(prices):
+        return [2.50 + (price - 2.50) * 0.3 for price in prices]
+
+    invalidated = shape(tighten(HIGHS), tighten(LOWS), last_close=2.44)
+
+    def fetch(ticker, interval):
+        if interval == "daily":
+            return daily_bars([2.0, 2.1], start=date(2026, 10, 15))
+        return invalidated
+
+    scan_ticker(db_conn, "HOST", None, NOW, deps(fetch))
+
+    verdict, _ = read_verdicts(db_conn)["HOST"]
+    counted = sum(int(n) for n in re.findall(r"(\d+) (?:bullish|bearish)", " ".join(verdict.reasons)))
+    assert counted == len(list_current_setups(db_conn, "HOST"))

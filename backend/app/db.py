@@ -65,7 +65,8 @@ CREATE TABLE IF NOT EXISTS setup_records (
     outcome TEXT NOT NULL DEFAULT 'open',
     resolved_at TEXT,
     max_favorable_r REAL,
-    max_adverse_r REAL
+    max_adverse_r REAL,
+    verdict TEXT
 );
 
 -- One open record per setup; once resolved, a later occurrence of the same
@@ -85,11 +86,36 @@ CREATE TABLE IF NOT EXISTS ticker_snapshots (
     fetched_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS ticker_verdicts (
+    ticker TEXT PRIMARY KEY,
+    call TEXT NOT NULL,
+    score REAL NOT NULL,
+    parts TEXT NOT NULL,
+    reasons TEXT NOT NULL,
+    computed_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS app_meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
 """
+
+
+# Columns added after a table first shipped. CREATE TABLE IF NOT EXISTS leaves an
+# existing table untouched, so each is added to older databases here.
+ADDED_COLUMNS = [
+    ("setup_records", "verdict", "TEXT"),
+]
+
+
+def _add_missing_columns(conn: sqlite3.Connection) -> None:
+    for table, column, column_type in ADDED_COLUMNS:
+        existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        if column not in existing:
+            # Names come from the constant above, never from input.
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
+    conn.commit()
 
 
 def connect(db_path: str) -> sqlite3.Connection:
@@ -99,4 +125,5 @@ def connect(db_path: str) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)
+    _add_missing_columns(conn)
     return conn
