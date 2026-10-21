@@ -10,7 +10,8 @@ RANGE_LOOKBACK = 20
 MAX_RANGE_PERCENT: dict[Interval, float] = {"1m": 3.0, "5m": 6.0, "daily": 15.0}
 EDGE_ZONE = 0.15  # swings within this share of the range from an edge count as touches
 MIN_EDGE_TOUCHES = 2
-NEAR_EDGE_PERCENT = 2.0
+NEAR_EDGE_PERCENT = 2.0  # how far past an edge price may already be
+NEAR_EDGE_SHARE = 0.25  # price must be in the outer quarter of the range on that side
 
 CUP_LOOKBACK = 60
 MIN_CUP_BARS = 20
@@ -39,12 +40,14 @@ def detect_ranges(bars: list[Bar], context: DetectorContext) -> list[PatternMatc
     if len(top_touches) < MIN_EDGE_TOUCHES or len(bottom_touches) < MIN_EDGE_TOUCHES:
         return []
 
+    # "Near" is measured against the range height, not as a flat percent: in a tight range
+    # a flat 2% covers the middle, which is no breakout. Just through an edge also counts.
     close = bars[-1].close
-    to_top = abs(close - top) / top * 100
-    to_bottom = abs(close - bottom) / bottom * 100
-    if to_top <= NEAR_EDGE_PERCENT and to_top <= to_bottom:
+    near_band = (top - bottom) * NEAR_EDGE_SHARE
+    beyond = NEAR_EDGE_PERCENT / 100
+    if top - near_band <= close <= top * (1 + beyond):
         pattern, direction, entry, stop = "range_breakout", "long", top, bottom
-    elif to_bottom <= NEAR_EDGE_PERCENT:
+    elif bottom * (1 - beyond) <= close <= bottom + near_band:
         pattern, direction, entry, stop = "range_breakdown", "short", bottom, top
     else:
         return []

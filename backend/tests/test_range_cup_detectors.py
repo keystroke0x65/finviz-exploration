@@ -78,3 +78,8 @@ def test_range_and_cup_detectors_return_nothing_on_short_or_flat_bars():
 
 def test_range_and_cup_detectors_are_registered():
     assert "cup_and_handle" in {m.pattern for m in run_detectors(from_closes(cup_closes()), FIVE_MINUTE)}
+
+
+def test_range_not_called_with_price_in_the_middle():
+    # 1.99-2.09 range on 5m; 2.055 is within 2% of the top but only 65% of the way up.
+    assert detect_ranges(zigzag(RANGE[:-1] + [2.055]), FIVE_MINUTE) == []
