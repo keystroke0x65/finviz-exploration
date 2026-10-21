@@ -9,6 +9,7 @@ from typing import Callable
 
 from app.finviz_client import Bar, Interval
 from app.patterns.detectors.abcd import ABCD_DETECTORS
+from app.patterns.detectors.converging import CONVERGING_DETECTORS
 from app.patterns.detectors.doubles import DOUBLE_DETECTORS
 from app.patterns.detectors.flags import FLAG_DETECTORS
 from app.patterns.detectors.flat_levels import FLAT_LEVEL_DETECTORS
@@ -27,6 +28,7 @@ DETECTORS: list[tuple[Detector, frozenset[Interval]]] = [
     *DOUBLE_DETECTORS,
     *ABCD_DETECTORS,
     *PULLBACK_DETECTORS,
+    *CONVERGING_DETECTORS,
 ]
 
 
