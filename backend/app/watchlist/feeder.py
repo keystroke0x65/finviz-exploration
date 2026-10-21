@@ -14,8 +14,6 @@ FEEDER_WINDOW_START = time(4, 0)
 FEEDER_WINDOW_END = time(20, 0)
 SATURDAY = 5
 
-UNFILTERED_REASON = "filters may have been ignored"
-
 RunScreenFunction = Callable[[list[str], str | None, str | None], ScreenResult]
 
 
@@ -40,12 +38,9 @@ def _fetch_feeder_hits(
 ) -> tuple[ScreenResult | None, str | None]:
     criteria = screen.criteria
     try:
-        result = run_screen_fn(criteria.filters, criteria.signal, criteria.order)
+        return run_screen_fn(criteria.filters, criteria.signal, criteria.order), None
     except (FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError) as exc:
         return None, str(exc)
-    if result.is_possibly_unfiltered:
-        return None, UNFILTERED_REASON
-    return result, None
 
 
 def run_feeder(
@@ -69,6 +64,7 @@ def run_feeder(
             already_counted = row.ticker in tickers_added or row.ticker in tickers_updated
             if not already_counted:
                 (tickers_added if outcome == "added" else tickers_updated).append(row.ticker)
+        conn.commit()
 
     return FeederResult(
         screens_run=len(feeder_screens),

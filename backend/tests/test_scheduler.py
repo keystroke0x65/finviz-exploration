@@ -39,7 +39,7 @@ def test_scheduler_tick_skips_outside_window(tmp_path):
 def test_scheduler_tick_runs_feeder_inside_window(tmp_path):
     result = run_scheduled_feeder_tick(
         _seeded_db_path(tmp_path), TUESDAY_10AM_ET, RETENTION_DAYS,
-        lambda *args: ScreenResult([], False),
+        lambda *args: ScreenResult([]),
     )
 
     assert isinstance(result, FeederResult)

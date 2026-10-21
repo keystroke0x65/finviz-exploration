@@ -85,7 +85,6 @@ class ScreenRowOut(BaseModel):
 
 class ScreenRunOut(BaseModel):
     rows: list[ScreenRowOut]
-    is_possibly_unfiltered: bool
     fetched_at: datetime
 
 

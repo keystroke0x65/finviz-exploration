@@ -64,7 +64,7 @@ def test_refresh_runs_feeder_and_reports_failures(api_client, db_conn):
     def fake_run_screen(filters, signal, order):
         if filters == ["sh_price_u5"]:
             raise FinvizUnavailableError("screen", "ReadTimeout")
-        return ScreenResult([], False)
+        return ScreenResult([])
 
     with patch("app.routes.watchlist.run_screen", side_effect=fake_run_screen):
         response = api_client.post("/api/watchlist/refresh")

@@ -55,7 +55,6 @@ export interface ScreenRow {
 
 export interface ScreenRun {
   rows: ScreenRow[];
-  is_possibly_unfiltered: boolean;
   fetched_at: string;
 }
 

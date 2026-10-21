@@ -22,12 +22,6 @@ export function ScreenResultsTable({ run, onAddToWatchlist }: ScreenResultsTable
   return (
     <section>
       <p>Fetched {new Date(run.fetched_at).toLocaleString()}</p>
-      {run.is_possibly_unfiltered && (
-        <p role="alert">
-          Finviz may have ignored some filters — check the screen's codes. Finviz returns the
-          whole market instead of an error when it doesn't recognise a code.
-        </p>
-      )}
       {run.rows.length === 0 ? (
         <p>No stocks match this screen right now.</p>
       ) : (

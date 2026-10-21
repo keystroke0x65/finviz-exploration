@@ -90,6 +90,8 @@ def record_feeder_hit(
     screen_id: int,
     now: datetime,
 ) -> Literal["added", "updated"]:
+    """Record one feeder hit. Doesn't commit: the feeder commits once per screen,
+    since a broad screen can return thousands of rows."""
     stored_now = _to_stored_time(now)
     cursor = conn.execute(
         "UPDATE watchlist_entries SET last_seen_in_feeder_at = ? WHERE ticker = ?",
@@ -112,7 +114,6 @@ def record_feeder_hit(
         """,
         (ticker, _eastern_date(now).isoformat(), change_percent, screen_id),
     )
-    conn.commit()
     return outcome
 
 

@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+import responses
 
+from app.config import get_settings
 from app.errors import FinvizRateLimitError
-from app.finviz_client import ScreenResult, ScreenRow
+from app.finviz_client import ScreenResult, ScreenRow, run_screen
 from app.screens.finviz_url import ScreenCriteria
 from app.screens.store import ScreenInput, create_screen
 from app.watchlist.feeder import is_within_feeder_window, run_feeder
@@ -54,7 +56,7 @@ def test_run_feeder_adds_hits_from_feeder_screens_only(db_conn):
 
     def fake_run_screen(filters, signal, order):
         calls.append(filters)
-        return ScreenResult([_row("HOST", 47.4), _row("WORX", 36.6)], False)
+        return ScreenResult([_row("HOST", 47.4), _row("WORX", 36.6)])
 
     result = run_feeder(db_conn, fake_run_screen, NOW, RETENTION_DAYS)
 
@@ -70,7 +72,7 @@ def test_run_feeder_reports_updated_tickers_on_second_run(db_conn):
     _add_screen(db_conn, "Feeder", ["geo_usa"])
 
     def fake_run_screen(filters, signal, order):
-        return ScreenResult([_row("HOST", 47.4)], False)
+        return ScreenResult([_row("HOST", 47.4)])
 
     run_feeder(db_conn, fake_run_screen, NOW, RETENTION_DAYS)
     result = run_feeder(db_conn, fake_run_screen, NOW + timedelta(minutes=15), RETENTION_DAYS)
@@ -84,7 +86,7 @@ def test_ticker_hit_by_two_feeder_screens_counts_once_as_added(db_conn):
     _add_screen(db_conn, "Second", ["sh_price_u20"])
 
     def fake_run_screen(filters, signal, order):
-        return ScreenResult([_row("HOST", 47.4)], False)
+        return ScreenResult([_row("HOST", 47.4)])
 
     result = run_feeder(db_conn, fake_run_screen, NOW, RETENTION_DAYS)
 
@@ -100,7 +102,7 @@ def test_run_feeder_continues_after_screen_failure(db_conn):
     def fake_run_screen(filters, signal, order):
         if filters == ["geo_usa"]:
             raise FinvizRateLimitError("screen")
-        return ScreenResult([_row("WORX", 36.6)], False)
+        return ScreenResult([_row("WORX", 36.6)])
 
     result = run_feeder(db_conn, fake_run_screen, NOW, RETENTION_DAYS)
 
@@ -112,22 +114,10 @@ def test_run_feeder_continues_after_screen_failure(db_conn):
     assert "rate limiting" in reason
 
 
-def test_run_feeder_ignores_possibly_unfiltered_result(db_conn):
-    _add_screen(db_conn, "Typo", ["geo_usa", "sh_flaot_u10"])
-
-    def fake_run_screen(filters, signal, order):
-        return ScreenResult([_row("AAPL", 1.0)], True)
-
-    result = run_feeder(db_conn, fake_run_screen, NOW, RETENTION_DAYS)
-
-    assert list_entries(db_conn) == []
-    assert result.failed_screens == [("Typo", "filters may have been ignored")]
-
-
 def test_run_feeder_expires_stale_entries(db_conn):
     record_feeder_hit(db_conn, "OLD", 5.0, 1, NOW - timedelta(days=100))
 
-    result = run_feeder(db_conn, lambda *args: ScreenResult([], False), NOW, RETENTION_DAYS)
+    result = run_feeder(db_conn, lambda *args: ScreenResult([]), NOW, RETENTION_DAYS)
 
     assert result.tickers_expired == ["OLD"]
     assert get_entry(db_conn, "OLD") is None
@@ -139,3 +129,21 @@ def test_run_feeder_with_no_feeder_screens_returns_empty_result(db_conn):
     assert result.screens_run == 0
     assert result.tickers_added == []
     assert result.failed_screens == []
+
+
+@responses.activate
+def test_broad_valid_screen_over_5000_rows_still_feeds_watchlist(db_conn, monkeypatch):
+    # "US only" legitimately returns ~10,400 rows; size alone must not be
+    # treated as "Finviz ignored the filters".
+    monkeypatch.setenv("FINVIZ_API_TOKEN", "test-token")
+    get_settings.cache_clear()
+    _add_screen(db_conn, "US only", ["geo_usa"])
+    header = "Ticker,Change\n"
+    body = header + "".join(f"T{index:04d},1.0%\n" for index in range(6000))
+    responses.add(responses.GET, "https://elite.finviz.com/export/screener", body=body)
+
+    result = run_feeder(db_conn, run_screen, NOW, RETENTION_DAYS)
+
+    assert result.failed_screens == []
+    assert len(result.tickers_added) == 6000
+    get_settings.cache_clear()

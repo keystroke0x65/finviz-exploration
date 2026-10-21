@@ -1,5 +1,7 @@
 from unittest.mock import patch
 
+import pytest
+
 from app.errors import FinvizRateLimitError
 from app.finviz_client import ScreenResult, ScreenRow
 
@@ -19,6 +21,12 @@ HOST_ROW = ScreenRow(
     after_hours_change_percent=-3.53, news_time="2026-10-20 10:36:03",
     news_url="https://elite.finviz.com/news/1", news_title="Buyback",
 )
+
+
+@pytest.fixture(autouse=True)
+def finviz_recognises_every_code():
+    with patch("app.routes.screens.find_unrecognised_codes", return_value=[]) as mock_check:
+        yield mock_check
 
 
 def _create(api_client, body=LOW_FLOAT_SCREEN) -> dict:
@@ -120,15 +128,14 @@ def test_form_fields_lists_options_and_signals(api_client):
     assert body["signals"]["ta_topgainers"] == "Top gainers"
 
 
-@patch("app.routes.screens.run_screen", return_value=ScreenResult([HOST_ROW], False))
-def test_run_screen_returns_rows_and_unfiltered_flag(mock_run_screen, api_client):
+@patch("app.routes.screens.run_screen", return_value=ScreenResult([HOST_ROW]))
+def test_run_screen_returns_rows(mock_run_screen, api_client):
     created = _create(api_client)
 
     response = api_client.post(f"/api/screens/{created['id']}/run")
 
     assert response.status_code == 200
     body = response.json()
-    assert body["is_possibly_unfiltered"] is False
     assert body["rows"][0]["ticker"] == "HOST"
     assert body["rows"][0]["after_hours_change_percent"] == -3.53
     assert "fetched_at" in body
@@ -149,3 +156,38 @@ def test_run_screen_maps_rate_limit_to_503(mock_run_screen, api_client):
 
     assert response.status_code == 503
     assert "rate limiting" in response.json()["detail"]
+
+
+def test_create_screen_checks_extra_codes_and_signal_with_finviz(api_client, finviz_recognises_every_code):
+    _create(api_client)
+
+    # Form codes are verified by the sanity script, so only pasted extras
+    # and the signal cost Finviz requests.
+    finviz_recognises_every_code.assert_called_once_with(["ta_rsi_os30"], "ta_topgainers")
+
+
+def test_create_screen_rejects_codes_finviz_does_not_recognise(api_client, finviz_recognises_every_code):
+    finviz_recognises_every_code.return_value = ["sh_flaot_u10"]
+    body = {**LOW_FLOAT_SCREEN, "extra_filters": ["sh_flaot_u10"]}
+
+    response = api_client.post("/api/screens", json=body)
+
+    assert response.status_code == 422
+    assert "sh_flaot_u10" in response.json()["detail"]
+    assert api_client.get("/api/screens").json() == []
+
+
+def test_update_screen_rejects_codes_finviz_does_not_recognise(api_client, finviz_recognises_every_code):
+    created = _create(api_client)
+    finviz_recognises_every_code.return_value = ["ta_bogus"]
+
+    response = api_client.put(f"/api/screens/{created['id']}", json={**LOW_FLOAT_SCREEN, "signal": "ta_bogus"})
+
+    assert response.status_code == 422
+    assert api_client.get("/api/screens").json()[0]["signal"] == "ta_topgainers"
+
+
+def test_create_screen_maps_finviz_failure_during_code_check(api_client, finviz_recognises_every_code):
+    finviz_recognises_every_code.side_effect = FinvizRateLimitError("check filter codes")
+
+    assert api_client.post("/api/screens", json=LOW_FLOAT_SCREEN).status_code == 503

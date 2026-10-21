@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from app.errors import FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError
-from app.finviz_client import run_screen
+from app.finviz_client import find_unrecognised_codes, run_screen
 from app.routes.dependencies import finviz_error_to_http, get_db_connection
 from app.schemas import (
     FormFieldsOut,
@@ -82,6 +82,19 @@ def _to_screen_input(body: ScreenIn) -> ScreenInput:
     )
 
 
+def _reject_unrecognised_codes(body: ScreenIn) -> None:
+    try:
+        unrecognised = find_unrecognised_codes(body.extra_filters, body.signal)
+    except (FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError) as exc:
+        raise finviz_error_to_http(exc) from exc
+    if unrecognised:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Finviz doesn't recognise these codes (it would silently ignore them): "
+            f"{', '.join(unrecognised)}",
+        )
+
+
 def _require_screen(conn: sqlite3.Connection, screen_id: int) -> Screen:
     screen = get_screen(conn, screen_id)
     if screen is None:
@@ -96,7 +109,9 @@ def get_screens(conn: DbConnection) -> list[ScreenOut]:
 
 @router.post("", response_model=ScreenOut, status_code=201)
 def post_screen(body: ScreenIn, conn: DbConnection) -> ScreenOut:
-    screen = create_screen(conn, _to_screen_input(body), datetime.now(timezone.utc))
+    screen_input = _to_screen_input(body)
+    _reject_unrecognised_codes(body)
+    screen = create_screen(conn, screen_input, datetime.now(timezone.utc))
     return _to_screen_out(screen)
 
 
@@ -116,7 +131,10 @@ def post_parse_url(body: ParseUrlIn) -> ScreenDraft:
 
 @router.put("/{screen_id}", response_model=ScreenOut)
 def put_screen(screen_id: int, body: ScreenIn, conn: DbConnection) -> ScreenOut:
-    screen = update_screen(conn, screen_id, _to_screen_input(body), datetime.now(timezone.utc))
+    _require_screen(conn, screen_id)
+    screen_input = _to_screen_input(body)
+    _reject_unrecognised_codes(body)
+    screen = update_screen(conn, screen_id, screen_input, datetime.now(timezone.utc))
     if screen is None:
         raise HTTPException(status_code=404, detail=f"Screen {screen_id} not found")
     return _to_screen_out(screen)
@@ -138,6 +156,5 @@ def post_run_screen(screen_id: int, conn: DbConnection) -> ScreenRunOut:
         raise finviz_error_to_http(exc) from exc
     return ScreenRunOut(
         rows=[asdict(row) for row in result.rows],
-        is_possibly_unfiltered=result.is_possibly_unfiltered,
         fetched_at=datetime.now(timezone.utc),
     )

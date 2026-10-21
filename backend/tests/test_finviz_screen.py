@@ -8,8 +8,8 @@ from app.config import get_settings
 from app.errors import FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError
 from app.finviz_client import (
     SCREEN_COLUMN_IDS,
-    UNFILTERED_ROW_THRESHOLD,
     ScreenRow,
+    find_unrecognised_codes,
     run_screen,
 )
 
@@ -68,7 +68,6 @@ def test_run_screen_parses_typed_rows():
     assert result.rows[1].float_millions is None
     assert result.rows[1].change_percent is None
     assert result.rows[1].volume is None
-    assert result.is_possibly_unfiltered is False
 
 
 @responses.activate
@@ -123,21 +122,55 @@ def test_run_screen_returns_empty_rows_for_header_only_csv():
     result = run_screen(["geo_usa"], None, None)
 
     assert result.rows == []
-    assert result.is_possibly_unfiltered is False
+
+
+def _count_csv(row_count: int) -> str:
+    return "Ticker\n" + "AAA\n" * row_count
+
+
+def _add_count_response(filters: str | None, signal: str | None, row_count: int) -> None:
+    params = {"v": "152", "c": "1", "auth": TOKEN}
+    if filters is not None:
+        params["f"] = filters
+    if signal is not None:
+        params["s"] = signal
+    responses.add(
+        responses.GET,
+        FINVIZ_EXPORT_URL,
+        body=_count_csv(row_count),
+        match=[matchers.query_param_matcher(params)],
+    )
 
 
 @responses.activate
-def test_run_screen_flags_result_over_threshold():
-    responses.add(
-        responses.GET, FINVIZ_EXPORT_URL, body=_csv_with_rows(UNFILTERED_ROW_THRESHOLD + 1)
-    )
-    responses.add(responses.GET, FINVIZ_EXPORT_URL, body=_csv_with_rows(UNFILTERED_ROW_THRESHOLD))
+def test_find_unrecognised_codes_flags_codes_that_do_not_narrow_results():
+    _add_count_response("", None, 50)  # whole market
+    _add_count_response("sh_price_u20", None, 20)
+    _add_count_response("sh_flaot_u10", None, 50)  # typo: Finviz ignores it
 
-    over_threshold = run_screen(["geo_usa"], None, None)
-    at_threshold = run_screen(["geo_usa"], None, None)
+    assert find_unrecognised_codes(["sh_price_u20", "sh_flaot_u10"], None) == ["sh_flaot_u10"]
 
-    assert over_threshold.is_possibly_unfiltered is True
-    assert at_threshold.is_possibly_unfiltered is False
+
+@responses.activate
+def test_find_unrecognised_codes_checks_the_signal():
+    _add_count_response("", None, 50)
+    _add_count_response("", "ta_topgainers", 10)
+    _add_count_response("", "ta_bogus", 50)
+
+    assert find_unrecognised_codes([], "ta_topgainers") == []
+    assert find_unrecognised_codes([], "ta_bogus") == ["ta_bogus"]
+
+
+def test_find_unrecognised_codes_makes_no_request_when_nothing_to_check():
+    # No responses registered: any request would raise ConnectionError.
+    assert find_unrecognised_codes([], None) == []
+
+
+@responses.activate
+def test_large_valid_result_is_returned_in_full():
+    responses.add(responses.GET, FINVIZ_EXPORT_URL, body=_csv_with_rows(6000))
+
+    assert len(run_screen(["geo_usa"], None, None).rows) == 6000
 
 
 @responses.activate

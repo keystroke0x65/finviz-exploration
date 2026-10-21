@@ -33,11 +33,8 @@ CUSTOM_VIEW = "152"
 # whatever order is requested, so rows are read by header name.
 SCREEN_COLUMN_IDS = "1,2,5,6,25,63,64,65,66,67,71,72,135,136,137"
 
-# Finviz silently ignores filter/signal codes it doesn't recognise and
-# returns the whole market (~10,400 rows) instead of an error. No real
-# screen the user runs comes near this, so a larger result means a code
-# was probably ignored.
-UNFILTERED_ROW_THRESHOLD = 5000
+# Ticker only: the cheapest export, used when just counting rows.
+COUNT_COLUMN_IDS = "1"
 
 MIN_SECONDS_BETWEEN_REQUESTS = 1.0
 REQUEST_TIMEOUT_SECONDS = 10
@@ -97,7 +94,6 @@ class ScreenRow:
 @dataclass(frozen=True)
 class ScreenResult:
     rows: list[ScreenRow]
-    is_possibly_unfiltered: bool
 
 
 def _fetch_export_csv(params: dict[str, str], operation: str) -> str:
@@ -180,14 +176,41 @@ def _to_screen_row(row: dict) -> ScreenRow:
     )
 
 
-def run_screen(filters: list[str], signal: str | None, order: str | None) -> ScreenResult:
-    params = {"v": CUSTOM_VIEW, "c": SCREEN_COLUMN_IDS, "f": ",".join(filters)}
+def _screen_params(
+    columns: str, filters: list[str], signal: str | None, order: str | None
+) -> dict[str, str]:
+    params = {"v": CUSTOM_VIEW, "c": columns, "f": ",".join(filters)}
     if signal:
         params["s"] = signal
     if order:
         params["o"] = order
+    return params
 
-    csv_text = _fetch_export_csv(params, "screen")
-    df = _read_csv_as_strings(csv_text)
+
+def run_screen(filters: list[str], signal: str | None, order: str | None) -> ScreenResult:
+    params = _screen_params(SCREEN_COLUMN_IDS, filters, signal, order)
+    df = _read_csv_as_strings(_fetch_export_csv(params, "screen"))
     rows = [_to_screen_row(_clean_missing(record)) for record in df.to_dict("records")]
-    return ScreenResult(rows=rows, is_possibly_unfiltered=len(rows) > UNFILTERED_ROW_THRESHOLD)
+    return ScreenResult(rows=rows)
+
+
+def _count_screen_rows(filters: list[str], signal: str | None) -> int:
+    params = _screen_params(COUNT_COLUMN_IDS, filters, signal, None)
+    return len(_read_csv_as_strings(_fetch_export_csv(params, "check filter codes")))
+
+
+def find_unrecognised_codes(filters: list[str], signal: str | None) -> list[str]:
+    """Return the codes Finviz ignores.
+
+    Finviz drops filter and signal codes it doesn't recognise without any
+    error and applies the rest, so a typo quietly widens a screen. A code is
+    treated as unrecognised when, applied on its own, it doesn't narrow the
+    whole-market result. One request per code plus one for the baseline.
+    """
+    if not filters and not signal:
+        return []
+    market_size = _count_screen_rows([], None)
+    unrecognised = [code for code in filters if _count_screen_rows([code], None) >= market_size]
+    if signal and _count_screen_rows([], signal) >= market_size:
+        unrecognised.append(signal)
+    return unrecognised

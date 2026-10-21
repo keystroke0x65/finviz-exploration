@@ -31,7 +31,7 @@ describe("ScreensView", () => {
   it("lists screens and shows results after running one", async () => {
     api.listScreens.mockResolvedValue([SCREEN]);
     api.fetchFormFields.mockResolvedValue({ options: {}, signals: {} });
-    api.runScreen.mockResolvedValue({ rows: [], is_possibly_unfiltered: false, fetched_at: "2026-10-20T14:00:00Z" });
+    api.runScreen.mockResolvedValue({ rows: [], fetched_at: "2026-10-20T14:00:00Z" });
     render(<ScreensView />);
 
     expect(await screen.findByText("Top gainers — low float")).toBeInTheDocument();

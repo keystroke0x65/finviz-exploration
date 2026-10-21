@@ -149,3 +149,14 @@ def test_list_orders_by_last_seen_desc_with_never_seen_last(db_conn):
     add_manual_entry(db_conn, "AAA", NOW)
 
     assert [entry.ticker for entry in list_entries(db_conn)] == ["NEWER", "OLDER", "AAA"]
+
+
+def test_feeder_hits_are_committed_by_the_caller(db_conn, tmp_path):
+    from app.db import connect
+
+    record_feeder_hit(db_conn, "HOST", 5.0, SCREEN_ID, NOW)
+    db_conn.commit()
+
+    other_conn = connect(str(tmp_path / "test.db"))
+    assert other_conn.execute("SELECT COUNT(*) FROM watchlist_entries").fetchone()[0] == 1
+    other_conn.close()

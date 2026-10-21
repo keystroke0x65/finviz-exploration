@@ -12,7 +12,7 @@ const HOST: ScreenRow = {
 };
 
 function run(overrides: Partial<ScreenRun> = {}): ScreenRun {
-  return { rows: [HOST], is_possibly_unfiltered: false, fetched_at: "2026-10-20T14:00:00Z", ...overrides };
+  return { rows: [HOST], fetched_at: "2026-10-20T14:00:00Z", ...overrides };
 }
 
 describe("ScreenResultsTable", () => {
@@ -33,12 +33,6 @@ describe("ScreenResultsTable", () => {
     expect(within(row).getByRole("link", { name: "Open HOST on Finviz" })).toHaveAttribute(
       "href", "https://finviz.com/quote.ashx?t=HOST",
     );
-  });
-
-  it("warns when the result may be unfiltered", () => {
-    render(<ScreenResultsTable run={run({ is_possibly_unfiltered: true })} onAddToWatchlist={vi.fn()} />);
-
-    expect(screen.getByRole("alert")).toHaveTextContent("Finviz may have ignored some filters");
   });
 
   it("shows an empty-state message when no rows", () => {

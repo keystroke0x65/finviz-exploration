@@ -36,7 +36,7 @@ describe("screens and watchlist API", () => {
   });
 
   it("runScreen posts to the screen's run endpoint", async () => {
-    const fetchMock = stubOkFetch({ rows: [], is_possibly_unfiltered: false, fetched_at: "x" });
+    const fetchMock = stubOkFetch({ rows: [], fetched_at: "x" });
 
     await runScreen(3);
 
