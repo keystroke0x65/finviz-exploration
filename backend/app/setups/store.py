@@ -1,7 +1,7 @@
 import json
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.patterns.ranking import ScoreBreakdown
 from app.patterns.trade_plan import TradePlan
@@ -11,6 +11,11 @@ from app.setups.resolver import Outcome, Resolution
 # Entries are rounded before storing so float noise from different scans
 # (2.0 vs 2.00000001) doesn't create duplicate records of the same setup.
 ENTRY_DECIMALS = 4
+
+# Scans run every 15 minutes; a ticker whose last scan is older than this
+# relative to the newest scan has dropped out of the active set, and its
+# setups would be stale on the Setups view.
+CURRENT_SCAN_WINDOW = timedelta(minutes=45)
 
 
 @dataclass(frozen=True)
@@ -119,8 +124,21 @@ def mark_ticker_scanned(conn: sqlite3.Connection, ticker: str, now: datetime) ->
     conn.commit()
 
 
+def _recently_scanned_tickers(conn: sqlite3.Connection) -> set[str]:
+    scans = [(row["ticker"], datetime.fromisoformat(row["scanned_at"])) for row in conn.execute("SELECT * FROM ticker_scans")]
+    if not scans:
+        return set()
+    newest = max(scanned_at for _, scanned_at in scans)
+    return {ticker for ticker, scanned_at in scans if newest - scanned_at <= CURRENT_SCAN_WINDOW}
+
+
 def list_current_setups(conn: sqlite3.Connection, ticker: str | None = None) -> list[SetupRecord]:
-    """Setups seen in each ticker's most recent scan, best score first."""
+    """Setups seen in each ticker's most recent scan, best score first.
+
+    Without a ticker, only tickers scanned in the latest round count; a stock
+    that went quiet days ago shouldn't still show its old setups.
+    """
+    recent = _recently_scanned_tickers(conn) if ticker is None else None
     rows = conn.execute(
         """
         SELECT setup_records.* FROM setup_records
@@ -132,7 +150,12 @@ def list_current_setups(conn: sqlite3.Connection, ticker: str | None = None) -> 
         """,
         (ticker, ticker),
     )
-    return [_to_record(row) for row in rows]
+    records = [_to_record(row) for row in rows]
+    return records if recent is None else [record for record in records if record.ticker in recent]
+
+
+def list_tickers_with_open_records(conn: sqlite3.Connection) -> list[str]:
+    return [row["ticker"] for row in conn.execute("SELECT DISTINCT ticker FROM setup_records WHERE outcome = 'open'")]
 
 
 def list_open_records(conn: sqlite3.Connection, ticker: str) -> list[SetupRecord]:

@@ -127,3 +127,17 @@ def test_unexpected_error_on_one_ticker_does_not_stop_the_scan(db_conn):
 
     assert result.scanned == ["AAA", "CCC"]
     assert result.failed == [("BBB", "internal error (KeyError); see backend logs")]
+
+
+def test_scan_resolves_open_setups_of_tickers_no_longer_active(db_conn):
+    from app.setups.store import list_open_records
+
+    # Just below the high of day: a forming setup that stays open.
+    forming = bars_for(HOD_BREAK_CLOSES[:-3] + [2.42, 2.43, 2.44])
+    scan_ticker(db_conn, "HOST", snapshot("HOST"), NOW, deps(forming))
+    assert list_open_records(db_conn, "HOST") != []
+
+    after_close = datetime(2026, 10, 20, 20, 30, tzinfo=EASTERN)
+    run_scan(db_conn, after_close, deps(forming), tickers=["OTHER"])
+
+    assert list_open_records(db_conn, "HOST") == []

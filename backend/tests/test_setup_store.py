@@ -119,3 +119,14 @@ def test_resolved_record_is_not_reused_by_a_new_detection(db_conn):
     assert second.outcome == "open"
     outcomes = [row[0] for row in db_conn.execute("SELECT outcome FROM setup_records ORDER BY id")]
     assert outcomes == ["stop", "open"]
+
+
+def test_list_current_setups_drops_tickers_not_scanned_recently(db_conn):
+    record(db_conn, now=SCAN_1)  # HOST, scanned at SCAN_1
+    other = PatternMatch(pattern="bull_flag", direction="long", timeframe="1m", entry=3.0, stop=2.9,
+                         detected_at=DETECTED, quality=0.7, quality_parts={}, key_points=[])
+    days_later = SCAN_1 + timedelta(days=3)
+    record_match(db_conn, "WORX", other, plan(3.0), "forming", SCORE, "regular", 1.0, days_later)
+    mark_ticker_scanned(db_conn, "WORX", days_later)
+
+    assert [setup.ticker for setup in list_current_setups(db_conn)] == ["WORX"]

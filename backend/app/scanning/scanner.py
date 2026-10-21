@@ -18,8 +18,14 @@ from app.patterns.trade_plan import build_trade_plan, classify_state
 from app.patterns.types import DetectorContext, PatternMatch
 from app.scanning.active import select_active_tickers
 from app.scanning.snapshots import save_snapshots
-from app.setups.resolver import resolve_outcome
-from app.setups.store import list_open_records, mark_ticker_scanned, record_match, save_outcome
+from app.setups.resolver import has_deadline_passed, resolve_outcome
+from app.setups.store import (
+    list_open_records,
+    list_tickers_with_open_records,
+    mark_ticker_scanned,
+    record_match,
+    save_outcome,
+)
 from app.watchlist.run_status import get_last_feeder_run
 from app.watchlist.store import list_entries
 
@@ -32,6 +38,8 @@ REGULAR_OPEN = time(9, 30)
 REGULAR_CLOSE = time(16, 0)
 SNAPSHOT_FAILURE_LABEL = "watchlist prices"
 RATE_LIMIT_SKIPPED_REASON = "skipped: Finviz is rate limiting requests"
+# Inactive tickers whose setups have passed their deadline, settled per scan.
+MAX_INACTIVE_RESOLUTIONS = 10
 
 
 @dataclass(frozen=True)
@@ -123,6 +131,28 @@ def _resolve_open_records(
             save_outcome(conn, record.id, resolution)
 
 
+def _resolve_inactive_tickers(conn: sqlite3.Connection, skip: set[str], now: datetime, deps: ScanDeps) -> None:
+    """Settle setups of tickers that dropped out of the active set.
+
+    Otherwise their records would stay open forever, and Finviz only keeps
+    about two weeks of 1m bars to resolve them from.
+    """
+    due = [
+        ticker
+        for ticker in list_tickers_with_open_records(conn)
+        if ticker not in skip and any(has_deadline_passed(record, now) for record in list_open_records(conn, ticker))
+    ][:MAX_INACTIVE_RESOLUTIONS]
+    for ticker in due:
+        try:
+            needed = {record.timeframe for record in list_open_records(conn, ticker)}
+            bars = {timeframe: load_bars(conn, ticker, timeframe, now, deps.fetch_bars).bars for timeframe in needed}
+            _resolve_open_records(conn, ticker, bars, now)
+        except (FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError) as exc:
+            # Best effort: the next scan tries again.
+            logger.warning("could not resolve setups for %s: %s", ticker, exc)
+            return
+
+
 def scan_ticker(conn: sqlite3.Connection, ticker: str, snapshot: ScreenRow | None, now: datetime, deps: ScanDeps) -> int:
     bars_by_timeframe = {
         timeframe: load_bars(conn, ticker, timeframe, now, deps.fetch_bars).bars for timeframe in TIMEFRAMES
@@ -168,12 +198,14 @@ def run_scan(
 
     scanned: list[str] = []
     setups_found = 0
+    was_stopped_by_finviz = False
     for index, ticker in enumerate(tickers):
         try:
             setups_found += scan_ticker(conn, ticker, snapshots.get(ticker), now, deps)
         except FinvizAuthError as exc:
             # Every later request would fail the same way.
             failed.append((ticker, str(exc)))
+            was_stopped_by_finviz = True
             break
         except FinvizRateLimitError as exc:
             # Back off: more requests now would only be refused too and could
@@ -182,6 +214,7 @@ def run_scan(
             skipped = tickers[index + 1 :]
             if skipped:
                 failed.append((", ".join(skipped), RATE_LIMIT_SKIPPED_REASON))
+            was_stopped_by_finviz = True
             break
         except FinvizUnavailableError as exc:
             failed.append((ticker, str(exc)))
@@ -192,4 +225,6 @@ def run_scan(
             failed.append((ticker, f"internal error ({type(exc).__name__}); see backend logs"))
             continue
         scanned.append(ticker)
+    if not was_stopped_by_finviz:
+        _resolve_inactive_tickers(conn, set(tickers), now, deps)
     return ScanResult(scanned, failed, setups_found, now)

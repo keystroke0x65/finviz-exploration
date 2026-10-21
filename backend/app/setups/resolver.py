@@ -32,6 +32,16 @@ def _deadline(record: SetupRecord) -> datetime:
     return datetime.combine(detected_day, INTRADAY_DEADLINE, tzinfo=EASTERN)
 
 
+# A daily setup needs 20 sessions; this many calendar days safely covers them.
+DAILY_DEADLINE_DAYS = 30
+
+
+def has_deadline_passed(record: SetupRecord, now: datetime) -> bool:
+    if record.timeframe == "daily":
+        return (now - record.detected_at).days >= DAILY_DEADLINE_DAYS
+    return now >= _deadline(record)
+
+
 def resolve_outcome(record: SetupRecord, bars: list[Bar], now: datetime) -> Resolution:
     if record.first_state != "forming":
         return Resolution("not_tracked", record.detected_at, None, None)
