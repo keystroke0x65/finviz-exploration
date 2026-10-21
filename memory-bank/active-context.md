@@ -4,21 +4,24 @@
      to operations-only writes). Keep it under 80 lines. Durable facts belong in context/ or experience/. -->
 
 ## Current focus
-Phase 2 M2a (bars, patterns, trade plans, ranking, outcomes, scans, Setups + Stock views)
-is BUILT on branch feat/phase2-m2a-setups (worktree .worktrees/feat-phase2-m2a), 15 commits,
-251 backend + 84 frontend tests green, live-verified against Finviz. NOT merged.
-Remaining: whole-branch review (reviewer was stopped at usage limit — rerun it with
-review-package + code-reviewer prompt), fix Critical/Important, then merge to main.
-
-## Running state
-- Docker stack currently runs FROM THE WORKTREE on :5174 with a COPY of the DB
-  (.worktrees/feat-phase2-m2a/data/). Main-folder stack is stopped; main's data/ DB untouched.
-  After merge: stop worktree stack, run from main (FRONTEND_PORT=5174).
+Phase 2 M2a merged into main (041ea54) on 2026-10-21; main not pushed (41 commits ahead).
+Docker runs from main with FRONTEND_PORT=5174 on the real DB (data/finviz_dashboard.db);
+backup before M2a schema: data/finviz_dashboard.db.backup-2026-10-21.
+Next: write the M2b plan (triangles, double top/bottom, ABCD, micro pullback, first
+pullback, EMAs, per-stock verdict), then M3 (continuation/reversal/candlesticks + track record).
 
 ## Open questions / blockers
 - Schwab developer API application not started (user's action).
-- Deferred minors from M1 still open; uvicorn --reload re-runs feeder+scan on every reload.
-- Ledger with all rulings: .worktrees/feat-phase2-m2a/.superpowers/sdd/2026-10-21-phase2-m2a-setups-engine/progress.md
+- FRONTEND_PORT=5174 not yet in user's .env.
+- Deferred minors: 9 from M1 review, 9 from M2a review (trailing stop bounds, direction-aware
+  conflict badge, stale daily state, concurrent-scan lock, sort bars, StockView stale
+  responses, auth path skipped list, ranking counts plan-less matches, API returns short
+  plans in warnings).
+
+## Recent changes
+- 2026-10-21: M2a built (14 tasks), reviewed (1 critical + 5 important fixed with tests),
+  merged; live-verified pre-market against Finviz.
+- 2026-10-21: Removed old phase1/branch Docker containers, volumes, images.
 
 ## Next steps
-- Final review of M2a, merge, then plan M2b (triangles, doubles, ABCD, micro/first pullback, verdict).
+- M2b plan when the user is ready; consider fixing the deferred minors in a small batch.

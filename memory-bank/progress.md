@@ -7,12 +7,12 @@
 
 ## Next
 <!-- empty: planned work, highest priority first -->
-- [prog-0010] root h=0 x=0 d=2026-10-21 labels=status,phase2 src="git log main..feat/phase2-m1-screens-watchlist" supersedes=prog-0009 :: Phase 2 M1 (screens + watchlist feeder) built on branch feat/phase2-m1-screens-watchlist (worktree .worktrees/feat-phase2-m1), 15 commits, 134 backend + 39 frontend tests, final review fixes applied; awaiting user's merge/PR choice. Next: plan M2 (bars, core+momentum patterns, verdict, outcome tracking).
 
 ## Done
 <!-- empty: completed milestones (keep the latest 15; consolidate archives older ones) -->
 - [prog-0001] root h=0 x=0 d=2026-09-17 labels=status src="user" :: Brainstorming/design phase complete for Phase 1 (foundation + stock lookup). Writing design spec doc next, then an implementation plan.
 - [prog-0007] root h=0 x=0 d=2026-10-20 labels=status,phase1 src="git log main" supersedes=prog-0004 :: Phase 1 (foundation + stock lookup) merged into main on 2026-10-20 (merge a9d414b) and pushed; 17 backend pytest + 7 frontend vitest tests green on merged result. Feature worktree removed.
+- [prog-0011] root h=0 x=0 d=2026-10-21 labels=status,phase2 src="git log main" supersedes=prog-0010 :: Phase 2 M1 (screens, watchlist feeder) and M2a (bars, level/flag/flat detectors, trade plans, ranking, outcome tracking, scans, Setups + Stock views) merged into main by 2026-10-21 (M2a merge 041ea54); not pushed. 261 backend + 84 frontend tests. Next: plan M2b (triangles, doubles, ABCD, micro/first pullback, verdict).
 
 ## Known issues
 <!-- empty: bugs, tech debt, limitations still open -->

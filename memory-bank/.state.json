@@ -4,9 +4,9 @@
     "brief": 4,
     "stack": 7,
     "dec": 3,
-    "prog": 10,
-    "dev-environment": 5,
-    "finviz": 5,
+    "prog": 11,
+    "dev-environment": 6,
+    "finviz": 6,
     "conv": 1
   },
   "reminded_sessions": [
@@ -14,5 +14,5 @@
     "18086c86-3585-44fc-8c36-16cd608bf967"
   ],
   "created": "2026-09-17",
-  "batches": 7
+  "batches": 8
 }
