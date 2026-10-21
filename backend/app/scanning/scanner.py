@@ -1,5 +1,6 @@
 """Runs pattern detection over a ticker's bars and records what it finds."""
 
+import logging
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, time
@@ -21,6 +22,8 @@ from app.setups.resolver import resolve_outcome
 from app.setups.store import list_open_records, mark_ticker_scanned, record_match, save_outcome
 from app.watchlist.run_status import get_last_feeder_run
 from app.watchlist.store import list_entries
+
+logger = logging.getLogger(__name__)
 
 TIMEFRAMES: list[Interval] = ["daily", "5m", "1m"]
 # Enough recent bars to find a swing for the trailing stop.
@@ -68,6 +71,11 @@ def _detect_all(bars_by_timeframe: dict[Interval, list[Bar]], now: datetime) -> 
         if not bars:
             continue
         is_intraday = timeframe != "daily"
+        # Before a stock trades today (the 4:00 AM scan, a halt, a thin
+        # pre-market) its latest intraday bars are from an earlier day; patterns
+        # in them aren't current setups.
+        if is_intraday and bars[-1].time.astimezone(EASTERN).date() != today:
+            continue
         context = DetectorContext(
             timeframe=timeframe,
             daily_levels=daily_levels,
@@ -177,6 +185,11 @@ def run_scan(
             break
         except FinvizUnavailableError as exc:
             failed.append((ticker, str(exc)))
+            continue
+        except Exception as exc:
+            # A bug or odd data for one stock must not cost the rest of the scan.
+            logger.exception("scan of %s failed", ticker)
+            failed.append((ticker, f"internal error ({type(exc).__name__}); see backend logs"))
             continue
         scanned.append(ticker)
     return ScanResult(scanned, failed, setups_found, now)

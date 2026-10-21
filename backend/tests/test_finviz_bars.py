@@ -131,3 +131,22 @@ def test_get_bars_raises_unavailable_on_empty_cell():
 
     with pytest.raises(FinvizUnavailableError, match="unexpected response format"):
         get_bars("HOST", "daily")
+
+
+@responses.activate
+def test_get_bars_raises_unavailable_when_a_column_is_missing():
+    responses.add(responses.GET, FINVIZ_BARS_URL, body="Date,High,Low,Close,Volume\n10/20/2026,2,1,1.5,10\n")
+
+    with pytest.raises(FinvizUnavailableError, match="unexpected response format"):
+        get_bars("HOST", "daily")
+
+
+@responses.activate
+def test_get_bars_drops_bars_with_non_positive_prices():
+    responses.add(
+        responses.GET,
+        FINVIZ_BARS_URL,
+        body=BARS_HEADER + "10/19/2026,1,2,0,1.5,10\n10/20/2026,1.5,2,1.4,1.8,10\n",
+    )
+
+    assert [bar.close for bar in get_bars("HOST", "daily")] == [1.8]

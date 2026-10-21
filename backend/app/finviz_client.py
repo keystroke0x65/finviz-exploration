@@ -274,9 +274,11 @@ def get_bars(ticker: str, interval: Interval) -> list[Bar]:
         _fetch_export_csv(FINVIZ_BARS_URL, params, operation), operation, required_column="Date"
     )
     try:
-        return [_to_bar(_clean_missing(record), interval) for record in df.to_dict("records")]
-    except (ValueError, TypeError):
+        bars = [_to_bar(_clean_missing(record), interval) for record in df.to_dict("records")]
+    except (ValueError, TypeError, KeyError):
         raise FinvizUnavailableError(operation, UNEXPECTED_FORMAT) from None
+    # A zero or negative price is a bad print, and pattern maths divides by price.
+    return [bar for bar in bars if min(bar.open, bar.high, bar.low, bar.close) > 0]
 
 
 def _count_screen_rows(filters: list[str], signal: str | None) -> int:

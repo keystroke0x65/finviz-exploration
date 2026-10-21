@@ -100,3 +100,30 @@ def test_run_scan_backs_off_after_rate_limit(db_conn):
     assert result.scanned == ["AAA"]
     assert result.failed[0] == ("BBB", "Finviz is rate limiting requests (daily bars BBB); try again in a minute.")
     assert result.failed[1] == ("CCC, DDD", "skipped: Finviz is rate limiting requests")
+
+
+def test_scan_ignores_intraday_bars_from_an_earlier_day(db_conn):
+    # 4:00 AM scans see yesterday's movers with only yesterday's bars.
+    yesterday = date(2026, 10, 19)
+
+    def yesterday_only(ticker, interval):
+        if interval == "daily":
+            return daily_bars([1.5, 1.8], start=date(2026, 10, 15))
+        return minute_bars(9, 30, HOD_BREAK_CLOSES, day=yesterday)
+
+    early_morning = datetime(2026, 10, 20, 7, 0, tzinfo=EASTERN)
+    scan_ticker(db_conn, "HOST", None, early_morning, deps(yesterday_only))
+
+    assert [setup for setup in list_current_setups(db_conn, "HOST") if setup.timeframe != "daily"] == []
+
+
+def test_unexpected_error_on_one_ticker_does_not_stop_the_scan(db_conn):
+    def broken_for_bbb(ticker, interval):
+        if ticker == "BBB":
+            raise KeyError("Open")
+        return bars_for(HOD_BREAK_CLOSES)(ticker, interval)
+
+    result = run_scan(db_conn, NOW, deps(broken_for_bbb), tickers=["AAA", "BBB", "CCC"])
+
+    assert result.scanned == ["AAA", "CCC"]
+    assert result.failed == [("BBB", "internal error (KeyError); see backend logs")]
