@@ -24,3 +24,17 @@ def test_find_swings_ignores_flat_stretches():
 def test_find_swings_needs_full_window():
     # A peak at the last bar has no bars after it to confirm it.
     assert find_swings(bars([2.0, 2.1, 2.2, 2.3, 2.9], [1.9, 2.0, 2.1, 2.2, 2.8])) == []
+
+
+def test_plateau_of_equal_highs_is_one_swing():
+    highs = [1.00, 1.01, 1.05, 1.05, 1.02, 1.00]
+    lows = [0.95, 0.96, 1.00, 1.00, 0.97, 0.95]
+
+    assert [swing for swing in find_swings(bars(highs, lows)) if swing.is_high] == [Swing(2, 1.05, True)]
+
+
+def test_plateau_of_equal_lows_is_one_swing():
+    highs = [1.10, 1.08, 1.03, 1.03, 1.06, 1.10]
+    lows = [1.05, 1.02, 0.98, 0.98, 1.01, 1.05]
+
+    assert [swing for swing in find_swings(bars(highs, lows)) if not swing.is_high] == [Swing(2, 0.98, False)]

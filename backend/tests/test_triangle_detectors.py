@@ -49,3 +49,13 @@ def test_triangles_are_registered_on_all_timeframes():
     daily = DetectorContext(timeframe="daily", daily_levels=[], session=None, vwap=None)
 
     assert "ascending_triangle" in {match.pattern for match in run_detectors(shape(HIGHS, LOWS), daily)}
+
+
+def test_ascending_triangle_with_two_bar_plateau_touches():
+    # Penny-tick stocks often print the exact same high on consecutive bars.
+    highs = [1.00, 1.05, 1.10, 1.10, 1.06, 1.04, 1.07, 1.10, 1.10, 1.07, 1.06, 1.08, 1.10, 1.10, 1.08, 1.09]
+    lows = [0.95, 1.00, 1.05, 1.05, 1.01, 0.99, 1.02, 1.05, 1.05, 1.03, 1.02, 1.04, 1.06, 1.06, 1.05, 1.06]
+
+    patterns = {match.pattern for match in detect_triangles(shape(highs, lows), CONTEXT)}
+
+    assert "ascending_triangle" in patterns
