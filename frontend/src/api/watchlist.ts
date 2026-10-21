@@ -24,6 +24,10 @@ export interface FeederResult {
   failed_screens: { screen: string; reason: string }[];
 }
 
+export interface FeederStatus extends FeederResult {
+  finished_at: string;
+}
+
 function entryPath(ticker: string): string {
   return `/api/watchlist/${encodeURIComponent(ticker)}`;
 }
@@ -46,4 +50,8 @@ export function setPinned(ticker: string, isPinned: boolean): Promise<WatchlistE
 
 export function refreshWatchlist(): Promise<FeederResult> {
   return requestJson<FeederResult>("/api/watchlist/refresh", { method: "POST" });
+}
+
+export function fetchFeederStatus(): Promise<FeederStatus | null> {
+  return requestJson<FeederStatus | null>("/api/watchlist/feeder-status");
 }

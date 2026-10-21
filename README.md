@@ -20,6 +20,8 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
   US Eastern (pre-market through after-hours), and keeps one history line per stock per
   day it showed up. Auto-added stocks drop off 90 days after they last showed up; pinned
   and manually added stocks never expire. "Refresh from feeder" runs it immediately.
+  The tab shows when the feeder last ran and which screens failed (e.g. an expired
+  token or Finviz rate limiting); failures are also logged as warnings.
 - **Lookup** tab: single-ticker quote (Phase 1).
 
 Finviz silently ignores filter codes it doesn't recognise, so saving a screen checks any

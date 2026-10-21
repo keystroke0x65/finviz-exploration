@@ -1,11 +1,11 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WatchlistEntry } from "../api/watchlist";
 import { WatchlistView } from "./WatchlistView";
 
 const api = {
   listWatchlist: vi.fn(), addToWatchlist: vi.fn(), removeFromWatchlist: vi.fn(),
-  setPinned: vi.fn(), refreshWatchlist: vi.fn(),
+  setPinned: vi.fn(), refreshWatchlist: vi.fn(), fetchFeederStatus: vi.fn(),
 };
 vi.mock("../api/watchlist", () => ({
   listWatchlist: () => api.listWatchlist(),
@@ -13,6 +13,7 @@ vi.mock("../api/watchlist", () => ({
   removeFromWatchlist: (ticker: string) => api.removeFromWatchlist(ticker),
   setPinned: (ticker: string, isPinned: boolean) => api.setPinned(ticker, isPinned),
   refreshWatchlist: () => api.refreshWatchlist(),
+  fetchFeederStatus: () => api.fetchFeederStatus(),
 }));
 
 const AUTO_ENTRY: WatchlistEntry = {
@@ -30,6 +31,10 @@ const MANUAL_ENTRY: WatchlistEntry = {
 };
 
 describe("WatchlistView", () => {
+  beforeEach(() => {
+    api.fetchFeederStatus.mockResolvedValue(null);
+  });
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -99,7 +104,20 @@ describe("WatchlistView", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Refresh from feeder" }));
 
-    expect(await screen.findByText("1 added, 0 updated, 0 expired")).toBeInTheDocument();
+    expect(await screen.findByText(/^Last feeder run:/)).toHaveTextContent("1 added, 0 updated, 0 expired");
     expect(screen.getByRole("alert")).toHaveTextContent("After-hours: Finviz request failed (screen): ReadTimeout");
+  });
+
+  it("shows the last background feeder run and its failures on load", async () => {
+    api.listWatchlist.mockResolvedValue([]);
+    api.fetchFeederStatus.mockResolvedValue({
+      finished_at: "2026-10-20T14:00:00Z", screens_run: 1, tickers_added: [], tickers_updated: [],
+      tickers_expired: [],
+      failed_screens: [{ screen: "Top gainers — low float", reason: "Finviz Elite API rejected the configured auth token." }],
+    });
+    render(<WatchlistView />);
+
+    expect(await screen.findByText(/^Last feeder run:/)).toHaveTextContent("0 added, 0 updated, 0 expired");
+    expect(screen.getByRole("alert")).toHaveTextContent("Top gainers — low float: Finviz Elite API rejected");
   });
 });

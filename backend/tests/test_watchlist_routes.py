@@ -93,3 +93,24 @@ def test_entries_include_expiry_only_for_unpinned_auto_entries(api_client, db_co
     assert entries["AUTO"]["expires_at"] == "2026-11-19T14:00:00Z"
     assert entries["PINNED"]["expires_at"] is None
     assert entries["MANUAL"]["expires_at"] is None
+
+
+def test_feeder_status_is_null_before_any_run(api_client):
+    assert api_client.get("/api/watchlist/feeder-status").json() is None
+
+
+def test_feeder_status_reports_last_run_failures(api_client, db_conn):
+    create_screen(db_conn, ScreenInput("Broken", ScreenCriteria(["sh_price_u5"], None, None), True), NOW)
+
+    with patch(
+        "app.routes.watchlist.run_screen",
+        side_effect=FinvizUnavailableError("screen", "ReadTimeout"),
+    ):
+        api_client.post("/api/watchlist/refresh")
+
+    status = api_client.get("/api/watchlist/feeder-status").json()
+    assert status["screens_run"] == 1
+    assert status["failed_screens"] == [
+        {"screen": "Broken", "reason": "Finviz request failed (screen): ReadTimeout"}
+    ]
+    assert "finished_at" in status

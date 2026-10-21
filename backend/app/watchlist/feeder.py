@@ -1,11 +1,11 @@
 import sqlite3
-from dataclasses import dataclass
 from datetime import datetime, time
 from typing import Callable
 
 from app.errors import FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError
 from app.finviz_client import ScreenResult
 from app.screens.store import Screen, list_feeder_screens
+from app.watchlist.run_status import FeederResult, save_last_feeder_run
 from app.watchlist.store import EASTERN, expire_stale_entries, record_feeder_hit
 
 # Pre-market opens at 04:00 ET and after-hours closes at 20:00 ET; outside
@@ -15,15 +15,6 @@ FEEDER_WINDOW_END = time(20, 0)
 SATURDAY = 5
 
 RunScreenFunction = Callable[[list[str], str | None, str | None], ScreenResult]
-
-
-@dataclass(frozen=True)
-class FeederResult:
-    screens_run: int
-    tickers_added: list[str]
-    tickers_updated: list[str]
-    tickers_expired: list[str]
-    failed_screens: list[tuple[str, str]]
 
 
 def is_within_feeder_window(now: datetime) -> bool:
@@ -66,10 +57,12 @@ def run_feeder(
                 (tickers_added if outcome == "added" else tickers_updated).append(row.ticker)
         conn.commit()
 
-    return FeederResult(
+    result = FeederResult(
         screens_run=len(feeder_screens),
         tickers_added=tickers_added,
         tickers_updated=tickers_updated,
         tickers_expired=expire_stale_entries(conn, now, retention_days),
         failed_screens=failed_screens,
     )
+    save_last_feeder_run(conn, now, result)
+    return result

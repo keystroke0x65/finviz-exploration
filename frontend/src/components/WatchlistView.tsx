@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useState } from "react";
 import {
   addToWatchlist,
   FeederResult,
+  FeederStatus,
+  fetchFeederStatus,
   listWatchlist,
   refreshWatchlist,
   removeFromWatchlist,
@@ -22,7 +24,7 @@ export function WatchlistView() {
   const [entries, setEntries] = useState<WatchlistEntry[]>([]);
   const [tickerInput, setTickerInput] = useState("");
   const [expandedTicker, setExpandedTicker] = useState<string | null>(null);
-  const [feederResult, setFeederResult] = useState<FeederResult | null>(null);
+  const [feederStatus, setFeederStatus] = useState<FeederStatus | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +33,11 @@ export function WatchlistView() {
   }
 
   useEffect(() => {
-    reloadEntries().catch((loadError) => setError(errorMessage(loadError)));
+    // The background feeder runs every 15 minutes; showing its last outcome is
+    // the only way its failures (e.g. an expired token) become visible.
+    Promise.all([reloadEntries(), fetchFeederStatus().then(setFeederStatus)]).catch((loadError) =>
+      setError(errorMessage(loadError)),
+    );
   }, []);
 
   async function runAction(action: () => Promise<void>) {
@@ -76,7 +82,8 @@ export function WatchlistView() {
   function handleRefresh() {
     setIsRefreshing(true);
     runAction(async () => {
-      setFeederResult(await refreshWatchlist());
+      const result = await refreshWatchlist();
+      setFeederStatus({ ...result, finished_at: new Date().toISOString() });
       await reloadEntries();
     }).finally(() => setIsRefreshing(false));
   }
@@ -95,10 +102,15 @@ export function WatchlistView() {
         Refresh from feeder
       </button>
 
-      {feederResult && <p>{summarizeFeederResult(feederResult)}</p>}
-      {feederResult && feederResult.failed_screens.length > 0 && (
+      {feederStatus && (
+        <p>
+          Last feeder run: {new Date(feederStatus.finished_at).toLocaleString()} —{" "}
+          {summarizeFeederResult(feederStatus)}
+        </p>
+      )}
+      {feederStatus && feederStatus.failed_screens.length > 0 && (
         <div role="alert">
-          {feederResult.failed_screens.map((failure) => (
+          {feederStatus.failed_screens.map((failure) => (
             <p key={failure.screen}>
               {failure.screen}: {failure.reason}
             </p>

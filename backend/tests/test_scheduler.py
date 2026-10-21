@@ -102,3 +102,18 @@ def test_lifespan_seeds_default_screens(tmp_path, monkeypatch):
     assert len(list_screens(conn)) == 2
     conn.close()
     get_settings.cache_clear()
+
+
+def test_scheduler_tick_logs_failed_screens_as_warning(tmp_path, caplog):
+    from app.errors import FinvizAuthError
+
+    def rejected_token(*args):
+        raise FinvizAuthError()
+
+    with caplog.at_level(logging.WARNING, logger="app.watchlist.scheduler"):
+        run_scheduled_feeder_tick(_seeded_db_path(tmp_path), TUESDAY_10AM_ET, RETENTION_DAYS, rejected_token)
+
+    warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert "Top gainers — low float" in warnings[0].getMessage()
+    assert "rejected the configured auth token" in warnings[0].getMessage()

@@ -15,8 +15,9 @@ from app.errors import (
 from app.finviz_client import get_quote, run_screen
 from app.routes.dependencies import finviz_error_to_http, get_db_connection
 from app.routes.stocks import TickerPath
-from app.schemas import AddTickerIn, FeederResultOut, PinIn, WatchlistEntryOut
+from app.schemas import AddTickerIn, FeederResultOut, FeederStatusOut, PinIn, WatchlistEntryOut
 from app.watchlist.feeder import run_feeder
+from app.watchlist.run_status import FeederResult, get_last_feeder_run
 from app.watchlist.store import (
     WatchlistEntry,
     add_manual_entry,
@@ -53,20 +54,32 @@ def post_watchlist_entry(body: AddTickerIn, conn: DbConnection) -> WatchlistEntr
     return _to_entry_out(add_manual_entry(conn, ticker, datetime.now(timezone.utc)))
 
 
+def _feeder_result_fields(result: FeederResult) -> dict:
+    return {
+        "screens_run": result.screens_run,
+        "tickers_added": result.tickers_added,
+        "tickers_updated": result.tickers_updated,
+        "tickers_expired": result.tickers_expired,
+        "failed_screens": [
+            {"screen": name, "reason": reason} for name, reason in result.failed_screens
+        ],
+    }
+
+
 @router.post("/refresh", response_model=FeederResultOut)
 def post_refresh(conn: DbConnection) -> FeederResultOut:
     result = run_feeder(
         conn, run_screen, datetime.now(timezone.utc), get_settings().watchlist_retention_days
     )
-    return FeederResultOut(
-        screens_run=result.screens_run,
-        tickers_added=result.tickers_added,
-        tickers_updated=result.tickers_updated,
-        tickers_expired=result.tickers_expired,
-        failed_screens=[
-            {"screen": name, "reason": reason} for name, reason in result.failed_screens
-        ],
-    )
+    return FeederResultOut(**_feeder_result_fields(result))
+
+
+@router.get("/feeder-status", response_model=FeederStatusOut | None)
+def get_feeder_status(conn: DbConnection) -> FeederStatusOut | None:
+    last_run = get_last_feeder_run(conn)
+    if last_run is None:
+        return None
+    return FeederStatusOut(finished_at=last_run.finished_at, **_feeder_result_fields(last_run.result))
 
 
 @router.delete("/{ticker}", status_code=204)

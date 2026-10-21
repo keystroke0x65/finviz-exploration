@@ -163,3 +163,23 @@ def test_malformed_finviz_response_fails_only_that_screen(db_conn, monkeypatch):
     assert result.tickers_added == ["HOST"]
     assert [name for name, _ in result.failed_screens] == ["Broken"]
     get_settings.cache_clear()
+
+
+def test_run_feeder_saves_last_run_summary(db_conn):
+    from app.watchlist.run_status import get_last_feeder_run
+
+    _add_screen(db_conn, "First", ["geo_usa"])
+    _add_screen(db_conn, "Second", ["sh_price_u20"])
+
+    def fake_run_screen(filters, signal, order):
+        if filters == ["geo_usa"]:
+            raise FinvizRateLimitError("screen")
+        return ScreenResult([_row("WORX", 36.6)])
+
+    assert get_last_feeder_run(db_conn) is None
+    run_feeder(db_conn, fake_run_screen, NOW, RETENTION_DAYS)
+
+    last_run = get_last_feeder_run(db_conn)
+    assert last_run.finished_at == NOW
+    assert last_run.result.tickers_added == ["WORX"]
+    assert last_run.result.failed_screens[0][0] == "First"

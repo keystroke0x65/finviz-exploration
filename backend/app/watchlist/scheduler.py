@@ -31,13 +31,19 @@ def run_scheduled_feeder_tick(
         return None
 
     logger.info(
-        "feeder tick: %d screens, %d added, %d updated, %d expired, failed: %s",
+        "feeder tick: %d screens, %d added, %d updated, %d expired",
         result.screens_run,
         len(result.tickers_added),
         len(result.tickers_updated),
         len(result.tickers_expired),
-        [name for name, _ in result.failed_screens] or "none",
     )
+    if result.failed_screens:
+        # WARNING, not INFO: uvicorn configures only its own loggers, so app
+        # INFO lines never print. Reasons never contain the auth token.
+        logger.warning(
+            "feeder screens failed: %s",
+            "; ".join(f"{name}: {reason}" for name, reason in result.failed_screens),
+        )
     return result
 
 

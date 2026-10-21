@@ -128,3 +128,7 @@ class FeederResultOut(BaseModel):
     tickers_updated: list[str]
     tickers_expired: list[str]
     failed_screens: list[FailedScreenOut]
+
+
+class FeederStatusOut(FeederResultOut):
+    finished_at: datetime
