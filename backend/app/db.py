@@ -73,6 +73,12 @@ CREATE TABLE IF NOT EXISTS ticker_scans (
     scanned_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS ticker_snapshots (
+    ticker TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    fetched_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS app_meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL

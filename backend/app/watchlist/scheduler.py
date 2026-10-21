@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 
 from app.config import Settings
 from app.db import connect
-from app.finviz_client import run_screen
+from app.finviz_client import get_bars, get_snapshots, run_screen
+from app.scanning.scanner import ScanDeps, ScanResult, run_scan
 from app.watchlist.feeder import FeederResult, RunScreenFunction, is_within_feeder_window, run_feeder
 
 logger = logging.getLogger(__name__)
@@ -47,13 +48,41 @@ def run_scheduled_feeder_tick(
     return result
 
 
+def run_scheduled_scan(db_path: str, now: datetime, deps: ScanDeps) -> ScanResult | None:
+    if not is_within_feeder_window(now):
+        return None
+    try:
+        conn = connect(db_path)
+        try:
+            result = run_scan(conn, now, deps)
+        finally:
+            conn.close()
+    except Exception:
+        # Same recovery point as the feeder: log and let the next tick retry.
+        logger.exception("scan failed")
+        return None
+
+    logger.info("scan: %d tickers scanned, %d setups", len(result.scanned), result.setups_found)
+    if result.failed:
+        logger.warning("scan failures: %s", "; ".join(f"{ticker}: {reason}" for ticker, reason in result.failed))
+    return result
+
+
+FINVIZ_SCAN_DEPS = ScanDeps(fetch_bars=get_bars, fetch_snapshots=get_snapshots)
+
+
 async def feeder_loop(settings: Settings) -> None:
     while True:
-        await asyncio.to_thread(
+        # Each tick feeds the watchlist first so the scan sees new names.
+        feeder_result = await asyncio.to_thread(
             run_scheduled_feeder_tick,
             settings.db_path,
             datetime.now(timezone.utc),
             settings.watchlist_retention_days,
             run_screen,
         )
+        if feeder_result is not None:
+            await asyncio.to_thread(
+                run_scheduled_scan, settings.db_path, datetime.now(timezone.utc), FINVIZ_SCAN_DEPS
+            )
         await asyncio.sleep(settings.feeder_interval_minutes * SECONDS_PER_MINUTE)
