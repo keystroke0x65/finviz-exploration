@@ -49,6 +49,16 @@ def _trailing_stop(bars: list[Bar], direction: Direction) -> float | None:
     return None
 
 
+def _bounded_trailing_stop(bars: list[Bar], direction: Direction, stop: float) -> float | None:
+    """A trailing stop only makes sense between the initial stop and the current price."""
+    candidate = _trailing_stop(bars, direction)
+    if candidate is None or not bars:
+        return None
+    current = bars[-1].close
+    is_between = stop < candidate < current if direction == "long" else current < candidate < stop
+    return candidate if is_between else None
+
+
 def build_trade_plan(match: PatternMatch, daily_levels: list[PriceLevel], recent_bars: list[Bar]) -> TradePlan | None:
     sign = 1 if match.direction == "long" else -1
     risk = _price((match.entry - match.stop) * sign)
@@ -76,7 +86,7 @@ def build_trade_plan(match: PatternMatch, daily_levels: list[PriceLevel], recent
         blocking_level=capped_target if blocking else None,
         partial_1r=_price(match.entry + sign * risk),
         partial_2r=_price(match.entry + sign * 2 * risk),
-        trailing_stop=_trailing_stop(recent_bars, match.direction),
+        trailing_stop=_bounded_trailing_stop(recent_bars, match.direction, match.stop),
     )
 
 

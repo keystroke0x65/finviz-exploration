@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Setup } from "../api/setups";
+import type { Setup, Warning } from "../api/setups";
 import { SetupsView } from "./SetupsView";
 
 const api = { fetchSetups: vi.fn(), runScan: vi.fn(), saveSettings: vi.fn() };
@@ -22,7 +22,7 @@ function setup(overrides: Partial<Setup> = {}): Setup {
   };
 }
 
-function respond(setups: Setup[], warnings: Setup[] = [], showShorts = false) {
+function respond(setups: Setup[], warnings: Warning[] = [], showShorts = false) {
   api.fetchSetups.mockResolvedValue({ setups, warnings, show_short_setups: showShorts });
 }
 
@@ -130,5 +130,12 @@ describe("SetupsView", () => {
 
     const badge = await screen.findByText("Leans long");
     expect(badge.getAttribute("title")).toContain("Above 5 of 5 trend lines");
+  });
+
+  it("labels a short row's conflict as a bullish pattern", async () => {
+    respond([setup({ direction: "short", pattern: "bear_flag", has_conflict: true })], [], true);
+    render(<SetupsView onOpenStock={vi.fn()} />);
+
+    expect(await screen.findByText("Bullish pattern too")).toBeInTheDocument();
   });
 });

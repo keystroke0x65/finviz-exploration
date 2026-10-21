@@ -23,6 +23,10 @@ export interface ScreenDraft {
   order: string | null;
 }
 
+export interface ParsedScreenDraft extends ScreenDraft {
+  ignored_params: string[];
+}
+
 export interface ScreenInput extends ScreenDraft {
   name: string;
   feeds_watchlist: boolean;
@@ -85,8 +89,8 @@ export function runScreen(id: number): Promise<ScreenRun> {
   return requestJson<ScreenRun>(`/api/screens/${id}/run`, { method: "POST" });
 }
 
-export function parseScreenerUrl(url: string): Promise<ScreenDraft> {
-  return requestJson<ScreenDraft>("/api/screens/parse-url", jsonRequest("POST", { url }));
+export function parseScreenerUrl(url: string): Promise<ParsedScreenDraft> {
+  return requestJson<ParsedScreenDraft>("/api/screens/parse-url", jsonRequest("POST", { url }));
 }
 
 export function fetchFormFields(): Promise<FormFields> {

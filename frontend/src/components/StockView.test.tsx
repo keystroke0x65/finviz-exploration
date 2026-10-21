@@ -109,7 +109,11 @@ describe("StockView", () => {
   });
 
   it("draws only the breakdown level for a bearish warning", async () => {
-    const warning = { ...SETUP, id: 8, direction: "short" as const, pattern: "low_of_day_break", entry: 1.9, stop: 2.0 };
+    const warning = {
+      id: 8, ticker: "HOST", pattern: "low_of_day_break", direction: "short" as const, timeframe: "5m" as const,
+      entry: 1.9, state: "forming" as const, key_points: [], detected_at: "2026-10-20T13:35:00Z",
+      last_seen_at: "2026-10-20T13:35:30Z",
+    };
     api.fetchStockSetups.mockResolvedValue({ setups: [], warnings: [warning], show_short_setups: false });
     render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
 
@@ -132,5 +136,44 @@ describe("StockView", () => {
     expect(await screen.findByText("Leans short")).toBeInTheDocument();
     expect(screen.getByText("Volume heavier on down bars")).toBeInTheDocument();
     expect(screen.getByText(/^Scored /)).toBeInTheDocument();
+  });
+
+  it("ignores a late response for a ticker that is no longer selected", async () => {
+    let finishHost: (value: unknown) => void = () => {};
+    api.fetchStockSetups.mockImplementation((ticker: string) =>
+      ticker === "HOST"
+        ? new Promise((resolve) => (finishHost = resolve))
+        : Promise.resolve({ setups: [{ ...SETUP, id: 9, ticker: "WORX", pattern: "abcd" }], warnings: [],
+            show_short_setups: false }),
+    );
+    const { rerender } = render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+    rerender(<StockView ticker="WORX" onTickerChange={vi.fn()} />);
+    expect(await screen.findByRole("button", { name: /ABCD/ })).toBeInTheDocument();
+
+    finishHost({ setups: [SETUP], warnings: [], show_short_setups: false });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.queryByRole("button", { name: /Bull flag/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /ABCD/ })).toBeInTheDocument();
+  });
+
+  it("drops a scan's results if the ticker changed while it ran", async () => {
+    let finishScan: (value: unknown) => void = () => {};
+    api.runScan.mockImplementation(() => new Promise((resolve) => (finishScan = resolve)));
+    api.fetchStockSetups.mockImplementation((ticker: string) =>
+      Promise.resolve({
+        setups: [ticker === "HOST" ? SETUP : { ...SETUP, id: 9, ticker: "WORX", pattern: "abcd" }],
+        warnings: [], show_short_setups: false,
+      }),
+    );
+    const { rerender } = render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Scan this stock" }));
+
+    rerender(<StockView ticker="WORX" onTickerChange={vi.fn()} />);
+    expect(await screen.findByRole("button", { name: /ABCD/ })).toBeInTheDocument();
+    finishScan({ scanned: ["HOST"], failed: [], setups_found: 1, scanned_at: "x" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.queryByRole("button", { name: /Bull flag/ })).not.toBeInTheDocument();
   });
 });

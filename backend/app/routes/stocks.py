@@ -3,8 +3,9 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Path
 
 from app.cache import get_cached_quote, set_cached_quote
-from app.errors import FinvizAuthError, TickerNotFoundError
+from app.errors import FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError, TickerNotFoundError
 from app.finviz_client import get_quote
+from app.routes.dependencies import finviz_error_to_http
 from app.schemas import QuoteResponse
 
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
@@ -28,8 +29,8 @@ def _fetch_quote(ticker: str, *, use_cache: bool) -> QuoteResponse:
         data = get_quote(ticker)
     except TickerNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except FinvizAuthError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except (FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError) as exc:
+        raise finviz_error_to_http(exc) from exc
 
     set_cached_quote(ticker, data)
     return QuoteResponse(**data)

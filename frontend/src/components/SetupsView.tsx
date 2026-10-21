@@ -202,7 +202,9 @@ function SetupRow({ setup, showDirection, isExpanded, onToggleScore, onOpenStock
         </button>
         {setup.has_conflict && (
           <div>
-            <span className="badge badge-warning">Bearish pattern too</span>
+            <span className="badge badge-warning">
+              {setup.direction === "long" ? "Bearish pattern too" : "Bullish pattern too"}
+            </span>
           </div>
         )}
       </td>

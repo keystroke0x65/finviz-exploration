@@ -3,15 +3,16 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.routes.dependencies import get_db_connection
 from app.routes.stocks import TickerPath
+from app.scanning.lock import try_scan_lock
 from app.scanning.scanner import finviz_scan_deps, run_scan
 from app.patterns.types import TIMEFRAME_ORDER
 from app.patterns.verdict import Verdict
 from app.scanning.verdicts import read_verdicts
-from app.schemas import ScanIn, ScanOut, SetupOut, SetupsOut, VerdictOut
+from app.schemas import ScanIn, ScanOut, SetupOut, SetupsOut, VerdictOut, WarningOut
 from app.setups.store import SetupRecord, list_current_setups
 from app.user_settings import get_show_short_setups
 
@@ -25,7 +26,10 @@ def post_scan(body: ScanIn, conn: DbConnection) -> ScanOut:
     # Runs synchronously: a full watchlist scan of up to 40 active tickers
     # takes about two minutes at Finviz's one-request-per-second pacing.
     tickers = [body.ticker.upper()] if body.ticker else None
-    result = run_scan(conn, datetime.now(timezone.utc), finviz_scan_deps(), tickers=tickers)
+    with try_scan_lock() as is_acquired:
+        if not is_acquired:
+            raise HTTPException(status_code=409, detail="A scan is already running; try again when it finishes")
+        result = run_scan(conn, datetime.now(timezone.utc), finviz_scan_deps(), tickers=tickers)
     return ScanOut(
         scanned=result.scanned,
         failed=[{"ticker": ticker, "reason": reason} for ticker, reason in result.failed],
@@ -43,7 +47,9 @@ def to_verdict_out(stored: tuple[Verdict, datetime] | None) -> VerdictOut | None
     )
 
 
-def _to_setup_out(record: SetupRecord, records: list[SetupRecord], verdicts: dict) -> SetupOut:
+def _to_setup_out(
+    record: SetupRecord, records: list[SetupRecord], verdicts: dict[str, tuple[Verdict, datetime]]
+) -> SetupOut:
     # Same rule as the ranking penalty: only an opposite pattern on the same
     # or a higher timeframe counts; a 1m wiggle against a 5m setup doesn't.
     has_conflict = any(
@@ -68,7 +74,11 @@ def _setups_response(conn: sqlite3.Connection, ticker: str | None) -> SetupsOut:
     # Shorts are never suggested as trades unless the user turned them on.
     return SetupsOut(
         setups=[setup for setup in setups if setup.direction == "long" or show_shorts],
-        warnings=[] if show_shorts else [setup for setup in setups if setup.direction == "short"],
+        warnings=[] if show_shorts else [
+            WarningOut(**setup.model_dump(include=set(WarningOut.model_fields)))
+            for setup in setups
+            if setup.direction == "short"
+        ],
         show_short_setups=show_shorts,
     )
 

@@ -71,6 +71,15 @@ def parse_finviz_screener_url(url: str) -> ScreenCriteria:
     )
 
 
+USED_PARAMS = {"v", "f", "s", "o"}
+
+
+def find_ignored_params(url: str) -> list[str]:
+    """Query parameters of a Finviz screener URL that a saved screen doesn't keep (e.g. t=)."""
+    query = parse_qs(urlsplit(url.strip()).query)
+    return [name for name in query if name not in USED_PARAMS]
+
+
 def build_finviz_screener_url(criteria: ScreenCriteria) -> str:
     # Codes are restricted to CODE_PATTERN, so they need no URL escaping and
     # the commas stay readable.

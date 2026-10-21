@@ -290,6 +290,7 @@ function WatchlistRow({ entry, isExpanded, onToggleHistory, onTogglePin, onRemov
                     <span className={changeClass(appearance.change_percent)}>
                       {formatSignedPercent(appearance.change_percent)}
                     </span>
+                    {appearance.screen_name && <span className="muted"> ({appearance.screen_name})</span>}
                   </li>
                 ))}
               </ul>

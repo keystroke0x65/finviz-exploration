@@ -54,3 +54,19 @@ def test_abcd_not_run_on_daily():
 def test_abcd_returns_nothing_on_short_or_flat_bars():
     assert detect_abcd(shape(HIGHS[:5], LOWS[:5]), CONTEXT) == []
     assert detect_abcd(shape([2.0] * 40, [1.9] * 40), CONTEXT) == []
+
+
+def test_abcd_ignores_yesterdays_bars():
+    from datetime import datetime
+
+    from app.market_time import EASTERN
+
+    # Today's own spike is only ~2% (below the 3% a 1m ABCD needs); it only looks
+    # like a 20% spike if yesterday's after-hours low is counted as its start.
+    today_highs = [2.37, 2.38, 2.38, 2.39, 2.39, 2.395] + HIGHS[6:]
+    today_lows = [2.35, 2.36, 2.36, 2.37, 2.37, 2.38] + LOWS[6:]
+    yesterday = shape([2.05] * 5, [2.00] * 5, start=datetime(2026, 10, 19, 19, 55, tzinfo=EASTERN))
+    today = shape(today_highs, today_lows, start=datetime(2026, 10, 20, 9, 30, tzinfo=EASTERN))
+
+    # (Today's own drop from 2.40 to 2.20 may still read as an inverse ABCD.)
+    assert "abcd" not in {match.pattern for match in detect_abcd(yesterday + today, CONTEXT)}

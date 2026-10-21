@@ -152,3 +152,40 @@ def test_setups_include_ticker_verdict(api_client, db_conn):
     setup = api_client.get("/api/setups").json()["setups"][0]
 
     assert setup["verdict"]["call"] == "no_clear_edge"
+
+
+def test_second_scan_request_gets_409(api_client):
+    from app.scanning.lock import scan_lock
+
+    assert scan_lock.acquire(blocking=False)
+    try:
+        response = api_client.post("/api/scans", json={})
+    finally:
+        scan_lock.release()
+
+    assert response.status_code == 409
+    assert "already running" in response.json()["detail"]
+
+
+def test_scan_lock_released_after_error(api_client):
+    import pytest
+
+    from app.scanning.lock import scan_lock
+
+    with patch("app.routes.setups.run_scan", side_effect=RuntimeError("boom")):
+        with pytest.raises(RuntimeError):
+            api_client.post("/api/scans", json={})
+
+    assert scan_lock.acquire(blocking=False)
+    scan_lock.release()
+
+
+def test_warnings_do_not_include_short_trade_plans(api_client, db_conn):
+    store_setup(db_conn, "SHORT", "short", pattern="low_of_day_break")
+
+    warning = api_client.get("/api/setups").json()["warnings"][0]
+
+    assert warning["entry"] == 2.0  # the breakdown level
+    for field in ("stop", "capped_target", "target_3r", "partial_1r", "partial_2r", "trailing_stop",
+                  "available_reward_risk", "risk_percent"):
+        assert field not in warning

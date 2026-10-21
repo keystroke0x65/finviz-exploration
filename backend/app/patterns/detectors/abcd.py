@@ -6,6 +6,7 @@ Inverse ABCD mirrors it for shorts.
 """
 
 from app.finviz_client import Bar, Interval
+from app.market_time import EASTERN
 from app.patterns.swings import Swing, find_swings
 from app.patterns.types import DetectorContext, Direction, PatternMatch
 
@@ -23,7 +24,10 @@ def _average_volume(bars: list[Bar]) -> float:
 
 
 def _match_abcd(bars: list[Bar], direction: Direction, timeframe: Interval) -> PatternMatch | None:
-    window = bars[-ABCD_LOOKBACK_BARS:]
+    # Today only: on 5m the lookback reaches into yesterday, where the overnight
+    # gap would masquerade as the spike.
+    today = bars[-1].time.astimezone(EASTERN).date()
+    window = [bar for bar in bars[-ABCD_LOOKBACK_BARS:] if bar.time.astimezone(EASTERN).date() == today]
     swings = find_swings(window)
     is_long = direction == "long"
     sign = 1 if is_long else -1

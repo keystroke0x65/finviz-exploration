@@ -51,7 +51,9 @@ those the feeder just found, or with relative volume of 1.5 or more, or moving 5
 records what it finds. "Scan watchlist" on the Setups tab and "Scan this stock" on the
 Stock tab run a scan on demand; a full scan takes about two minutes because Finviz is
 called at most once a second. If Finviz starts rate limiting, the scan stops and lists the
-stocks it skipped.
+stocks it skipped. Only one scan runs at a time: "Scan watchlist" says so if a scheduled scan is
+already running. Expired watchlist entries are cleared on every 15-minute tick, including
+evenings and weekends.
 
 Patterns so far:
 - Momentum (1m and 5m): high/low of day break, pre-market high/low break, opening range
@@ -67,11 +69,15 @@ clear edge**, with the reasons listed on the Stock tab (and on hover elsewhere).
 combines four things, each shown in the reasons:
 - trend: price against VWAP, the 9 and 20 EMAs on 1m and 5m, and the 20- and 50-day
   averages;
-- volume: whether recent 1m volume is heavier on up bars or down bars;
-- room: distance to the nearest daily resistance above versus support below;
+- volume: whether recent 1m volume is heavier on up bars or down bars, counted for less
+  when relative volume is low;
+- room: distance to the nearest daily resistance above versus support below (each side
+  counted up to 20%, so a stock with nothing overhead isn't marked down for distant support);
 - patterns: bullish versus bearish patterns found, weighted by quality.
 
 "No clear edge" is common and means the signals disagree; the app doesn't force a call.
+It is also the answer when there's too little data (e.g. only the daily trend) or when the
+trend and the patterns point strongly in opposite directions.
 Inputs it doesn't have (e.g. no trades yet today) are left out and named in the reasons.
 The verdict is shown even when short setups are hidden.
 

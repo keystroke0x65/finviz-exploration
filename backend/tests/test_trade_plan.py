@@ -93,3 +93,18 @@ def test_classify_state_short_mirrors():
     assert classify_state(plan, 2.01) == "forming"
     assert classify_state(plan, 2.00) == "triggered"
     assert classify_state(plan, 1.90) == "extended"
+
+
+def test_trailing_stop_dropped_when_above_current_price():
+    # Swing low at 2.05 (index 2), but price has since fallen to 2.01.
+    lows = [2.10, 2.08, 2.05, 2.07, 2.09, 2.00]
+    bars = [make_bar(9, 30 + index, low + 0.02, low + 0.05, low, low + 0.01) for index, low in enumerate(lows)]
+
+    assert build_trade_plan(match(), [], bars).trailing_stop is None
+
+
+def test_trailing_stop_dropped_when_below_initial_stop():
+    lows = [1.95, 1.90, 1.85, 1.92, 1.96, 2.00]
+    bars = [make_bar(9, 30 + index, low + 0.02, low + 0.05, low, low + 0.03) for index, low in enumerate(lows)]
+
+    assert build_trade_plan(match(), [], bars).trailing_stop is None

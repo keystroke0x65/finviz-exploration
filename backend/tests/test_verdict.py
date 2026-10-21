@@ -75,8 +75,11 @@ def test_verdict_with_missing_inputs_uses_what_is_available():
 
     verdict = compute_verdict([], [], daily, None, [], [])
 
-    assert verdict.call == "leans_long"  # only the daily trend is known, and it's up
+    # Only the daily trend is known: too little for a call, but it's still reported.
+    assert verdict.call == "no_clear_edge"
+    assert verdict.reasons[0] == "Not enough data for a call"
     assert set(verdict.parts) == {"trend"}
+    assert verdict.parts["trend"] == 1.0
     assert "No intraday volume data" in verdict.reasons
     assert "No patterns detected" in verdict.reasons
     assert "No daily support/resistance levels" in verdict.reasons
@@ -89,3 +92,39 @@ def test_reasons_are_ordered_by_contribution():
 
     assert verdict.reasons[0].startswith("Above")  # trend carries the largest weight
     assert any("bullish" in reason for reason in verdict.reasons)
+
+
+def test_single_pattern_alone_is_not_enough_for_a_call():
+    verdict = compute_verdict([], [], [], None, [], [pattern("long", 0.2)])
+
+    assert verdict.call == "no_clear_edge"
+    assert verdict.reasons[0] == "Not enough data for a call"
+
+
+def test_trend_and_patterns_disagreeing_is_no_clear_edge():
+    one_minute, five_minute, daily = rising_inputs()  # trend and volume both up
+
+    verdict = compute_verdict(one_minute, five_minute, daily, session_vwap(one_minute), [], [pattern("short")])
+
+    assert verdict.parts["trend"] == 1.0 and verdict.parts["patterns"] == -1.0
+    assert verdict.call == "no_clear_edge"
+    assert "Trend and patterns disagree" in verdict.reasons
+
+
+def test_distant_support_is_not_bearish_for_a_stock_with_no_resistance():
+    one_minute, five_minute, daily = rising_inputs()  # last price ~2.59
+
+    verdict = compute_verdict(one_minute, five_minute, daily, session_vwap(one_minute), [PriceLevel(1.5, 2)], [])
+
+    assert verdict.parts["location"] == 0.0  # 20% room overhead (none), support capped at 20%
+
+
+def test_low_relative_volume_weakens_the_volume_signal():
+    one_minute, five_minute, daily = rising_inputs()  # every 1m bar is an up bar
+
+    normal = compute_verdict(one_minute, five_minute, daily, None, [], [], relative_volume=3.0)
+    quiet = compute_verdict(one_minute, five_minute, daily, None, [], [], relative_volume=0.75)
+
+    assert normal.parts["volume"] == 1.0
+    assert quiet.parts["volume"] == 0.5
+    assert any("3.0x relative volume" in reason for reason in normal.reasons)

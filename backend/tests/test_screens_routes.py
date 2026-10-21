@@ -112,6 +112,7 @@ def test_parse_url_returns_draft_with_unknown_codes_as_extra(api_client):
         "extra_filters": ["fa_pe_u10"],
         "signal": "ta_topgainers",
         "order": None,
+        "ignored_params": [],
     }
 
 
@@ -191,3 +192,23 @@ def test_create_screen_maps_finviz_failure_during_code_check(api_client, finviz_
     finviz_recognises_every_code.side_effect = FinvizRateLimitError("check filter codes")
 
     assert api_client.post("/api/screens", json=LOW_FLOAT_SCREEN).status_code == 503
+
+
+def test_update_only_checks_new_codes(api_client, finviz_recognises_every_code):
+    created = _create(api_client)
+    finviz_recognises_every_code.reset_mock()
+
+    api_client.put(f"/api/screens/{created['id']}", json={**LOW_FLOAT_SCREEN, "name": "Renamed"})
+    assert finviz_recognises_every_code.call_count == 0  # nothing new: no Finviz requests
+
+    api_client.put(f"/api/screens/{created['id']}",
+                   json={**LOW_FLOAT_SCREEN, "extra_filters": ["ta_rsi_os30", "fa_pe_u10"]})
+    finviz_recognises_every_code.assert_called_once_with(["fa_pe_u10"], None)
+
+
+def test_parse_url_reports_unused_url_parts(api_client):
+    url = "https://finviz.com/screener.ashx?v=111&f=geo_usa&t=AAPL,MSFT&r=21"
+
+    body = api_client.post("/api/screens/parse-url", json={"url": url}).json()
+
+    assert body["ignored_params"] == ["t", "r"]
