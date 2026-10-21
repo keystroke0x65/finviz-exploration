@@ -4,24 +4,23 @@
      to operations-only writes). Keep it under 80 lines. Durable facts belong in context/ or experience/. -->
 
 ## Current focus
-Phase 2 M2a merged into main (041ea54) on 2026-10-21; main not pushed (41 commits ahead).
-Docker runs from main with FRONTEND_PORT=5174 on the real DB (data/finviz_dashboard.db);
-backup before M2a schema: data/finviz_dashboard.db.backup-2026-10-21.
-Next: write the M2b plan (triangles, double top/bottom, ABCD, micro pullback, first
-pullback, EMAs, per-stock verdict), then M3 (continuation/reversal/candlesticks + track record).
+Phase 2 milestones 1, 2a and 2b merged into main (2b merge 0bdedea) on 2026-10-21; main not
+pushed. Docker runs from main with FRONTEND_PORT=5174 on the real DB. Backups:
+data/finviz_dashboard.db.backup-2026-10-21 (pre-2a), ...-2026-10-21-m2b (pre-2b).
+Next: milestone 3 (continuation/reversal patterns, candlestick score modifiers, Track record
+view, track record feeding ranking) — needs a plan.
 
 ## Open questions / blockers
 - Schwab developer API application not started (user's action).
 - FRONTEND_PORT=5174 not yet in user's .env.
-- Deferred minors: 9 from M1 review, 9 from M2a review (trailing stop bounds, direction-aware
-  conflict badge, stale daily state, concurrent-scan lock, sort bars, StockView stale
-  responses, auth path skipped list, ranking counts plan-less matches, API returns short
-  plans in warnings).
+- Deferred minors: 9 from M1, 8 remaining from M2a, 9 from M2b (verdict: single-input calls,
+  location treats far support as bearish, no rel vol; micro pullback/ABCD crossing sessions;
+  untyped dicts). Worth one cleanup batch before M3.
 
 ## Recent changes
-- 2026-10-21: M2a built (14 tasks), reviewed (1 critical + 5 important fixed with tests),
-  merged; live-verified pre-market against Finviz.
-- 2026-10-21: Removed old phase1/branch Docker containers, volumes, images.
+- 2026-10-21: M2b built (9 tasks), reviewed (5 important fixed with tests), merged;
+  live-verified at 12:28 ET (12 verdicts, new patterns firing, migration kept 195 setups).
+- 2026-10-21: M2a merged earlier the same day.
 
 ## Next steps
-- M2b plan when the user is ready; consider fixing the deferred minors in a small batch.
+- Ask user: deferred-minors cleanup batch vs milestone 3 plan.
