@@ -28,6 +28,63 @@ CREATE TABLE IF NOT EXISTS watchlist_appearances (
     PRIMARY KEY (ticker, seen_on, screen_id)
 );
 
+CREATE TABLE IF NOT EXISTS bar_cache (
+    ticker TEXT NOT NULL,
+    interval TEXT NOT NULL,
+    fetched_at TEXT NOT NULL,
+    bars TEXT NOT NULL,
+    PRIMARY KEY (ticker, interval)
+);
+
+CREATE TABLE IF NOT EXISTS setup_records (
+    id INTEGER PRIMARY KEY,
+    ticker TEXT NOT NULL,
+    pattern TEXT NOT NULL,
+    direction TEXT NOT NULL CHECK (direction IN ('long', 'short')),
+    timeframe TEXT NOT NULL,
+    entry REAL NOT NULL,
+    stop REAL NOT NULL,
+    capped_target REAL NOT NULL,
+    target_3r REAL NOT NULL,
+    available_reward_risk REAL NOT NULL,
+    risk_percent REAL NOT NULL,
+    blocking_level REAL,
+    partial_1r REAL NOT NULL,
+    partial_2r REAL NOT NULL,
+    trailing_stop REAL,
+    quality REAL NOT NULL,
+    score REAL NOT NULL,
+    score_parts TEXT NOT NULL,
+    key_points TEXT NOT NULL,
+    state TEXT NOT NULL,
+    first_state TEXT NOT NULL,
+    session TEXT NOT NULL,
+    float_at_detection REAL,
+    detected_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    outcome TEXT NOT NULL DEFAULT 'open',
+    resolved_at TEXT,
+    max_favorable_r REAL,
+    max_adverse_r REAL
+);
+
+-- One open record per setup; once resolved, a later occurrence of the same
+-- setup starts a new record instead of rewriting a finished one.
+CREATE UNIQUE INDEX IF NOT EXISTS setup_records_open_key
+    ON setup_records (ticker, pattern, direction, timeframe, entry)
+    WHERE outcome = 'open';
+
+CREATE TABLE IF NOT EXISTS ticker_scans (
+    ticker TEXT PRIMARY KEY,
+    scanned_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ticker_snapshots (
+    ticker TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    fetched_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS app_meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL

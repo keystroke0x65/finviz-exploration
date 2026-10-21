@@ -7,14 +7,22 @@ an unexpected error from the app.
 Usage:
     cd backend && python -m scripts.finviz_sanity_check AAPL
     cd backend && python -m scripts.finviz_sanity_check --screens
+    cd backend && python -m scripts.finviz_sanity_check --bars HOST
 """
 
 import argparse
 import sys
+import tempfile
 from dataclasses import replace
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from app.errors import FinvizAuthError, TickerNotFoundError
-from app.finviz_client import find_unrecognised_codes, get_quote, run_screen
+from app.db import connect
+from app.finviz_client import find_unrecognised_codes, get_bars, get_quote, run_screen
+from app.market_time import EASTERN
+from app.scanning.scanner import finviz_scan_deps, scan_ticker
+from app.setups.store import list_current_setups
 from app.screens.filter_form import FORM_OPTIONS, SIGNAL_OPTIONS, ScreenForm, form_to_codes
 from app.screens.store import DEFAULT_SCREENS
 
@@ -59,15 +67,55 @@ def check_screens() -> bool:
     return True
 
 
+# Intraday bars should be from today or, after a weekend/holiday, a recent day.
+MAX_INTRADAY_AGE_DAYS = 4
+
+
+def check_bars(ticker: str) -> bool:
+    print(f"Fetching live Finviz bars for {ticker}...")
+    all_ok = True
+    for interval in ("daily", "5m", "1m"):
+        bars = get_bars(ticker, interval)
+        if not bars:
+            print(f"  FAIL {interval}: no bars")
+            all_ok = False
+            continue
+        first, last = bars[0].time.astimezone(EASTERN), bars[-1].time.astimezone(EASTERN)
+        print(f"  {interval}: {len(bars)} bars, {first:%Y-%m-%d %H:%M} to {last:%Y-%m-%d %H:%M} ET")
+        if interval != "daily" and datetime.now(EASTERN) - last > timedelta(days=MAX_INTRADAY_AGE_DAYS):
+            print(f"  FAIL {interval}: latest bar is older than {MAX_INTRADAY_AGE_DAYS} days")
+            all_ok = False
+
+    print("Running a full scan of the ticker against a temporary database...")
+    with tempfile.TemporaryDirectory() as folder:
+        conn = connect(str(Path(folder) / "sanity.db"))
+        found = scan_ticker(conn, ticker, None, datetime.now(timezone.utc), finviz_scan_deps())
+        for setup in list_current_setups(conn, ticker):
+            print(
+                f"  {setup.direction:5} {setup.pattern:24} {setup.timeframe:5} {setup.state:10} "
+                f"entry {setup.entry} stop {setup.stop} target {setup.capped_target} "
+                f"({setup.available_reward_risk:.1f}R) score {setup.score}"
+            )
+        conn.close()
+    print(f"{found} setups recorded.")
+    return all_ok
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("ticker", nargs="?", default="AAPL")
     parser.add_argument(
         "--screens", action="store_true", help="check default screens and every form/signal code"
     )
+    parser.add_argument("--bars", action="store_true", help="fetch 1m/5m/daily bars and scan the ticker")
     args = parser.parse_args()
 
-    is_ok = check_screens() if args.screens else check_quote(args.ticker)
+    if args.screens:
+        is_ok = check_screens()
+    elif args.bars:
+        is_ok = check_bars(args.ticker.upper())
+    else:
+        is_ok = check_quote(args.ticker)
     sys.exit(0 if is_ok else 1)
 
 

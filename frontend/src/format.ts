@@ -49,3 +49,13 @@ export function changeClass(value: number | null): string {
   }
   return value > 0 ? "gain" : "loss";
 }
+
+// Sub-dollar stocks move in tenths of a cent, so they need more decimals.
+const SUB_DOLLAR = 1;
+
+export function formatPrice(value: number | null): string {
+  if (value == null) {
+    return MISSING_VALUE;
+  }
+  return value.toFixed(Math.abs(value) < SUB_DOLLAR ? 4 : 2);
+}

@@ -6,6 +6,14 @@ export interface Appearance {
   screen_id: number;
 }
 
+export interface PriceSnapshot {
+  price: number | null;
+  change_percent: number | null;
+  after_hours_change_percent: number | null;
+  relative_volume: number | null;
+  fetched_at: string;
+}
+
 export interface WatchlistEntry {
   ticker: string;
   source: "auto" | "manual";
@@ -14,6 +22,7 @@ export interface WatchlistEntry {
   is_pinned: boolean;
   expires_at: string | null;
   appearances: Appearance[];
+  snapshot: PriceSnapshot | null;
 }
 
 export interface FeederResult {

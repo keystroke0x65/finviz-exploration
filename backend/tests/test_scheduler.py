@@ -117,3 +117,47 @@ def test_scheduler_tick_logs_failed_screens_as_warning(tmp_path, caplog):
     assert len(warnings) == 1
     assert "Top gainers — low float" in warnings[0].getMessage()
     assert "rejected the configured auth token" in warnings[0].getMessage()
+
+
+def test_scheduled_scan_runs_inside_window(tmp_path):
+    from app.scanning.scanner import ScanDeps, ScanResult
+    from app.watchlist.scheduler import run_scheduled_scan
+
+    snapshot_calls = []
+    deps = ScanDeps(fetch_bars=lambda *args: [], fetch_snapshots=lambda tickers: snapshot_calls.append(tickers) or [])
+
+    result = run_scheduled_scan(_seeded_db_path(tmp_path), TUESDAY_10AM_ET, deps)
+
+    assert isinstance(result, ScanResult)
+    assert snapshot_calls == [[]]
+
+
+def test_scheduled_scan_skips_outside_window(tmp_path):
+    from app.scanning.scanner import ScanDeps
+    from app.watchlist.scheduler import run_scheduled_scan
+
+    deps = ScanDeps(fetch_bars=lambda *args: [], fetch_snapshots=lambda tickers: [])
+
+    assert run_scheduled_scan(_seeded_db_path(tmp_path), SATURDAY_10AM_ET, deps) is None
+
+
+def test_scheduled_scan_logs_failed_tickers(tmp_path, caplog):
+    from app.errors import FinvizUnavailableError
+    from app.scanning.scanner import ScanDeps
+    from app.watchlist.scheduler import run_scheduled_scan
+    from app.watchlist.store import add_manual_entry
+
+    db_path = _seeded_db_path(tmp_path)
+    conn = connect(db_path)
+    add_manual_entry(conn, "HOST", TUESDAY_10AM_ET)
+    conn.close()
+
+    def failing_snapshots(tickers):
+        raise FinvizUnavailableError("snapshot", "HTTP 500")
+
+    deps = ScanDeps(fetch_bars=lambda *args: [], fetch_snapshots=failing_snapshots)
+    with caplog.at_level(logging.WARNING, logger="app.watchlist.scheduler"):
+        run_scheduled_scan(db_path, TUESDAY_10AM_ET, deps)
+
+    assert "scan failures" in caplog.text
+    assert "HTTP 500" in caplog.text

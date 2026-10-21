@@ -35,7 +35,7 @@ describe("ScreensView", () => {
     api.listScreens.mockResolvedValue([SCREEN]);
     api.fetchFormFields.mockResolvedValue({ options: {}, signals: {} });
     api.runScreen.mockResolvedValue({ rows: [], fetched_at: "2026-10-20T14:00:00Z" });
-    render(<ScreensView />);
+    render(<ScreensView onOpenStock={vi.fn()} />);
 
     expect(await screen.findByText("Top gainers — low float")).toBeInTheDocument();
     expect(screen.getByText(/feeds watchlist/)).toBeInTheDocument();
@@ -49,7 +49,7 @@ describe("ScreensView", () => {
     api.listScreens.mockResolvedValue([SCREEN]);
     api.fetchFormFields.mockResolvedValue({ options: {}, signals: {} });
     api.runScreen.mockRejectedValue(new Error("Finviz is rate limiting requests (screen); try again in a minute."));
-    render(<ScreensView />);
+    render(<ScreensView onOpenStock={vi.fn()} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Run Top gainers — low float" }));
 
@@ -66,7 +66,7 @@ describe("ScreensView", () => {
         ? new Promise((resolve) => (finishSlowRun = resolve))
         : Promise.resolve({ rows: [], fetched_at: "2026-10-20T14:00:00Z" }),
     );
-    render(<ScreensView />);
+    render(<ScreensView onOpenStock={vi.fn()} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Run Top gainers — low float" }));
     fireEvent.click(screen.getByRole("button", { name: "Run After-hours" }));

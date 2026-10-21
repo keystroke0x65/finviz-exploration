@@ -21,7 +21,7 @@ describe("ScreenResultsTable", () => {
   });
 
   it("renders a row with formatted numbers and a news link", () => {
-    render(<ScreenResultsTable run={run()} onAddToWatchlist={vi.fn()} watchlistTickers={new Set()} />);
+    render(<ScreenResultsTable run={run()} onAddToWatchlist={vi.fn()} watchlistTickers={new Set()} onOpenStock={vi.fn()} />);
 
     const row = screen.getByRole("row", { name: /HOST/ });
     expect(within(row).getByText("+47.40%")).toBeInTheDocument();
@@ -36,7 +36,7 @@ describe("ScreenResultsTable", () => {
   });
 
   it("shows an empty-state message when no rows", () => {
-    render(<ScreenResultsTable run={run({ rows: [] })} onAddToWatchlist={vi.fn()} watchlistTickers={new Set()} />);
+    render(<ScreenResultsTable run={run({ rows: [] })} onAddToWatchlist={vi.fn()} watchlistTickers={new Set()} onOpenStock={vi.fn()} />);
 
     expect(screen.getByText(/^No stocks match this screen right now\./)).toBeInTheDocument();
   });
@@ -45,7 +45,7 @@ describe("ScreenResultsTable", () => {
     const sparse: ScreenRow = { ...HOST, ticker: "NOAH", after_hours_change_percent: null,
       relative_volume: null, news_title: null, news_url: null };
 
-    render(<ScreenResultsTable run={run({ rows: [sparse] })} onAddToWatchlist={vi.fn()} watchlistTickers={new Set()} />);
+    render(<ScreenResultsTable run={run({ rows: [sparse] })} onAddToWatchlist={vi.fn()} watchlistTickers={new Set()} onOpenStock={vi.fn()} />);
 
     const row = screen.getByRole("row", { name: /NOAH/ });
     expect(within(row).getAllByText("—").length).toBeGreaterThanOrEqual(3);
@@ -54,21 +54,21 @@ describe("ScreenResultsTable", () => {
   it("does not link news whose url isn't http(s)", () => {
     const hostile: ScreenRow = { ...HOST, news_url: "javascript:alert(1)" };
 
-    render(<ScreenResultsTable run={run({ rows: [hostile] })} onAddToWatchlist={vi.fn()} watchlistTickers={new Set()} />);
+    render(<ScreenResultsTable run={run({ rows: [hostile] })} onAddToWatchlist={vi.fn()} watchlistTickers={new Set()} onOpenStock={vi.fn()} />);
 
     expect(screen.queryByRole("link", { name: "Buyback" })).not.toBeInTheDocument();
     expect(screen.getByText("Buyback")).toBeInTheDocument();
   });
 
   it("shows when the data was fetched", () => {
-    render(<ScreenResultsTable run={run()} onAddToWatchlist={vi.fn()} watchlistTickers={new Set()} />);
+    render(<ScreenResultsTable run={run()} onAddToWatchlist={vi.fn()} watchlistTickers={new Set()} onOpenStock={vi.fn()} />);
 
     expect(screen.getByText(/^Fetched /)).toBeInTheDocument();
   });
 
   it("calls onAddToWatchlist with the row ticker", () => {
     const onAddToWatchlist = vi.fn();
-    render(<ScreenResultsTable run={run()} onAddToWatchlist={onAddToWatchlist} watchlistTickers={new Set()} />);
+    render(<ScreenResultsTable run={run()} onAddToWatchlist={onAddToWatchlist} watchlistTickers={new Set()} onOpenStock={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Add HOST to watchlist" }));
 
@@ -77,9 +77,9 @@ describe("ScreenResultsTable", () => {
 
   it("sorts rows by a column when its header is clicked", () => {
     const small: ScreenRow = { ...HOST, ticker: "WORX", change_percent: 12.5 };
-    render(<ScreenResultsTable run={run({ rows: [small, HOST] })} onAddToWatchlist={vi.fn()} watchlistTickers={new Set()} />);
+    render(<ScreenResultsTable run={run({ rows: [small, HOST] })} onAddToWatchlist={vi.fn()} watchlistTickers={new Set()} onOpenStock={vi.fn()} />);
     const tickersInOrder = () =>
-      screen.getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("link")[0].textContent);
+      screen.getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("button")[0].textContent);
 
     fireEvent.click(screen.getByRole("button", { name: "Sort by Change" }));
     expect(tickersInOrder()).toEqual(["HOST", "WORX"]);
@@ -89,7 +89,7 @@ describe("ScreenResultsTable", () => {
   });
 
   it("shows tickers already on the watchlist as added", () => {
-    render(<ScreenResultsTable run={run()} onAddToWatchlist={vi.fn()} watchlistTickers={new Set(["HOST"])} />);
+    render(<ScreenResultsTable run={run()} onAddToWatchlist={vi.fn()} watchlistTickers={new Set(["HOST"])} onOpenStock={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: "HOST is on the watchlist" })).toBeDisabled();
   });
