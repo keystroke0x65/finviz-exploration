@@ -7,7 +7,7 @@
 
 ## Next
 <!-- empty: planned work, highest priority first -->
-- [prog-0009] root h=0 x=0 d=2026-10-21 labels=roadmap,phase2 src="docs/superpowers/plans/2026-10-20-phase2-m1-screens-watchlist.md" supersedes=prog-0008 :: Next: execute docs/superpowers/plans/2026-10-20-phase2-m1-screens-watchlist.md (10 tasks: screens + watchlist feeder) once user picks execution approach; then plan M2.
+- [prog-0010] root h=0 x=0 d=2026-10-21 labels=status,phase2 src="git log main..feat/phase2-m1-screens-watchlist" supersedes=prog-0009 :: Phase 2 M1 (screens + watchlist feeder) built on branch feat/phase2-m1-screens-watchlist (worktree .worktrees/feat-phase2-m1), 15 commits, 134 backend + 39 frontend tests, final review fixes applied; awaiting user's merge/PR choice. Next: plan M2 (bars, core+momentum patterns, verdict, outcome tracking).
 
 ## Done
 <!-- empty: completed milestones (keep the latest 15; consolidate archives older ones) -->

@@ -4,21 +4,22 @@
      to operations-only writes). Keep it under 80 lines. Durable facts belong in context/ or experience/. -->
 
 ## Current focus
-Phase 2 redefined and approved: screens + auto watchlist + pattern setups.
-Spec: docs/superpowers/specs/2026-10-20-screener-watchlist-patterns-design.md.
-Milestone 1 plan written: docs/superpowers/plans/2026-10-20-phase2-m1-screens-watchlist.md
-(10 tasks). Awaiting user's choice of execution approach (subagent-driven vs native).
+Phase 2 milestone 1 (screens + watchlist feeder) is built and reviewed on branch
+feat/phase2-m1-screens-watchlist (worktree .worktrees/feat-phase2-m1). Awaiting the
+user's choice: merge locally / PR / keep. Local smoke servers may still be running
+(uvicorn :8000 with scratch DB, vite :5174).
 
 ## Open questions / blockers
 - Schwab developer API application not started (user's action; needed for phase 3).
-- origin/feat/phase1-foundation remote branch can be deleted (fully merged).
-- Original roadmap phases 4-5 may need revisiting after phase 2 ships.
+- Docker not reachable from WSL right now (Docker Desktop integration) — Docker run of
+  M1 not verified; local uvicorn+vite smoke test passed against live Finviz.
+- 9 deferred minor review findings (see M1 final report in conversation; e.g. re-checking
+  codes on every save, expiry only inside feeder window, no screen name in history).
 
 ## Recent changes
-- 2026-10-20: Brainstormed phase 2 with user; probed Finviz export (bars 1m/5m/daily,
-  wide columns, silent ignoring of bad filter codes). Wrote + committed spec and M1 plan.
-- 2026-10-20: Merged phase 1 into main (a9d414b).
+- 2026-10-20: Built M1 (10 plan tasks + 3 review fixes). Spec deviation: replaced
+  ">5,000 rows = ignored filters" with save-time code validation after a live check.
+- 2026-10-20: Phase 2 spec + M1 plan committed on main.
 
 ## Next steps
-- Execute M1 plan in a worktree, then plan M2 (bars, core+momentum patterns, verdict,
-  outcome tracking).
+- Integrate the M1 branch, then write the M2 plan.

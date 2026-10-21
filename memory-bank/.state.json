@@ -4,14 +4,14 @@
     "brief": 4,
     "stack": 6,
     "dec": 3,
-    "prog": 9,
-    "dev-environment": 2,
-    "finviz": 3
+    "prog": 10,
+    "dev-environment": 4,
+    "finviz": 5
   },
   "reminded_sessions": [
     "8526e8ea-be9e-4201-ba24-a0c6fc35964e",
     "18086c86-3585-44fc-8c36-16cd608bf967"
   ],
   "created": "2026-09-17",
-  "batches": 5
+  "batches": 6
 }
