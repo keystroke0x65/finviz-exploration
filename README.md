@@ -56,12 +56,23 @@ pasted codes with Finviz first and rejects ones it would ignore.
    docker compose up --build
    ```
 
+   If port 5173 is already used by another dev server, set `FRONTEND_PORT=5174` (or any
+   free port) in `.env` and use that port below.
+
 3. Open the app:
 
    - Frontend: http://localhost:5173
    - Backend health check: http://localhost:8000/health
 
 Enter a ticker (e.g. `AAPL`) in the search box to look up a quote.
+
+## Where the data lives
+
+Everything is stored in one SQLite file, `data/finviz_dashboard.db`, inside this project
+folder (the folder is gitignored apart from a placeholder). Back it up by copying the
+file; delete it to start fresh (the default screens are recreated on the next start).
+Docker runs the backend as user `1000:1000` so the file stays owned by you; set
+`HOST_UID`/`HOST_GID` in `.env` if your user id differs (`id -u`, `id -g`).
 
 ## Running tests
 
