@@ -133,7 +133,7 @@ describe("SetupsView", () => {
     const onOpenStock = vi.fn();
     render(<SetupsView onOpenStock={onOpenStock} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "HOST" }));
+    fireEvent.click(await screen.findByRole("link", { name: "HOST" }));
 
     expect(onOpenStock).toHaveBeenCalledWith("HOST");
   });

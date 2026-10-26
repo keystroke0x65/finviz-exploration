@@ -15,6 +15,7 @@ import { saveSettings } from "../api/settings";
 import { formatPrice } from "../format";
 import { describeSetupState } from "../setupState";
 import { VerdictBadge } from "./VerdictBadge";
+import { StockLink } from "./StockLink";
 
 interface SetupsViewProps {
   onOpenStock: (ticker: string) => void;
@@ -166,9 +167,7 @@ export function SetupsView({ onOpenStock }: SetupsViewProps) {
           <ul className="warning-list">
             {response.warnings.map((warning) => (
               <li key={warning.id}>
-                <button type="button" className="ticker-button" onClick={() => onOpenStock(warning.ticker)}>
-                  {warning.ticker}
-                </button>
+                <StockLink ticker={warning.ticker} onOpen={onOpenStock} />
                 <span>{patternName(warning.pattern)}</span>
                 <span className="muted">
                   {warning.timeframe}, breaks down below {formatPrice(warning.entry)}
@@ -194,9 +193,7 @@ function SetupRow({ setup, showDirection, isExpanded, onToggleScore, onOpenStock
   return (
     <tr>
       <td>
-        <button type="button" className="ticker-button" onClick={() => onOpenStock(setup.ticker)}>
-          {setup.ticker}
-        </button>
+        <StockLink ticker={setup.ticker} onOpen={onOpenStock} />
         {setup.has_conflict && (
           <div>
             <span className="badge badge-warning">

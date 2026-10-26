@@ -21,6 +21,7 @@ import {
 } from "../format";
 import { RunDots } from "./RunDots";
 import { VerdictBadge } from "./VerdictBadge";
+import { StockLink } from "./StockLink";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown error";
@@ -208,9 +209,7 @@ function WatchlistRow({ entry, isExpanded, onToggleHistory, onTogglePin, onRemov
     <>
       <tr>
         <td>
-          <button type="button" className="ticker-button" onClick={() => onOpenStock(entry.ticker)}>
-            {entry.ticker}
-          </button>{" "}
+          <StockLink ticker={entry.ticker} onOpen={onOpenStock} />{" "}
           <a
             className="small-link"
             href={finvizQuoteUrl(entry.ticker)}
