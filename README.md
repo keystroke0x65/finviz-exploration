@@ -24,8 +24,11 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
   Bearish patterns are listed as warnings; tick "Show short setups" to turn them into
   ranked short setups. Detection is rule-based: it flags shapes worth checking on the
   chart, it doesn't predict, and it isn't advice.
-- **Stock** tab: candles (1m, 5m or daily) with daily support/resistance near the price,
-  pre-market high/low, previous close and VWAP. Click a setup to draw its entry, stop and
+- **Stock** tab: candles (1m, 5m or daily) with volume bars underneath (green on up
+  candles, red on down), daily support/resistance near the price, pre-market high/low,
+  previous close and VWAP. On 1m and 5m, pre-market (4:00-9:30 AM ET) is shaded teal and
+  after-hours (4:00-8:00 PM ET) purple; Finviz only has bars when a trade happened, so a
+  thinly traded stock shows only a sliver of each. Click a setup to draw its entry, stop and
   target. Tickers anywhere in the app open this tab; the small "Finviz" link opens Finviz.
 - **Screens** tab: saved Finviz screens. Paste a Finviz screener URL (build it on
   finviz.com, copy the address bar) or use the form for country, price, float, market cap,

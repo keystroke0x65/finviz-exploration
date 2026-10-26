@@ -9,7 +9,7 @@ const api = vi.hoisted(() => ({
   fetchStockVerdict: vi.fn(),
   runScan: vi.fn(),
   fetchQuote: vi.fn(),
-  chartProps: [] as { levels: { price: number; kind: string }[] }[],
+  chartProps: [] as { levels: { price: number; kind: string }[]; shadeSessions?: boolean }[],
 }));
 vi.mock("../api/bars", () => ({ fetchBars: (...args: unknown[]) => api.fetchBars(...args) }));
 vi.mock("../api/setups", async (importOriginal) => ({
@@ -20,7 +20,7 @@ vi.mock("../api/setups", async (importOriginal) => ({
 }));
 vi.mock("../api/stocks", () => ({ fetchQuote: (ticker: string) => api.fetchQuote(ticker) }));
 vi.mock("./CandleChart", () => ({
-  CandleChart: (props: { levels: { price: number; kind: string }[] }) => {
+  CandleChart: (props: { levels: { price: number; kind: string }[]; shadeSessions?: boolean }) => {
     api.chartProps.push(props);
     return <div data-testid="chart" />;
   },
@@ -87,6 +87,19 @@ describe("StockView", () => {
         expect.objectContaining({ price: 2.5, kind: "level" }),
       ]));
     });
+  });
+
+  it("shades and labels the sessions on intraday charts only", async () => {
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+
+    expect(await screen.findByText("Pre-market")).toBeInTheDocument();
+    expect(screen.getByText("After-hours")).toBeInTheDocument();
+    expect(api.chartProps[api.chartProps.length - 1].shadeSessions).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "daily" }));
+
+    await vi.waitFor(() => expect(api.chartProps[api.chartProps.length - 1].shadeSessions).toBe(false));
+    expect(screen.queryByText("Pre-market")).not.toBeInTheDocument();
   });
 
   it("says when each setup triggered", async () => {

@@ -72,6 +72,8 @@ function setupLevels(setup: Setup | Warning): ChartLevel[] {
 
 export function StockView({ ticker, onTickerChange }: StockViewProps) {
   const [timeframe, setTimeframe] = useState<Timeframe>("5m");
+  // Daily bars have no pre-market or after-hours part to shade.
+  const hasSessions = timeframe !== "daily";
   const [bars, setBars] = useState<BarsResponse | null>(null);
   const [setups, setSetups] = useState<SetupsResponse | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -217,13 +219,28 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
             </div>
             {bars ? (
               bars.bars.length > 0 ? (
-                <CandleChart
-                  bars={bars.bars}
-                  levels={chartLevels}
-                  outline={outline}
-                  vwap={bars.vwap}
-                  visibleBars={VISIBLE_BARS[timeframe]}
-                />
+                <>
+                  <CandleChart
+                    bars={bars.bars}
+                    levels={chartLevels}
+                    outline={outline}
+                    vwap={bars.vwap}
+                    visibleBars={VISIBLE_BARS[timeframe]}
+                    shadeSessions={hasSessions}
+                  />
+                  {hasSessions && (
+                    <p className="chart-legend muted">
+                      <span className="legend-item">
+                        <span className="legend-swatch" data-session="pre-market" />
+                        Pre-market
+                      </span>
+                      <span className="legend-item">
+                        <span className="legend-swatch" data-session="after-hours" />
+                        After-hours
+                      </span>
+                    </p>
+                  )}
+                </>
               ) : (
                 <p className="empty-state">Finviz has no {timeframe} bars for {ticker}.</p>
               )
