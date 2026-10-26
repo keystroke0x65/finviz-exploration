@@ -24,6 +24,10 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
   Bearish patterns are listed as warnings; tick "Show short setups" to turn them into
   ranked short setups. Detection is rule-based: it flags shapes worth checking on the
   chart, it doesn't predict, and it isn't advice.
+- Tickers in Setups, Screens and the Watchlist are links: click to open the stock here, or
+  Ctrl/Cmd-click, middle-click or right-click → "Open link in new tab" to open it in its
+  own tab. The address (e.g. `/?stock=HOST`) opens the Stock view on that ticker, and
+  stays on the stock you're viewing, so a refresh or a copied link comes back to it.
 - **Stock** tab: candles (1m, 5m or daily) with volume bars underneath (green on up
   candles, red on down), daily support/resistance near the price, pre-market high/low,
   previous close and VWAP. On 1m and 5m, pre-market (4:00-9:30 AM ET) is shaded teal and

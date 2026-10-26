@@ -10,6 +10,7 @@ import {
   isWebUrl,
   MISSING_VALUE,
 } from "../format";
+import { StockLink } from "./StockLink";
 
 interface ScreenResultsTableProps {
   run: ScreenRun;
@@ -114,9 +115,7 @@ export function ScreenResultsTable({ run, onAddToWatchlist, watchlistTickers, on
           {rows.map((row) => (
             <tr key={row.ticker}>
               <td>
-                <button type="button" className="ticker-button" onClick={() => onOpenStock(row.ticker)}>
-                  {row.ticker}
-                </button>{" "}
+                <StockLink ticker={row.ticker} onOpen={onOpenStock} />{" "}
                 <a
                   className="small-link"
                   href={finvizQuoteUrl(row.ticker)}

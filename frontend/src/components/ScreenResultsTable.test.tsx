@@ -101,13 +101,23 @@ describe("ScreenResultsTable", () => {
     const small: ScreenRow = { ...HOST, ticker: "WORX", change_percent: 12.5 };
     render(<ScreenResultsTable run={run({ rows: [small, HOST] })} onAddToWatchlist={vi.fn()} watchlistTickers={new Set()} onOpenStock={vi.fn()} />);
     const tickersInOrder = () =>
-      screen.getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("button")[0].textContent);
+      screen.getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("link")[0].textContent);
 
     fireEvent.click(screen.getByRole("button", { name: "Sort by Change" }));
     expect(tickersInOrder()).toEqual(["HOST", "WORX"]);
 
     fireEvent.click(screen.getByRole("button", { name: "Sort by Change" }));
     expect(tickersInOrder()).toEqual(["WORX", "HOST"]);
+  });
+
+  it("links each ticker to its Stock view so it can open in a new tab", () => {
+    const onOpenStock = vi.fn();
+    render(<ScreenResultsTable run={run()} onAddToWatchlist={vi.fn()} watchlistTickers={new Set()} onOpenStock={onOpenStock} />);
+
+    const ticker = screen.getByRole("link", { name: "HOST" });
+    expect(ticker).toHaveAttribute("href", "/?stock=HOST");
+    fireEvent.click(ticker);
+    expect(onOpenStock).toHaveBeenCalledWith("HOST");
   });
 
   it("shows tickers already on the watchlist as added", () => {

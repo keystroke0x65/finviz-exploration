@@ -152,7 +152,7 @@ describe("WatchlistView", () => {
     const onOpenStock = vi.fn();
     render(<WatchlistView onOpenStock={onOpenStock} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "HOST" }));
+    fireEvent.click(await screen.findByRole("link", { name: "HOST" }));
 
     expect(onOpenStock).toHaveBeenCalledWith("HOST");
   });
