@@ -75,6 +75,38 @@ def test_scan_route_without_ticker_scans_watchlist(mock_scan, api_client):
     assert mock_scan.call_args.kwargs["tickers"] is None
 
 
+@patch("app.routes.setups.run_scan", return_value=ScanResult(["HOST", "WORX"], [("BAD", "rate limited")], 2, NOW))
+def test_full_scan_from_the_page_is_recorded(mock_scan, api_client):
+    api_client.post("/api/scans", json={})
+
+    status = api_client.get("/api/scans/status").json()
+
+    assert status["latest"] == {
+        "status": "completed", "finished_at": "2026-10-20T10:00:00-04:00", "scanned": 2,
+        "failed": [{"ticker": "BAD", "reason": "rate limited"}],
+    }
+    assert status["last_completed_at"] == "2026-10-20T10:00:00-04:00"
+
+
+@patch("app.routes.setups.run_scan", return_value=ScanResult(["HOST"], [], 1, NOW))
+def test_one_stock_scan_is_not_recorded_as_the_last_scan(mock_scan, api_client):
+    api_client.post("/api/scans", json={"ticker": "HOST"})
+
+    assert api_client.get("/api/scans/status").json()["latest"] is None
+
+
+def test_scan_status_reports_a_crash_and_whether_scans_are_overdue(api_client, db_conn):
+    from app.scanning.run_status import CrashedScan, save_scan_attempt
+
+    save_scan_attempt(db_conn, CrashedScan(finished_at=NOW, error_type="TypeError"))
+
+    status = api_client.get("/api/scans/status").json()
+
+    assert status["latest"] == {"status": "crashed", "finished_at": "2026-10-20T10:00:00-04:00", "error_type": "TypeError"}
+    assert status["last_completed_at"] is None
+    assert isinstance(status["is_overdue"], bool)
+
+
 def test_setups_hide_shorts_as_warnings_by_default(api_client, db_conn):
     store_setup(db_conn, "LONG", "long")
     store_setup(db_conn, "SHORT", "short", pattern="low_of_day_break")

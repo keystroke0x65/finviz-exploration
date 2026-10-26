@@ -21,6 +21,9 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
   reward:risk actually available, risk as a % of price, and a 0-100 score you can expand
   to see how it was built. Targets are 3R unless a daily support/resistance level sits in
   the way; then the target stops at that level and the row says "capped by level at …".
+  Above the table a grey line says when the last full scan ran ("Last scan 3:45 PM · 40
+  stocks"); it turns into a red warning if that scan failed, or if no scan has finished for
+  30 minutes during scan hours (4 AM-8 PM ET), since the setups shown are then out of date.
   Bearish patterns are listed as warnings; tick "Show short setups" to turn them into
   ranked short setups. Detection is rule-based: it flags shapes worth checking on the
   chart, it doesn't predict, and it isn't advice.

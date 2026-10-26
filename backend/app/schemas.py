@@ -209,6 +209,27 @@ class ScanOut(BaseModel):
     scanned_at: datetime
 
 
+class CompletedScanOut(BaseModel):
+    status: Literal["completed"] = "completed"
+    finished_at: datetime
+    scanned: int
+    failed: list[FailedTickerOut]
+
+
+class CrashedScanOut(BaseModel):
+    status: Literal["crashed"] = "crashed"
+    finished_at: datetime
+    error_type: str
+
+
+class ScanStatusOut(BaseModel):
+    """The latest full scan (scheduled or from the page) and whether scans have stalled."""
+
+    latest: Annotated[CompletedScanOut | CrashedScanOut, Field(discriminator="status")] | None
+    last_completed_at: datetime | None
+    is_overdue: bool
+
+
 class SetupOut(BaseModel):
     id: int
     ticker: str

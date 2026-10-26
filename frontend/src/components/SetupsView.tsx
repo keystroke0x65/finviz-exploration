@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import {
   fetchSetups,
+  fetchScanStatus,
   MIN_TRADES_FOR_TRACK_RECORD,
   MIN_TRADING_DAYS_FOR_TRACK_RECORD,
   patternName,
@@ -8,11 +9,13 @@ import {
   ScanResult,
   SCORE_PART_NAMES,
   Setup,
+  ScanStatus,
   SetupsResponse,
   TrackRecordSummary,
 } from "../api/setups";
 import { saveSettings } from "../api/settings";
 import { formatPrice } from "../format";
+import { describeScanStatus } from "../scanStatus";
 import { describeSetupState } from "../setupState";
 import { VerdictBadge } from "./VerdictBadge";
 import { StockLink } from "./StockLink";
@@ -35,14 +38,18 @@ function formatPoints(points: number): string {
 
 export function SetupsView({ onOpenStock }: SetupsViewProps) {
   const [response, setResponse] = useState<SetupsResponse | null>(null);
+  const [scanStatus, setScanStatus] = useState<ScanStatus | null>(null);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    setResponse(await fetchSetups());
+    const [setups, status] = await Promise.all([fetchSetups(), fetchScanStatus()]);
+    setResponse(setups);
+    setScanStatus(status);
   }, []);
+  const scanNote = scanStatus ? describeScanStatus(scanStatus, new Date()) : null;
 
   useEffect(() => {
     reload().catch((loadError) => setError(errorMessage(loadError)));
@@ -95,6 +102,12 @@ export function SetupsView({ onOpenStock }: SetupsViewProps) {
         </div>
       </div>
 
+      {scanNote?.isProblem && (
+        <p role="alert" className="alert">
+          {scanNote.text}
+        </p>
+      )}
+      {scanNote && !scanNote.isProblem && <p className="muted scan-status">{scanNote.text}</p>}
       {scanResult && scanResult.failed.length > 0 && (
         <div role="alert" className="alert">
           {scanResult.failed.map((failure) => (

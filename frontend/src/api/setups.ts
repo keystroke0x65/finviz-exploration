@@ -158,6 +158,22 @@ export function fetchStockSetups(ticker: string): Promise<SetupsResponse> {
   return requestJson<SetupsResponse>(`/api/stocks/${encodeURIComponent(ticker)}/setups`);
 }
 
+export type ScanAttempt =
+  | { status: "completed"; finished_at: string; scanned: number; failed: { ticker: string; reason: string }[] }
+  | { status: "crashed"; finished_at: string; error_type: string };
+
+// The latest full scan, scheduled or started from Setups.
+export interface ScanStatus {
+  latest: ScanAttempt | null;
+  last_completed_at: string | null;
+  // No full scan has finished for two intervals during scan hours.
+  is_overdue: boolean;
+}
+
+export function fetchScanStatus(): Promise<ScanStatus> {
+  return requestJson<ScanStatus>("/api/scans/status");
+}
+
 export function runScan(ticker?: string): Promise<ScanResult> {
   return requestJson<ScanResult>("/api/scans", jsonRequest("POST", ticker ? { ticker } : {}));
 }
