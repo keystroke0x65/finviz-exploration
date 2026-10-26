@@ -1,13 +1,24 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Setup, TrackRecordSummary, Warning } from "../api/setups";
+import type { ScanStatus, Setup, TrackRecordSummary, Warning } from "../api/setups";
 import { SetupsView } from "./SetupsView";
 
-const api = { fetchSetups: vi.fn(), runScan: vi.fn(), saveSettings: vi.fn() };
+const CLEAN_SCAN: ScanStatus = {
+  latest: { status: "completed", finished_at: "2026-10-20T10:45:00-04:00", scanned: 40, failed: [] },
+  last_completed_at: "2026-10-20T10:45:00-04:00",
+  is_overdue: false,
+};
+const api = {
+  fetchSetups: vi.fn(),
+  runScan: vi.fn(),
+  saveSettings: vi.fn(),
+  fetchScanStatus: vi.fn(() => Promise.resolve(CLEAN_SCAN)),
+};
 vi.mock("../api/setups", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/setups")>()),
   fetchSetups: () => api.fetchSetups(),
   runScan: (ticker?: string) => api.runScan(ticker),
+  fetchScanStatus: () => api.fetchScanStatus(),
 }));
 vi.mock("../api/settings", () => ({ saveSettings: (settings: unknown) => api.saveSettings(settings) }));
 
@@ -37,6 +48,37 @@ describe("SetupsView", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+  });
+
+  it("says when the last scan ran", async () => {
+    respond([setup()]);
+    render(<SetupsView onOpenStock={vi.fn()} />);
+
+    expect(await screen.findByText(/^Last scan .* · 40 stocks$/)).toBeInTheDocument();
+  });
+
+  it("warns when the last scan failed", async () => {
+    respond([setup()]);
+    api.fetchScanStatus.mockResolvedValueOnce({
+      latest: { status: "crashed", finished_at: "2026-10-20T11:00:00-04:00", error_type: "TypeError" },
+      last_completed_at: "2026-10-20T10:45:00-04:00",
+      is_overdue: false,
+    });
+    render(<SetupsView onOpenStock={vi.fn()} />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/scan failed \(TypeError\), so these setups are from the/);
+  });
+
+  it("checks the scan status again after scanning", async () => {
+    respond([setup()]);
+    api.runScan.mockResolvedValue({ scanned: ["HOST"], failed: [], setups_found: 1, scanned_at: "2026-10-20T11:00:00-04:00" });
+    render(<SetupsView onOpenStock={vi.fn()} />);
+    await screen.findByText(/^Last scan/);
+
+    fireEvent.click(screen.getByRole("button", { name: "Scan watchlist" }));
+
+    await vi.waitFor(() => expect(api.fetchScanStatus).toHaveBeenCalledTimes(2));
   });
 
   it("lists setups ranked with entry, stop, target and available R:R", async () => {

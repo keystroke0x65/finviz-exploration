@@ -132,6 +132,39 @@ def test_scheduled_scan_runs_inside_window(tmp_path):
     assert snapshot_calls == [[]]
 
 
+def test_scheduled_scan_records_that_it_completed(tmp_path):
+    from app.scanning.run_status import CompletedScan, read_scan_status
+    from app.scanning.scanner import ScanDeps
+    from app.watchlist.scheduler import run_scheduled_scan
+
+    db_path = _seeded_db_path(tmp_path)
+    run_scheduled_scan(db_path, TUESDAY_10AM_ET, ScanDeps(fetch_bars=lambda *args: [], fetch_snapshots=lambda t: []))
+
+    conn = connect(db_path)
+    status = read_scan_status(conn)
+    conn.close()
+    assert isinstance(status.latest, CompletedScan)
+    assert status.last_completed_at == TUESDAY_10AM_ET
+
+
+def test_scheduled_scan_records_a_crash_by_error_type_only(tmp_path):
+    from app.scanning.run_status import CrashedScan, read_scan_status
+    from app.scanning.scanner import ScanDeps
+    from app.watchlist.scheduler import run_scheduled_scan
+
+    def crashing_snapshots(tickers):
+        raise TypeError("token=SECRET must never reach the UI")
+
+    db_path = _seeded_db_path(tmp_path)
+    run_scheduled_scan(db_path, TUESDAY_10AM_ET, ScanDeps(fetch_bars=lambda *args: [], fetch_snapshots=crashing_snapshots))
+
+    conn = connect(db_path)
+    status = read_scan_status(conn)
+    conn.close()
+    assert status.latest == CrashedScan(finished_at=TUESDAY_10AM_ET, error_type="TypeError")
+    assert status.last_completed_at is None
+
+
 def test_scheduled_scan_skips_outside_window(tmp_path):
     from app.scanning.scanner import ScanDeps
     from app.watchlist.scheduler import run_scheduled_scan

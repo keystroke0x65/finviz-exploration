@@ -1,18 +1,38 @@
 import sqlite3
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.routes.dependencies import get_db_connection
 from app.routes.stocks import TickerPath
+from app.config import get_settings
 from app.scanning.lock import try_scan_lock
+from app.scanning.run_status import (
+    CompletedScan,
+    CrashedScan,
+    ScanAttempt,
+    is_scan_overdue,
+    read_scan_status,
+    save_scan_attempt,
+)
 from app.scanning.scanner import finviz_scan_deps, run_scan
 from app.patterns.types import TIMEFRAME_ORDER
 from app.patterns.verdict import Verdict
 from app.scanning.verdicts import read_verdicts
-from app.schemas import ScanIn, ScanOut, SetupOut, SetupsOut, TrackRecordSummaryOut, VerdictOut, WarningOut
+from app.schemas import (
+    CompletedScanOut,
+    CrashedScanOut,
+    ScanIn,
+    ScanOut,
+    ScanStatusOut,
+    SetupOut,
+    SetupsOut,
+    TrackRecordSummaryOut,
+    VerdictOut,
+    WarningOut,
+)
 from app.setups.store import SetupRecord, list_current_setups
 from app.setups.track_record import PatternStats, has_enough_history, stats_for
 from app.user_settings import get_show_short_setups
@@ -27,15 +47,50 @@ def post_scan(body: ScanIn, conn: DbConnection) -> ScanOut:
     # Runs synchronously: a full watchlist scan of up to 40 active tickers
     # takes about two minutes at Finviz's one-request-per-second pacing.
     tickers = [body.ticker.upper()] if body.ticker else None
+    # Only full scans count as "the last scan"; one stock says nothing about the rest.
+    is_full_scan = tickers is None
     with try_scan_lock() as is_acquired:
         if not is_acquired:
             raise HTTPException(status_code=409, detail="A scan is already running; try again when it finishes")
-        result = run_scan(conn, datetime.now(timezone.utc), finviz_scan_deps(), tickers=tickers)
+        now = datetime.now(timezone.utc)
+        try:
+            result = run_scan(conn, now, finviz_scan_deps(), tickers=tickers)
+        except Exception as error:
+            if is_full_scan:
+                save_scan_attempt(conn, CrashedScan(finished_at=now, error_type=type(error).__name__))
+            raise
+    if is_full_scan:
+        save_scan_attempt(
+            conn, CompletedScan(finished_at=result.scanned_at, scanned=len(result.scanned), failed=result.failed)
+        )
     return ScanOut(
         scanned=result.scanned,
         failed=[{"ticker": ticker, "reason": reason} for ticker, reason in result.failed],
         setups_found=result.setups_found,
         scanned_at=result.scanned_at,
+    )
+
+
+def _to_scan_attempt_out(attempt: ScanAttempt | None) -> CompletedScanOut | CrashedScanOut | None:
+    if attempt is None:
+        return None
+    if isinstance(attempt, CrashedScan):
+        return CrashedScanOut(finished_at=attempt.finished_at, error_type=attempt.error_type)
+    return CompletedScanOut(
+        finished_at=attempt.finished_at,
+        scanned=attempt.scanned,
+        failed=[{"ticker": ticker, "reason": reason} for ticker, reason in attempt.failed],
+    )
+
+
+@router.get("/scans/status", response_model=ScanStatusOut)
+def get_scan_status(conn: DbConnection) -> ScanStatusOut:
+    status = read_scan_status(conn)
+    interval = timedelta(minutes=get_settings().feeder_interval_minutes)
+    return ScanStatusOut(
+        latest=_to_scan_attempt_out(status.latest),
+        last_completed_at=status.last_completed_at,
+        is_overdue=is_scan_overdue(status.last_completed_at, datetime.now(timezone.utc), interval),
     )
 
 

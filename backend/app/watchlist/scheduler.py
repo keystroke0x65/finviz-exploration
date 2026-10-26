@@ -6,6 +6,7 @@ from app.config import Settings
 from app.db import connect
 from app.finviz_client import run_screen
 from app.scanning.lock import try_scan_lock
+from app.scanning.run_status import CompletedScan, CrashedScan, save_scan_attempt
 from app.scanning.scanner import ScanDeps, ScanResult, finviz_scan_deps, run_scan
 from app.watchlist.run_status import get_last_feeder_run
 from app.watchlist.store import expire_stale_entries
@@ -64,15 +65,26 @@ def run_scheduled_scan(db_path: str, now: datetime, deps: ScanDeps) -> ScanResul
                 result = run_scan(conn, now, deps)
             finally:
                 conn.close()
-        except Exception:
-            # Same recovery point as the feeder: log and let the next tick retry.
+        except Exception as error:
+            # Same recovery point as the feeder: log and let the next tick retry,
+            # and record it so the Setups view says its list is stale.
             logger.exception("scan failed")
+            _record_scan_attempt(db_path, CrashedScan(finished_at=now, error_type=type(error).__name__))
             return None
+        _record_scan_attempt(db_path, CompletedScan(finished_at=now, scanned=len(result.scanned), failed=result.failed))
 
     logger.info("scan: %d tickers scanned, %d setups", len(result.scanned), result.setups_found)
     if result.failed:
         logger.warning("scan failures: %s", "; ".join(f"{ticker}: {reason}" for ticker, reason in result.failed))
     return result
+
+
+def _record_scan_attempt(db_path: str, attempt: CompletedScan | CrashedScan) -> None:
+    conn = connect(db_path)
+    try:
+        save_scan_attempt(conn, attempt)
+    finally:
+        conn.close()
 
 
 def run_scheduled_expiry(db_path: str, now: datetime, retention_days: int) -> list[str]:
