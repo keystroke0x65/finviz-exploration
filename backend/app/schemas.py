@@ -83,7 +83,7 @@ class ScreenRowOut(BaseModel):
     volume: int | None
     after_hours_close: float | None
     after_hours_change_percent: float | None
-    news_time: str | None
+    news_time: datetime | None
     news_url: str | None
     news_title: str | None
 

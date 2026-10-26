@@ -1,9 +1,11 @@
+from datetime import datetime
 from unittest.mock import patch
 
 import pytest
 
 from app.errors import FinvizRateLimitError
 from app.finviz_client import ScreenResult, ScreenRow
+from app.market_time import EASTERN
 
 LOW_FLOAT_SCREEN = {
     "name": "  Mine  ",
@@ -18,7 +20,7 @@ HOST_ROW = ScreenRow(
     ticker="HOST", company="Host Digital Inc", country="USA", market_cap_millions=79.8,
     float_millions=5.46, average_volume_thousands=433.04, relative_volume=14.22, price=2.83,
     change_percent=47.4, volume=6158186, after_hours_close=2.73,
-    after_hours_change_percent=-3.53, news_time="2026-10-20 10:36:03",
+    after_hours_change_percent=-3.53, news_time=datetime(2026, 10, 20, 10, 36, 3, tzinfo=EASTERN),
     news_url="https://elite.finviz.com/news/1", news_title="Buyback",
 )
 
@@ -139,6 +141,7 @@ def test_run_screen_returns_rows(mock_run_screen, api_client):
     body = response.json()
     assert body["rows"][0]["ticker"] == "HOST"
     assert body["rows"][0]["after_hours_change_percent"] == -3.53
+    assert body["rows"][0]["news_time"] == "2026-10-20T10:36:03-04:00"
     assert "fetched_at" in body
     mock_run_screen.assert_called_once_with(
         ["geo_usa", "sh_price_u20", "ta_rsi_os30"], "ta_topgainers", "-change"

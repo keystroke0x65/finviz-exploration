@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 import requests
 import responses
@@ -6,6 +8,7 @@ from responses import matchers
 from app import finviz_client
 from app.config import get_settings
 from app.errors import FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError
+from app.market_time import EASTERN
 from app.finviz_client import (
     SCREEN_COLUMN_IDS,
     ScreenRow,
@@ -60,7 +63,7 @@ def test_run_screen_parses_typed_rows():
         volume=6158186,
         after_hours_close=2.73,
         after_hours_change_percent=-3.53,
-        news_time="2026-10-20 10:36:03",
+        news_time=datetime(2026, 10, 20, 10, 36, 3, tzinfo=EASTERN),
         news_url="https://elite.finviz.com/news/1",
         news_title="Buyback",
     )
@@ -265,3 +268,14 @@ def test_run_screen_raises_unavailable_on_empty_body():
 
     with pytest.raises(FinvizUnavailableError, match="unexpected response format"):
         run_screen(["geo_usa"], None, None)
+
+
+@responses.activate
+def test_run_screen_keeps_a_row_whose_news_time_it_cannot_read():
+    body = SCREEN_HEADER + "AAA,A Co,USA,1,1,1,1,1,1%,1,1,1%,yesterday-ish,https://elite.finviz.com/news/2,Headline\n"
+    responses.add(responses.GET, FINVIZ_EXPORT_URL, body=body, status=200)
+
+    [row] = run_screen(["geo_usa"], None, None).rows
+
+    assert row.news_time is None
+    assert row.news_title == "Headline"

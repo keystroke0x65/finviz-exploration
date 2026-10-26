@@ -4,6 +4,7 @@ import {
   changeClass,
   finvizQuoteUrl,
   formatCount,
+  formatNewsTime,
   formatNumber,
   formatSignedPercent,
   isWebUrl,
@@ -141,6 +142,9 @@ export function ScreenResultsTable({ run, onAddToWatchlist, watchlistTickers, on
               <td className="number">{formatNumber(row.float_millions)}</td>
               <td className="number">{formatNumber(row.market_cap_millions)}</td>
               <td>
+                {row.news_time && (
+                  <span className="news-time muted">{formatNewsTime(row.news_time, new Date())}</span>
+                )}
                 {row.news_title && isWebUrl(row.news_url) ? (
                   <a className="headline" href={row.news_url} target="_blank" rel="noreferrer" title={row.news_title}>
                     {row.news_title}

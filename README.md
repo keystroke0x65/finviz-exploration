@@ -33,7 +33,7 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
 - **Screens** tab: saved Finviz screens. Paste a Finviz screener URL (build it on
   finviz.com, copy the address bar) or use the form for country, price, float, market cap,
   volume and relative volume. Running a screen shows price, change, after-hours change,
-  volume, relative volume, float, market cap and the latest headline, with links to Finviz
+  volume, relative volume, float, market cap and the latest headline (with the date and time it came out, Eastern; older years show the year), with links to Finviz
   and an "add to watchlist" button. Two screens are created on first start: "Top gainers —
   low float" (feeds the watchlist) and "After-hours".
 - **Watchlist** tab: filled automatically from every screen marked "feeds watchlist".

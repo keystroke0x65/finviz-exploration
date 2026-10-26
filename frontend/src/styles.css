@@ -490,6 +490,13 @@ input[type="checkbox"] {
   text-overflow: ellipsis;
 }
 
+/* On its own line above the headline so the column doesn't widen the table. */
+.news-time {
+  display: block;
+  white-space: nowrap;
+  font-size: 0.85em;
+}
+
 .headline {
   display: inline-block;
   max-width: 28ch;

@@ -52,7 +52,7 @@ export interface ScreenRow {
   volume: number | null;
   after_hours_close: number | null;
   after_hours_change_percent: number | null;
-  news_time: string | null;
+  news_time: string | null; // ISO timestamp, Eastern offset
   news_url: string | null;
   news_title: string | null;
 }
