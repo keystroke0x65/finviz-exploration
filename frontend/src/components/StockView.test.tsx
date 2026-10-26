@@ -30,7 +30,7 @@ const SETUP: Setup = {
   id: 7, ticker: "HOST", pattern: "bull_flag", direction: "long", timeframe: "5m", entry: 2.12, stop: 2.05,
   capped_target: 2.33, target_3r: 2.33, available_reward_risk: 3, risk_percent: 3.3, blocking_level: null,
   partial_1r: 2.19, partial_2r: 2.26, trailing_stop: null, quality: 0.7, score: 80, score_parts: {},
-  key_points: [["2026-10-20T13:30:00Z", 2.0]], state: "forming", session: "regular",
+  key_points: [["2026-10-20T13:30:00Z", 2.0]], state: "forming", triggered_at: null, session: "regular",
   detected_at: "2026-10-20T13:35:00Z", last_seen_at: "2026-10-20T13:35:30Z", has_conflict: false,
 };
 
@@ -89,6 +89,16 @@ describe("StockView", () => {
     });
   });
 
+  it("says when each setup triggered", async () => {
+    api.fetchStockSetups.mockResolvedValue({
+      setups: [{ ...SETUP, state: "triggered", triggered_at: "2026-10-20T13:42:00Z" }], warnings: [],
+      show_short_setups: false,
+    });
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+
+    expect(await screen.findByText(/Triggered 9:42 AM/)).toBeInTheDocument();
+  });
+
   it("scans the stock and reloads its setups", async () => {
     api.runScan.mockResolvedValue({ scanned: ["HOST"], failed: [], setups_found: 1, scanned_at: "x" });
     render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
@@ -111,7 +121,7 @@ describe("StockView", () => {
   it("draws only the breakdown level for a bearish warning", async () => {
     const warning = {
       id: 8, ticker: "HOST", pattern: "low_of_day_break", direction: "short" as const, timeframe: "5m" as const,
-      entry: 1.9, state: "forming" as const, key_points: [], detected_at: "2026-10-20T13:35:00Z",
+      entry: 1.9, state: "forming" as const, triggered_at: null, key_points: [], detected_at: "2026-10-20T13:35:00Z",
       last_seen_at: "2026-10-20T13:35:30Z",
     };
     api.fetchStockSetups.mockResolvedValue({ setups: [], warnings: [warning], show_short_setups: false });

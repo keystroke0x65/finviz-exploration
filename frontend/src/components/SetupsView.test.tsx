@@ -17,7 +17,7 @@ function setup(overrides: Partial<Setup> = {}): Setup {
     capped_target: 2.3, target_3r: 2.3, available_reward_risk: 3.0, risk_percent: 5.0, blocking_level: null,
     partial_1r: 2.1, partial_2r: 2.2, trailing_stop: null, quality: 0.7, score: 81.5,
     score_parts: { reward_risk: 40, quality: 17.5, volume: 10, freshness: 10, timeframe_agreement: 0, conflict: 0 },
-    key_points: [], state: "forming", session: "regular", detected_at: "2026-10-20T14:00:00Z",
+    key_points: [], state: "forming", triggered_at: null, session: "regular", detected_at: "2026-10-20T14:00:00Z",
     last_seen_at: "2026-10-20T14:00:30Z", has_conflict: false, ...overrides,
   };
 }
@@ -51,6 +51,14 @@ describe("SetupsView", () => {
     expect(within(hostRow).getByText("2.30")).toBeInTheDocument();
     expect(within(hostRow).getByText("3.0R")).toBeInTheDocument();
     expect(within(rows[2]).getByText("High-of-day break")).toBeInTheDocument();
+  });
+
+  it("says when a triggered setup triggered", async () => {
+    respond([setup({ state: "triggered", triggered_at: "2026-10-20T13:42:00Z" })]);
+    render(<SetupsView onOpenStock={vi.fn()} />);
+
+    const [, hostRow] = await screen.findAllByRole("row");
+    expect(within(hostRow).getByText("Triggered 9:42 AM")).toBeInTheDocument();
   });
 
   it("shows the blocking level when the target is capped", async () => {

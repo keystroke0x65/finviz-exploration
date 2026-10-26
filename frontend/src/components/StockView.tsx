@@ -14,6 +14,7 @@ import {
 } from "../api/setups";
 import { fetchQuote, Quote } from "../api/stocks";
 import { finvizQuoteUrl, formatPrice } from "../format";
+import { describeSetupState } from "../setupState";
 import { CandleChart, ChartLevel } from "./CandleChart";
 import { QuoteTable } from "./QuoteTable";
 import { StockSearch } from "./StockSearch";
@@ -266,6 +267,7 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
                         {patternName(setup.pattern)} <span className="muted">{setup.timeframe}</span>
                       </span>
                       <span className="screen-meta">
+                        {describeSetupState(setup)} ·{" "}
                         {isTradeSetup(setup)
                           ? `Entry ${formatPrice(setup.entry)}, stop ${formatPrice(setup.stop)}, ${setup.available_reward_risk.toFixed(1)}R`
                           : `Bearish warning, breaks below ${formatPrice(setup.entry)}`}

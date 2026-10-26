@@ -230,6 +230,7 @@ class SetupOut(BaseModel):
     score_parts: dict[str, float]
     key_points: list[tuple[datetime, float]]
     state: Literal["forming", "triggered", "extended", "invalidated"]
+    triggered_at: datetime | None  # when price last reached the entry (None while forming)
     session: str
     detected_at: datetime
     last_seen_at: datetime
@@ -249,6 +250,7 @@ class WarningOut(BaseModel):
     timeframe: Literal["1m", "5m", "daily"]
     entry: float  # the breakdown level
     state: Literal["forming", "triggered", "extended", "invalidated"]
+    triggered_at: datetime | None
     key_points: list[tuple[datetime, float]]
     detected_at: datetime
     last_seen_at: datetime

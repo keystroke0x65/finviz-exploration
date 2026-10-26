@@ -15,7 +15,7 @@ from app.patterns.detectors import run_detectors
 from app.patterns.indicators import session_levels, session_vwap
 from app.patterns.levels import find_daily_levels
 from app.patterns.ranking import score_setup
-from app.patterns.trade_plan import TradePlan, build_trade_plan, classify_state
+from app.patterns.trade_plan import TradePlan, build_trade_plan, classify_state, find_trigger_time
 from app.patterns.types import DetectorContext, PatternMatch, SetupState
 from app.patterns.verdict import Verdict, compute_verdict
 from app.scanning.active import select_active_tickers
@@ -127,6 +127,7 @@ class _UsableSetup:
     match: PatternMatch
     plan: TradePlan
     state: SetupState
+    triggered_at: datetime | None
 
 
 def _latest_price(bars_by_timeframe: dict[Interval, list[Bar]], timeframe: Interval, now: datetime) -> float:
@@ -138,6 +139,19 @@ def _latest_price(bars_by_timeframe: dict[Interval, list[Bar]], timeframe: Inter
             if todays:
                 return todays[-1].close
     return bars_by_timeframe[timeframe][-1].close
+
+
+def _price_path(bars_by_timeframe: dict[Interval, list[Bar]], timeframe: Interval, now: datetime) -> list[Bar]:
+    """Bars to find a trigger in; daily setups get today's 1m bars in place of the
+    cached daily bar, matching how their state is judged."""
+    if timeframe != "daily":
+        return bars_by_timeframe[timeframe]
+    todays_minutes = _todays_bars(bars_by_timeframe["1m"], now)
+    if not todays_minutes:
+        return bars_by_timeframe["daily"]
+    today = now.astimezone(EASTERN).date()
+    earlier_days = [bar for bar in bars_by_timeframe["daily"] if bar.time.astimezone(EASTERN).date() < today]
+    return earlier_days + todays_minutes
 
 
 def _usable_setups(
@@ -157,8 +171,14 @@ def _usable_setups(
         state = classify_state(plan, _latest_price(bars_by_timeframe, match.timeframe, now))
         # A setup already past its stop isn't a setup; recording it would also
         # skew outcome stats with trades nobody could have taken.
-        if state != "invalidated":
-            usable.append(_UsableSetup(match, plan, state))
+        if state == "invalidated":
+            continue
+        triggered_at = (
+            find_trigger_time(plan, _price_path(bars_by_timeframe, match.timeframe, now))
+            if state in ("triggered", "extended")
+            else None
+        )
+        usable.append(_UsableSetup(match, plan, state, triggered_at))
     return usable
 
 
@@ -187,7 +207,7 @@ def _record_setups(
         )
         record_match(
             conn, ticker, setup.match, setup.plan, setup.state, score, _session_label(setup.match),
-            float_millions, now, verdict=verdict_call,
+            float_millions, now, verdict=verdict_call, triggered_at=setup.triggered_at,
         )
     return len(setups)
 

@@ -4,7 +4,7 @@ import pytest
 
 from app.market_time import EASTERN
 from app.patterns.levels import PriceLevel
-from app.patterns.trade_plan import build_trade_plan, classify_state
+from app.patterns.trade_plan import build_trade_plan, classify_state, find_trigger_time
 from app.patterns.types import PatternMatch
 from tests.bar_fixtures import make_bar
 
@@ -114,3 +114,40 @@ def test_build_trade_plan_rejects_a_stop_too_close_to_trade():
     # 2.3400 entry with a 2.3395 stop: 0.02% risk shows as entry = stop = target.
     assert build_trade_plan(match(entry=2.34, stop=2.3395), [], []) is None
     assert build_trade_plan(match(entry=2.34, stop=2.33), [], []) is not None  # 0.43%
+
+
+def test_trigger_time_is_the_first_bar_that_reached_entry():
+    plan = build_trade_plan(match(), [], [])  # long, entry 2.00
+    bars = [make_bar(9, 30, 1.95, 1.98, 1.94, 1.97), make_bar(9, 31, 1.97, 2.01, 1.96, 2.00),
+            make_bar(9, 32, 2.00, 2.05, 1.99, 2.04)]
+
+    assert find_trigger_time(plan, bars) == make_bar(9, 31, 0, 0, 0, 0).time
+
+
+def test_trigger_time_is_the_latest_cross_after_a_dip_back_below_entry():
+    plan = build_trade_plan(match(), [], [])
+    bars = [make_bar(9, 30, 1.97, 2.02, 1.96, 2.01), make_bar(9, 31, 1.99, 1.99, 1.95, 1.96),
+            make_bar(9, 32, 1.96, 2.03, 1.96, 2.02)]
+
+    assert find_trigger_time(plan, bars) == make_bar(9, 32, 0, 0, 0, 0).time
+
+
+def test_short_trigger_time_uses_the_low():
+    plan = build_trade_plan(match(entry=2.00, stop=2.10, direction="short"), [], [])
+    bars = [make_bar(9, 30, 2.05, 2.06, 2.01, 2.02), make_bar(9, 31, 2.02, 2.03, 1.99, 2.00)]
+
+    assert find_trigger_time(plan, bars) == make_bar(9, 31, 0, 0, 0, 0).time
+
+
+def test_no_trigger_time_when_the_last_bar_is_short_of_entry():
+    plan = build_trade_plan(match(), [], [])
+
+    assert find_trigger_time(plan, [make_bar(9, 30, 1.95, 1.98, 1.94, 1.97)]) is None
+
+
+def test_no_trigger_time_when_every_bar_is_past_entry():
+    # The cross happened before the bars we have, so its time is unknown.
+    plan = build_trade_plan(match(), [], [])
+    bars = [make_bar(9, 30, 2.02, 2.05, 2.01, 2.04), make_bar(9, 31, 2.04, 2.06, 2.03, 2.05)]
+
+    assert find_trigger_time(plan, bars) is None

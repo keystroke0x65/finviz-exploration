@@ -14,7 +14,10 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
   4 AM to 8 PM Eastern strip with a marker for now. Exchange holidays aren't shown.
 - **Setups** tab (home): setups found in the latest scans, best score first. Each shows
   the pattern, timeframe (1m, 5m or daily), state (forming = entry not reached yet,
-  triggered, extended = already more than 1R past entry), entry, stop, target, the
+  triggered, extended = already more than 1R past entry; triggered and extended setups
+  show when price reached the entry, e.g. "Triggered 9:42 AM" Eastern, or the date for
+  daily setups, taken from the bar itself rather than the scan, which runs every 15
+  minutes), entry, stop, target, the
   reward:risk actually available, risk as a % of price, and a 0-100 score you can expand
   to see how it was built. Targets are 3R unless a daily support/resistance level sits in
   the way; then the target stops at that level and the row says "capped by level at …".
