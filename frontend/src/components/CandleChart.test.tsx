@@ -12,13 +12,20 @@ const chart = vi.hoisted(() => {
   const candleSeries = {
     setData: vi.fn(),
     createPriceLine: vi.fn((options) => options),
+    priceScale: vi.fn(() => priceScale),
     removePriceLine: vi.fn(throwIfRemoved),
   };
   const lineSeries = { setData: vi.fn() };
+  const priceScale = { applyOptions: vi.fn() };
+  const volumeSeries = { setData: vi.fn(), priceScale: vi.fn(() => priceScale) };
+  const sessionSeries = { setData: vi.fn(), priceScale: vi.fn(() => priceScale) };
+  const histogramSeries = [sessionSeries, volumeSeries];
   const timeScale = { fitContent: vi.fn(), setVisibleLogicalRange: vi.fn() };
   const instance = {
     addCandlestickSeries: vi.fn(() => candleSeries),
     addLineSeries: vi.fn(() => lineSeries),
+    // The chart adds the session shading first (so it sits behind the candles), then volume.
+    addHistogramSeries: vi.fn(() => histogramSeries[(instance.addHistogramSeries.mock.calls.length - 1) % 2]),
     removeSeries: vi.fn(throwIfRemoved),
     timeScale: vi.fn(() => timeScale),
     remove: vi.fn(() => {
@@ -29,7 +36,7 @@ const chart = vi.hoisted(() => {
     state.isRemoved = false;
     return instance;
   });
-  return { instance, candleSeries, lineSeries, timeScale, createChart };
+  return { instance, candleSeries, lineSeries, volumeSeries, sessionSeries, timeScale, createChart };
 });
 vi.mock("lightweight-charts", () => ({ createChart: chart.createChart, LineStyle: { Dashed: 2, Dotted: 1 } }));
 
@@ -70,6 +77,42 @@ describe("CandleChart", () => {
       [2.3, CHART_COLORS.target],
       [2.5, CHART_COLORS.level],
     ]);
+  });
+
+  it("draws a volume bar under each candle, coloured by direction", () => {
+    const falling = { ...BARS[1], time: "2026-10-20T09:32:00-04:00", open: 2.15, close: 2.1, volume: 700 };
+    render(<CandleChart bars={[...BARS, falling]} levels={[]} outline={null} vwap={null} />);
+
+    const volumes = chart.volumeSeries.setData.mock.calls[0][0].map((point: { value: number; color: string }) => [
+      point.value,
+      point.color,
+    ]);
+    expect(volumes).toEqual([
+      [1000, CHART_COLORS.volumeUp],
+      [1500, CHART_COLORS.volumeUp],
+      [700, CHART_COLORS.volumeDown],
+    ]);
+  });
+
+  it("shades pre-market and after-hours bars when asked", () => {
+    const sessionBars = [
+      { ...BARS[0], time: "2026-10-20T08:00:00-04:00" },
+      { ...BARS[0], time: "2026-10-20T10:00:00-04:00" },
+      { ...BARS[0], time: "2026-10-20T17:00:00-04:00" },
+    ];
+    render(<CandleChart bars={sessionBars} levels={[]} outline={null} vwap={null} shadeSessions />);
+
+    const shading = chart.sessionSeries.setData.mock.calls[0][0];
+    expect(shading).toHaveLength(3);
+    expect(shading[0]).toMatchObject({ value: 1, color: CHART_COLORS.preMarket });
+    expect(shading[1]).not.toHaveProperty("value"); // regular hours: nothing drawn
+    expect(shading[2]).toMatchObject({ value: 1, color: CHART_COLORS.afterHours });
+  });
+
+  it("shades nothing on charts without sessions", () => {
+    render(<CandleChart bars={BARS} levels={[]} outline={null} vwap={null} />);
+
+    expect(chart.sessionSeries.setData).toHaveBeenCalledWith([]);
   });
 
   it("draws VWAP and the pattern outline as lines", () => {

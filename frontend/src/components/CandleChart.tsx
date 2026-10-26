@@ -1,14 +1,16 @@
 import { useEffect, useRef } from "react";
 import {
   createChart,
+  HistogramData,
   IChartApi,
   IPriceLine,
   ISeriesApi,
   LineStyle,
   UTCTimestamp,
+  WhitespaceData,
 } from "lightweight-charts";
 import type { Bar } from "../api/bars";
-import { toChartTime } from "../chartTime";
+import { barSession, BarSession, toChartTime } from "../chartTime";
 
 export type ChartLevelKind = "level" | "session" | "entry" | "stop" | "target";
 
@@ -25,6 +27,8 @@ interface CandleChartProps {
   vwap: (number | null)[] | null;
   // How many of the most recent bars to show at first; the user can scroll back.
   visibleBars?: number;
+  // Shade pre-market and after-hours bars (intraday charts only).
+  shadeSessions?: boolean;
 }
 
 // Mirrors the tokens in styles.css; the chart draws on canvas and can't read CSS variables.
@@ -41,7 +45,23 @@ export const CHART_COLORS = {
   session: "#7b6aa6",
   vwap: "#c9a8ff",
   outline: "#f0b44c",
+  volumeUp: "rgba(70, 192, 138, 0.45)",
+  volumeDown: "rgba(229, 107, 93, 0.45)",
+  preMarket: "rgba(64, 190, 200, 0.2)",
+  afterHours: "rgba(180, 120, 240, 0.2)",
 } as const;
+
+const SESSION_SHADES: Record<BarSession, string | null> = {
+  "pre-market": CHART_COLORS.preMarket,
+  regular: null,
+  "after-hours": CHART_COLORS.afterHours,
+};
+// Volume uses the bottom fifth of the chart; candles keep clear of it.
+const VOLUME_MARGINS = { top: 0.8, bottom: 0 };
+const CANDLE_MARGINS = { top: 0.08, bottom: 0.25 };
+// Shading is a full-height bar of value 1 on its own hidden scale.
+const SHADE_HEIGHT = 1;
+const FULL_HEIGHT_MARGINS = { top: 0, bottom: 0 };
 
 const CHART_HEIGHT = 420;
 // Empty space after the last bar so the latest candle isn't against the axis.
@@ -51,16 +71,36 @@ function toTime(isoTime: string): UTCTimestamp {
   return toChartTime(isoTime) as UTCTimestamp;
 }
 
+function toVolumePoints(bars: Bar[]): HistogramData[] {
+  return bars.map((bar) => ({
+    time: toTime(bar.time),
+    value: bar.volume,
+    color: bar.close >= bar.open ? CHART_COLORS.volumeUp : CHART_COLORS.volumeDown,
+  }));
+}
+
+// lightweight-charts has no background bands, so session shading is a histogram
+// behind the candles; regular-hours bars get an empty point (nothing drawn).
+function toSessionShading(bars: Bar[]): (HistogramData | WhitespaceData)[] {
+  return bars.map((bar) => {
+    const time = toTime(bar.time);
+    const shade = SESSION_SHADES[barSession(bar.time)];
+    return shade ? { time, value: SHADE_HEIGHT, color: shade } : { time };
+  });
+}
+
 // lightweight-charts throws on unsorted or repeated times.
 function toSortedUniquePoints(points: [string, number][]): { time: UTCTimestamp; value: number }[] {
   const byTime = new Map(points.map(([time, price]) => [toTime(time), price]));
   return [...byTime.entries()].sort(([left], [right]) => left - right).map(([time, value]) => ({ time, value }));
 }
 
-export function CandleChart({ bars, levels, outline, vwap, visibleBars }: CandleChartProps) {
+export function CandleChart({ bars, levels, outline, vwap, visibleBars, shadeSessions = false }: CandleChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const sessionsRef = useRef<ISeriesApi<"Histogram"> | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -74,17 +114,37 @@ export function CandleChart({ bars, levels, outline, vwap, visibleBars }: Candle
       timeScale: { timeVisible: true, secondsVisible: false },
     });
     chartRef.current = chart;
-    candlesRef.current = chart.addCandlestickSeries({
+    // Added first so it's drawn behind everything else.
+    const sessions = chart.addHistogramSeries({
+      priceScaleId: "sessions",
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+    sessions.priceScale().applyOptions({ scaleMargins: FULL_HEIGHT_MARGINS });
+    sessionsRef.current = sessions;
+    const candles = chart.addCandlestickSeries({
       upColor: CHART_COLORS.up,
       downColor: CHART_COLORS.down,
       wickUpColor: CHART_COLORS.up,
       wickDownColor: CHART_COLORS.down,
       borderVisible: false,
     });
+    candles.priceScale().applyOptions({ scaleMargins: CANDLE_MARGINS });
+    candlesRef.current = candles;
+    const volume = chart.addHistogramSeries({
+      priceScaleId: "volume",
+      priceFormat: { type: "volume" },
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+    volume.priceScale().applyOptions({ scaleMargins: VOLUME_MARGINS });
+    volumeRef.current = volume;
     return () => {
       chart.remove();
       chartRef.current = null;
       candlesRef.current = null;
+      volumeRef.current = null;
+      sessionsRef.current = null;
     };
   }, []);
 
@@ -97,6 +157,8 @@ export function CandleChart({ bars, levels, outline, vwap, visibleBars }: Candle
     candles.setData(
       bars.map((bar) => ({ time: toTime(bar.time), open: bar.open, high: bar.high, low: bar.low, close: bar.close })),
     );
+    volumeRef.current?.setData(toVolumePoints(bars));
+    sessionsRef.current?.setData(shadeSessions ? toSessionShading(bars) : []);
 
     const priceLines: IPriceLine[] = levels.map((level) =>
       candles.createPriceLine({
@@ -140,7 +202,7 @@ export function CandleChart({ bars, levels, outline, vwap, visibleBars }: Candle
       priceLines.forEach((line) => candles.removePriceLine(line));
       extraSeries.forEach((series) => chart.removeSeries(series));
     };
-  }, [bars, levels, outline, vwap, visibleBars]);
+  }, [bars, levels, outline, vwap, visibleBars, shadeSessions]);
 
   return <div ref={containerRef} className="candle-chart" />;
 }

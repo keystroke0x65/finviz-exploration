@@ -13,18 +13,12 @@ import {
 } from "../api/setups";
 import { saveSettings } from "../api/settings";
 import { formatPrice } from "../format";
+import { describeSetupState } from "../setupState";
 import { VerdictBadge } from "./VerdictBadge";
 
 interface SetupsViewProps {
   onOpenStock: (ticker: string) => void;
 }
-
-const STATE_NAMES: Record<Setup["state"], string> = {
-  forming: "Forming",
-  triggered: "Triggered",
-  extended: "Extended",
-  invalidated: "Invalidated",
-};
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown error";
@@ -219,7 +213,7 @@ function SetupRow({ setup, showDirection, isExpanded, onToggleScore, onOpenStock
         <VerdictBadge verdict={setup.verdict} />
       </td>
       <td>{setup.timeframe}</td>
-      <td>{STATE_NAMES[setup.state]}</td>
+      <td>{describeSetupState(setup)}</td>
       <td className="number">{formatPrice(setup.entry)}</td>
       <td className="number">{formatPrice(setup.stop)}</td>
       <td className="number">{formatPrice(setup.capped_target)}</td>

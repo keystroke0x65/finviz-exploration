@@ -66,7 +66,8 @@ CREATE TABLE IF NOT EXISTS setup_records (
     resolved_at TEXT,
     max_favorable_r REAL,
     max_adverse_r REAL,
-    verdict TEXT
+    verdict TEXT,
+    triggered_at TEXT
 );
 
 -- One open record per setup; once resolved, a later occurrence of the same
@@ -106,6 +107,7 @@ CREATE TABLE IF NOT EXISTS app_meta (
 # existing table untouched, so each is added to older databases here.
 ADDED_COLUMNS = [
     ("setup_records", "verdict", "TEXT"),
+    ("setup_records", "triggered_at", "TEXT"),
 ]
 
 

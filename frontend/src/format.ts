@@ -59,3 +59,28 @@ export function formatPrice(value: number | null): string {
   }
   return value.toFixed(Math.abs(value) < SUB_DOLLAR ? 4 : 2);
 }
+
+const NEWS_TIME = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+const NEWS_TIME_WITH_YEAR = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+const EASTERN_YEAR = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric" });
+
+// "Oct 22, 11:00 AM" in market time; older headlines keep their year so a stale
+// story can't pass for this week's.
+export function formatNewsTime(isoTimestamp: string, now: Date): string {
+  const published = new Date(isoTimestamp);
+  const isThisYear = EASTERN_YEAR.format(published) === EASTERN_YEAR.format(now);
+  return (isThisYear ? NEWS_TIME : NEWS_TIME_WITH_YEAR).format(published);
+}

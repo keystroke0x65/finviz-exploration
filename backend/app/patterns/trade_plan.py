@@ -5,6 +5,7 @@ which case the plan shows the reward:risk actually available up to that level.
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from app.finviz_client import Bar
 from app.patterns.levels import PriceLevel, nearest_level_above, nearest_level_below
@@ -91,6 +92,27 @@ def build_trade_plan(match: PatternMatch, daily_levels: list[PriceLevel], recent
         partial_2r=_price(match.entry + sign * 2 * risk),
         trailing_stop=_bounded_trailing_stop(recent_bars, match.direction, match.stop),
     )
+
+
+def find_trigger_time(plan: TradePlan, bars: list[Bar]) -> datetime | None:
+    """Time of the bar where price last reached the entry: the start of the run of bars,
+    ending at the latest one, that touched it (high for a long, low for a short).
+
+    None when the latest bar didn't touch the entry, or when every bar did, since then
+    the cross happened before the bars we have.
+    """
+    sign = 1 if plan.direction == "long" else -1
+
+    def touches_entry(bar: Bar) -> bool:
+        favorable_price = bar.high if sign == 1 else bar.low
+        return (favorable_price - plan.entry) * sign >= 0
+
+    trigger_time = None
+    for bar in reversed(bars):
+        if not touches_entry(bar):
+            return trigger_time
+        trigger_time = bar.time
+    return None
 
 
 def classify_state(plan: TradePlan, last_price: float) -> SetupState:

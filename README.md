@@ -14,20 +14,26 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
   4 AM to 8 PM Eastern strip with a marker for now. Exchange holidays aren't shown.
 - **Setups** tab (home): setups found in the latest scans, best score first. Each shows
   the pattern, timeframe (1m, 5m or daily), state (forming = entry not reached yet,
-  triggered, extended = already more than 1R past entry), entry, stop, target, the
+  triggered, extended = already more than 1R past entry; triggered and extended setups
+  show when price reached the entry, e.g. "Triggered 9:42 AM" Eastern, or the date for
+  daily setups, taken from the bar itself rather than the scan, which runs every 15
+  minutes), entry, stop, target, the
   reward:risk actually available, risk as a % of price, and a 0-100 score you can expand
   to see how it was built. Targets are 3R unless a daily support/resistance level sits in
   the way; then the target stops at that level and the row says "capped by level at …".
   Bearish patterns are listed as warnings; tick "Show short setups" to turn them into
   ranked short setups. Detection is rule-based: it flags shapes worth checking on the
   chart, it doesn't predict, and it isn't advice.
-- **Stock** tab: candles (1m, 5m or daily) with daily support/resistance near the price,
-  pre-market high/low, previous close and VWAP. Click a setup to draw its entry, stop and
+- **Stock** tab: candles (1m, 5m or daily) with volume bars underneath (green on up
+  candles, red on down), daily support/resistance near the price, pre-market high/low,
+  previous close and VWAP. On 1m and 5m, pre-market (4:00-9:30 AM ET) is shaded teal and
+  after-hours (4:00-8:00 PM ET) purple; Finviz only has bars when a trade happened, so a
+  thinly traded stock shows only a sliver of each. Click a setup to draw its entry, stop and
   target. Tickers anywhere in the app open this tab; the small "Finviz" link opens Finviz.
 - **Screens** tab: saved Finviz screens. Paste a Finviz screener URL (build it on
   finviz.com, copy the address bar) or use the form for country, price, float, market cap,
   volume and relative volume. Running a screen shows price, change, after-hours change,
-  volume, relative volume, float, market cap and the latest headline, with links to Finviz
+  volume, relative volume, float, market cap and the latest headline (with the date and time it came out, Eastern; older years show the year), with links to Finviz
   and an "add to watchlist" button. Two screens are created on first start: "Top gainers —
   low float" (feeds the watchlist) and "After-hours".
 - **Watchlist** tab: filled automatically from every screen marked "feeds watchlist".

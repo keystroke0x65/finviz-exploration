@@ -35,6 +35,8 @@ export interface Setup {
   score_parts: Record<string, number>;
   key_points: [string, number][];
   state: SetupState;
+  // When price last reached the entry; null while forming or when it happened before the bars we have.
+  triggered_at: string | null;
   session: string;
   detected_at: string;
   last_seen_at: string;
@@ -67,6 +69,7 @@ export interface Warning {
   timeframe: Timeframe;
   entry: number;
   state: SetupState;
+  triggered_at: string | null;
   key_points: [string, number][];
   detected_at: string;
   last_seen_at: string;

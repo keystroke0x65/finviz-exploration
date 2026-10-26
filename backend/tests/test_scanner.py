@@ -199,6 +199,16 @@ def test_daily_setup_state_uses_todays_intraday_price(db_conn):
     assert daily_flags == []
 
 
+def test_scan_records_when_a_setup_triggered(db_conn):
+    scan_ticker(db_conn, "HOST", None, NOW, deps())
+
+    [high_of_day] = [s for s in list_current_setups(db_conn, "HOST")
+                     if (s.pattern, s.timeframe) == ("high_of_day_break", "1m")]
+    # Entry 2.46: the 9:41 bar topped out at 2.45, the 9:42 bar reached 2.48.
+    assert high_of_day.state == "triggered"
+    assert high_of_day.triggered_at == datetime(2026, 10, 20, 9, 42, tzinfo=EASTERN)
+
+
 def test_run_scan_lists_skipped_tickers_after_auth_failure(db_conn):
     result = run_scan(db_conn, NOW, deps(auth_failing="AAA"), tickers=["AAA", "BBB", "CCC"])
 

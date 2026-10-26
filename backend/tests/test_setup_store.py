@@ -139,3 +139,19 @@ def test_setup_keeps_verdict_from_first_detection(db_conn):
                           verdict="leans_short")
 
     assert first.verdict == second.verdict == "leans_long"
+
+
+def test_record_match_stores_and_refreshes_the_trigger_time(db_conn):
+    first_cross = datetime(2026, 10, 20, 9, 42, tzinfo=EASTERN)
+    later_cross = datetime(2026, 10, 20, 9, 51, tzinfo=EASTERN)
+
+    triggered = record_match(db_conn, "HOST", match(), plan(), "triggered", SCORE, "regular", 5.46, SCAN_1,
+                             triggered_at=first_cross)
+    assert triggered.triggered_at == first_cross
+
+    retriggered = record_match(db_conn, "HOST", match(), plan(), "triggered", SCORE, "regular", 5.46, SCAN_2,
+                               triggered_at=later_cross)
+    assert retriggered.triggered_at == later_cross
+
+    back_to_forming = record_match(db_conn, "HOST", match(), plan(), "forming", SCORE, "regular", 5.46, SCAN_2)
+    assert back_to_forming.triggered_at is None

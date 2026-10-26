@@ -1,4 +1,5 @@
 import io
+import logging
 import threading
 import time
 from dataclasses import dataclass
@@ -16,6 +17,8 @@ from app.errors import (
     TickerNotFoundError,
 )
 from app.market_time import EASTERN
+
+logger = logging.getLogger(__name__)
 
 # /export.ashx is a legacy alias that 301-redirects to /export/screener;
 # /export/stock (a different endpoint) returns historical price bars, not
@@ -98,7 +101,7 @@ class ScreenRow:
     volume: int | None
     after_hours_close: float | None
     after_hours_change_percent: float | None
-    news_time: str | None
+    news_time: datetime | None  # Eastern time
     news_url: str | None
     news_title: str | None
 
@@ -182,6 +185,23 @@ def _parse_integer(raw: str | None) -> int | None:
     return None if number is None else int(number)
 
 
+NEWS_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
+def _parse_news_time(raw: str | None, ticker: str) -> datetime | None:
+    """Finviz gives the latest headline's time as Eastern wall-clock time with no zone.
+
+    An unreadable value only costs the timestamp, so the row is kept and the problem logged.
+    """
+    if raw is None:
+        return None
+    try:
+        return datetime.strptime(raw, NEWS_TIME_FORMAT).replace(tzinfo=EASTERN)
+    except ValueError:
+        logger.warning("Unreadable Finviz news time %r for %s", raw, ticker)
+        return None
+
+
 def _to_screen_row(row: dict) -> ScreenRow:
     return ScreenRow(
         ticker=row["Ticker"],
@@ -196,7 +216,7 @@ def _to_screen_row(row: dict) -> ScreenRow:
         volume=_parse_integer(row.get("Volume")),
         after_hours_close=_parse_number(row.get("After-Hours Close")),
         after_hours_change_percent=_parse_number(row.get("After-Hours Change")),
-        news_time=row.get("News Time"),
+        news_time=_parse_news_time(row.get("News Time"), row["Ticker"]),
         news_url=row.get("News URL"),
         news_title=row.get("News Title"),
     )

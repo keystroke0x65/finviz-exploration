@@ -13,7 +13,8 @@ from tests.bar_fixtures import daily_bars, minute_bars
 NOW = datetime(2026, 10, 20, 10, 0, tzinfo=EASTERN)
 
 
-def store_setup(conn, ticker="HOST", direction="long", pattern="high_of_day_break", score=70.0):
+def store_setup(conn, ticker="HOST", direction="long", pattern="high_of_day_break", score=70.0, state="forming",
+                triggered_at=None):
     sign = 1 if direction == "long" else -1
     match = PatternMatch(pattern=pattern, direction=direction, timeframe="1m", entry=2.0, stop=2.0 - 0.1 * sign,
                          detected_at=NOW, quality=0.7, quality_parts={}, key_points=[(NOW, 2.0)])
@@ -21,7 +22,8 @@ def store_setup(conn, ticker="HOST", direction="long", pattern="high_of_day_brea
                      target_3r=2.0 + 0.3 * sign, capped_target=2.0 + 0.15 * sign, available_reward_risk=1.5,
                      blocking_level=2.0 + 0.15 * sign, partial_1r=2.0 + 0.1 * sign, partial_2r=2.0 + 0.2 * sign,
                      trailing_stop=None)
-    record_match(conn, ticker, match, plan, "forming", ScoreBreakdown(score, {"reward_risk": 20.0}), "regular", 5.0, NOW)
+    record_match(conn, ticker, match, plan, state, ScoreBreakdown(score, {"reward_risk": 20.0}), "regular", 5.0, NOW,
+                 triggered_at=triggered_at)
     mark_ticker_scanned(conn, ticker, NOW)
 
 
@@ -204,3 +206,13 @@ def test_setups_include_pattern_track_record(api_client, db_conn):
         "trades": 3, "win_rate": 1.0, "average_r": 3.0, "average_win_r": 3.0, "tickers": 1, "trading_days": 1,
         "has_enough_history": False,
     }
+
+
+def test_setups_include_when_they_triggered(api_client, db_conn):
+    store_setup(db_conn, "HOST", state="triggered", triggered_at=datetime(2026, 10, 20, 9, 42, tzinfo=EASTERN))
+    store_setup(db_conn, "WORX")
+
+    setups = {setup["ticker"]: setup for setup in api_client.get("/api/setups").json()["setups"]}
+
+    assert setups["HOST"]["triggered_at"] == "2026-10-20T09:42:00-04:00"
+    assert setups["WORX"]["triggered_at"] is None
