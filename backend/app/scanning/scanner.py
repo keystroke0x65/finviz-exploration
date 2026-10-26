@@ -130,28 +130,36 @@ class _UsableSetup:
     triggered_at: datetime | None
 
 
+def _todays_intraday_bars(bars_by_timeframe: dict[Interval, list[Bar]], now: datetime) -> list[Bar]:
+    """Today's 1m bars, else today's 5m bars, else none."""
+    for intraday in ("1m", "5m"):
+        todays = _todays_bars(bars_by_timeframe[intraday], now)
+        if todays:
+            return todays
+    return []
+
+
 def _latest_price(bars_by_timeframe: dict[Interval, list[Bar]], timeframe: Interval, now: datetime) -> float:
     # Daily bars are cached until the close, so a daily setup's state would be
     # hours stale; today's intraday close is the current price when there is one.
     if timeframe == "daily":
-        for intraday in ("1m", "5m"):
-            todays = _todays_bars(bars_by_timeframe[intraday], now)
-            if todays:
-                return todays[-1].close
+        todays = _todays_intraday_bars(bars_by_timeframe, now)
+        if todays:
+            return todays[-1].close
     return bars_by_timeframe[timeframe][-1].close
 
 
 def _price_path(bars_by_timeframe: dict[Interval, list[Bar]], timeframe: Interval, now: datetime) -> list[Bar]:
-    """Bars to find a trigger in; daily setups get today's 1m bars in place of the
-    cached daily bar, matching how their state is judged."""
+    """Bars to find a trigger in; daily setups get today's intraday bars in place of
+    the cached daily bar, matching how their state is judged."""
     if timeframe != "daily":
         return bars_by_timeframe[timeframe]
-    todays_minutes = _todays_bars(bars_by_timeframe["1m"], now)
-    if not todays_minutes:
+    todays = _todays_intraday_bars(bars_by_timeframe, now)
+    if not todays:
         return bars_by_timeframe["daily"]
     today = now.astimezone(EASTERN).date()
     earlier_days = [bar for bar in bars_by_timeframe["daily"] if bar.time.astimezone(EASTERN).date() < today]
-    return earlier_days + todays_minutes
+    return earlier_days + todays
 
 
 def _usable_setups(
