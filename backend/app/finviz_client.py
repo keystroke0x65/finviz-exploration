@@ -186,6 +186,7 @@ def _parse_integer(raw: str | None) -> int | None:
 
 
 NEWS_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+NO_NEWS_MARKER = "-"  # what Finviz puts in News Time when a stock has no headline
 
 
 def _parse_news_time(raw: str | None, ticker: str) -> datetime | None:
@@ -193,7 +194,7 @@ def _parse_news_time(raw: str | None, ticker: str) -> datetime | None:
 
     An unreadable value only costs the timestamp, so the row is kept and the problem logged.
     """
-    if raw is None:
+    if raw is None or raw == NO_NEWS_MARKER:
         return None
     try:
         return datetime.strptime(raw, NEWS_TIME_FORMAT).replace(tzinfo=EASTERN)

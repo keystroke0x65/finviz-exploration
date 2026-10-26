@@ -279,3 +279,15 @@ def test_run_screen_keeps_a_row_whose_news_time_it_cannot_read():
 
     assert row.news_time is None
     assert row.news_title == "Headline"
+
+
+@responses.activate
+def test_run_screen_reads_a_dash_news_time_as_no_news_without_a_warning(caplog):
+    # Finviz writes "-" in the News Time column for stocks with no headline.
+    body = SCREEN_HEADER + "AAA,A Co,USA,1,1,1,1,1,1%,1,1,1%,-,,\n"
+    responses.add(responses.GET, FINVIZ_EXPORT_URL, body=body, status=200)
+
+    [row] = run_screen(["geo_usa"], None, None).rows
+
+    assert row.news_time is None
+    assert "Unreadable Finviz news time" not in caplog.text
