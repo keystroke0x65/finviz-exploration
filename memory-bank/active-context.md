@@ -4,22 +4,21 @@
      to operations-only writes). Keep it under 80 lines. Durable facts belong in context/ or experience/. -->
 
 ## Current focus
-Phase 2 milestones 1, 2a, 2b, a cleanup batch and M3 are merged into main (2026-10-21);
-main not pushed. Docker runs from main with FRONTEND_PORT=5174 on the real DB. Backups in
-data/: finviz_dashboard.db.backup-2026-10-21 (pre-2a), ...-m2b, ...-m3, backup-2026-10-26.
+Brainstorming a trading research system (movers journal -> measurements -> pattern search ->
+live strategies, after how Dux/Sykes/Grattani/Kellogg work). Working notes:
+docs/superpowers/specs/2026-10-27-trading-research-system-notes.md (not an approved design).
+Dashboard: phases 1-2 + feedback batches merged and pushed (main = origin/main, 2026-10-26).
+Docker runs from main on FRONTEND_PORT=5174 (now in .env). Backups in data/.
 
 ## Open questions / blockers
 - Schwab developer API application not started (user's action).
-- FRONTEND_PORT=5174 not yet in user's .env.
 - Deferred minors listed in progress.md (prog-0015).
 
 ## Recent changes
-- 2026-10-26: User feedback after a few days of trading: added trigger time on setups,
-  volume + session shading on the chart, headline time on Screens (merged).
-- 2026-10-21: M3 merged (track record, candles, 13 more pattern pairs); review fixed 4 issues
-  (candle wick through stop, mid-range "breakouts", duplicate trades, avg win shown).
-- 2026-10-21: Cleanup batch, M2b and M2a merged.
+- 2026-10-26: trigger time, chart volume/session shading, news time, stock links, scan
+  status notice; snapshot JSON hotfix; '-' news time fix; main pushed.
+- Track record (4 days, 3483 trades): generic setups lose (~-0.25R), mornings better,
+  score/verdict don't separate winners; nearer targets don't fix it.
 
 ## Next steps
-- Track record needs 5+ trading days before it moves scores; revisit numbers after a week.
-- Options: cleanup batch for deferred minors, push main, or Phase 3 (needs Schwab).
+- Research the named traders' public scan criteria/setups, then continue the brainstorm.
