@@ -77,9 +77,73 @@ the trading calendar, which the dashboard doesn't model today.)
 - **Auto-trading** *(Claude's suggestion)*: a late, opt-in step behind a broker API with hard
   risk limits, after alerts have earned trust.
 
+## Research: what the named traders say (2026-10-27)
+
+Sources are mostly secondary (course pages, blog summaries, interviews from 2019–2023), so
+every number below is a starting hypothesis to check against our own tables, not a rule.
+
+**Steven Dux** (small-cap short framework, as summarised by Tradezella):
+- Universe: initial market cap under $100M for gap-up shorts (up to ~$200M for bounce shorts
+  and first red days); float under 50M, bucketed 1–2M / 2–5M / 5–10M; price above $3; avoid
+  biotech and energy (his tracking showed a win-rate drop on biotech); avoid thin Chinese
+  tickers with halt risk.
+- Volume pace: full-day volume estimated from pre-market at roughly 1:5 to 1:10; pre-market
+  volume above 50M makes a same-day gap-up short risky; float rotation above ~15x means
+  smaller or no trade; gap-up shorts want ~30–35% of expected volume traded by late morning.
+- Setups: gap-up short (stock up >100%, short after the opening push, 9:30–11:30, breakdown
+  usually 10:00–11:00, after ~1 hour of consolidation); bounce short into a prior
+  high-volume resistance area (uses ~1 year of history; "trapped volume" ≥ 2:1 against
+  today's buying); first red day short (≥3 consecutive green days; skip if the red day
+  already erased >50% of the run).
+- Statistics cited: post-open push averages ~30–35% on 1–2M floats, ~20–25% on 5–10M floats;
+  gap-up short average fade ~24–26% from the high of day with ~7% average risk (≈1:3.5–1:4).
+  Setups occur a "known number of times per year" with known win rates and fades.
+- Benzinga (2019): he ran aggregated data sets through scenarios and only tracked stocks with
+  market caps up to $200M.
+
+**Tim Sykes** (his own blog, older posts): morning panic dip buy: a 30–35%+ sell-off at or
+near the open, on a stock that first ran a lot (≈50%+), not on bad news; buy when support
+holds and buyers step in; cut fast. Supernova / multi-day runners almost always "fall off a
+cliff"; first green day: buy a stock closing near its highs for the next-morning gap. A
+7-step framework (one step is the "cliff dive" panic after a run).
+
+**Tim Grittani:** shorts heavily promoted stocks that are overextended after several
+consecutive green days; warns that a first red day doesn't necessarily mean the move is over.
+No published checklist found. Others' first-red-day criteria: 2–3+ green days, run of
+~80–100%+ (or 200–500%), market cap under $500M.
+
+**Jack Kellogg:** trades OTCs too; low float for spikes but real size only in liquid names
+with clean stops; starts small and adds to winners, moving the stop to break even; waits for
+pullbacks below VWAP before longs; aims for very high reward:risk (~10:1). No published
+scanner criteria found.
+
+**What this suggests for the system** *(Claude's reading)*:
+- Every setup is tied to a *stage* of a run (day 1 gap-up, day 2, first red day after N green
+  days, panic after a big run, bounce into old resistance). The stage needs its own columns
+  (consecutive green days, % run from start, prior high-volume price areas).
+- Their measurements are simple and specific: float/market-cap buckets, pre-market volume,
+  volume pace vs expected, float rotation, time windows, % push after open, % fade from high.
+- Their statistics are simple too: per setup and segment, how often it happens, win rate,
+  average fade/push, average risk.
+- Dux and Grittani are mostly short-side; for a long-only trader their setups still matter:
+  a stock matching a strong short setup is a poor long.
+
+Sources: [Tradezella: Steven Dux small-cap short strategy](https://www.tradezella.com/strategies/small-cap-short-strategy),
+[Benzinga 2019 interview](https://www.benzinga.com/markets/penny-stocks/19/08/14300909/verified-millionaire-trader-steven-dux-shares-his-high-odds-strategy),
+[Trading Reviewers: Steven Dux](https://www.tradingreviewers.com/steven-dux/),
+[Sykes: morning panic dip buys](https://www.timothysykes.com/blog/dip-buy-morning-panics/),
+[Sykes: which stocks are morning panic dip buys](https://www.timothysykes.com/blog/morning-panic-dip-buys/),
+[Sykes: first green day](https://www.timothysykes.com/blog/first-green-day-otc/),
+[Trading Reviewers: Grittani Trading Tickers](https://www.tradingreviewers.com/tim-grittani-trading-tickers-dvd-review/),
+[Tradezella: first red day](https://www.tradezella.com/strategies/first-red-day-2),
+[Bullish Bears: first red day](https://bullishbears.com/first-red-day-pattern/),
+[SteadyTrade: Jack Kellogg](https://www.steadytrade.com/jack-kellogg/),
+[Forex Club: Jack Kellogg](https://en.forexclub.pl/jack-kellogg-advice-from-a-trader-who-went-from-75k-usd-to-126m-usd-in-5-years/).
+
 ## Open
 
-- Research what the named traders publicly say they scan for and trade (in progress).
+- Research what the named traders publicly say they scan for and trade (done above; primary
+  material such as their courses and videos wasn't available).
 - What "a worthwhile pattern" means in numbers (sample size, out-of-sample checks, costs).
 - What the A–F grade means.
 - Order of the sub-projects (Claude's proposal: journal → measurements/outcomes → pattern
