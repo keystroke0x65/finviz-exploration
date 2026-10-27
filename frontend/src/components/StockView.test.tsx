@@ -9,6 +9,7 @@ const api = vi.hoisted(() => ({
   fetchStockVerdict: vi.fn(),
   runScan: vi.fn(),
   fetchQuote: vi.fn(),
+  refreshQuote: vi.fn(),
   chartProps: [] as { levels: { price: number; kind: string }[]; shadeSessions?: boolean }[],
 }));
 vi.mock("../api/bars", () => ({ fetchBars: (...args: unknown[]) => api.fetchBars(...args) }));
@@ -18,7 +19,10 @@ vi.mock("../api/setups", async (importOriginal) => ({
   fetchStockVerdict: (ticker: string) => api.fetchStockVerdict(ticker),
   runScan: (ticker?: string) => api.runScan(ticker),
 }));
-vi.mock("../api/stocks", () => ({ fetchQuote: (ticker: string) => api.fetchQuote(ticker) }));
+vi.mock("../api/stocks", () => ({
+  fetchQuote: (ticker: string) => api.fetchQuote(ticker),
+  refreshQuote: (ticker: string) => api.refreshQuote(ticker),
+}));
 vi.mock("./CandleChart", () => ({
   CandleChart: (props: { levels: { price: number; kind: string }[]; shadeSessions?: boolean }) => {
     api.chartProps.push(props);
@@ -47,6 +51,7 @@ describe("StockView", () => {
     api.fetchBars.mockResolvedValue(BARS_RESPONSE);
     api.fetchStockSetups.mockResolvedValue({ setups: [SETUP], warnings: [], show_short_setups: false });
     api.fetchQuote.mockResolvedValue({ Ticker: "HOST", Company: "Host Digital Inc" });
+    api.refreshQuote.mockResolvedValue({ Ticker: "HOST", Company: "Host Digital Inc" });
     api.fetchStockVerdict.mockResolvedValue(null);
     api.chartProps = [];
   });
@@ -120,6 +125,23 @@ describe("StockView", () => {
 
     await vi.waitFor(() => expect(api.fetchStockSetups).toHaveBeenCalledTimes(2));
     expect(api.runScan).toHaveBeenCalledWith("HOST");
+  });
+
+  it("reloads the chart and quote after a scan", async () => {
+    api.runScan.mockResolvedValue({ scanned: ["HOST"], failed: [], setups_found: 1, scanned_at: "x" });
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "1m" }));
+    await screen.findByTestId("chart");
+    api.fetchBars.mockResolvedValue({ ...BARS_RESPONSE, fetched_at: "2026-10-20T13:41:00Z" });
+    api.refreshQuote.mockResolvedValue({ Ticker: "HOST", Company: "Host Digital Inc", Price: "2.40" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Scan this stock" }));
+
+    expect(await screen.findByText("2.40")).toBeInTheDocument();
+    await vi.waitFor(() => expect(api.fetchBars).toHaveBeenLastCalledWith("HOST", "1m"));
+    const expectedTime = new Date("2026-10-20T13:41:00Z").toLocaleTimeString();
+    expect(await screen.findByText(`Bars as of ${expectedTime}`)).toBeInTheDocument();
+    expect(api.refreshQuote).toHaveBeenCalledWith("HOST");
   });
 
   it("links to Finviz and shows the quote", async () => {

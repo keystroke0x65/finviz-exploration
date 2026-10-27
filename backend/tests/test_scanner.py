@@ -222,3 +222,31 @@ def test_scan_passes_relative_volume_to_the_verdict(db_conn):
 
     verdict, _ = read_verdicts(db_conn)["HOST"]
     assert any("4.2x relative volume" in reason for reason in verdict.reasons)
+
+
+def counting_deps():
+    fetched: list[str] = []
+
+    def fetch(ticker, interval):
+        fetched.append(interval)
+        return bars_for(HOD_BREAK_CLOSES)(ticker, interval)
+
+    return deps(fetch), fetched
+
+
+def test_repeat_scan_reuses_cached_bars_by_default(db_conn):
+    scan_deps, fetched = counting_deps()
+
+    run_scan(db_conn, NOW, scan_deps, tickers=["HOST"])
+    run_scan(db_conn, NOW.replace(second=20), scan_deps, tickers=["HOST"])
+
+    assert sorted(fetched) == ["1m", "5m", "daily"]
+
+
+def test_refreshing_scan_refetches_intraday_bars_but_keeps_daily_cache(db_conn):
+    scan_deps, fetched = counting_deps()
+
+    run_scan(db_conn, NOW, scan_deps, tickers=["HOST"])
+    run_scan(db_conn, NOW.replace(second=20), scan_deps, tickers=["HOST"], should_refresh_intraday=True)
+
+    assert sorted(fetched) == ["1m", "1m", "5m", "5m", "daily"]
