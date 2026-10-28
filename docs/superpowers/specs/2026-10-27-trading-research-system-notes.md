@@ -155,8 +155,10 @@ No published checklist found. Others' first-red-day criteria: 2–3+ green days,
 
 **Jack Kellogg:** trades OTCs too; low float for spikes but real size only in liquid names
 with clean stops; starts small and adds to winners, moving the stop to break even; waits for
-pullbacks below VWAP before longs; aims for very high reward:risk (~10:1). No published
-scanner criteria found.
+pullbacks below VWAP before longs. No published scanner criteria or reward:risk figures
+found. (An earlier draft said he aims for ~10:1; that came from an unsourced search summary
+and couldn't be verified, so it was removed. His Chat With Traders episode 249 is the best
+primary source to check.)
 
 **What this suggests for the system** *(Claude's reading)*:
 - Every setup is tied to a *stage* of a run (day 1 gap-up, day 2, first red day after N green
