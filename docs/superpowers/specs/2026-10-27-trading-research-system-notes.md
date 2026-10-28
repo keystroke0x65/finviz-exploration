@@ -87,6 +87,20 @@ the trading calendar, which the dashboard doesn't model today.)
 - **Which stocks go into the journal:** the ones the user's current screens catch.
   *(Claude's suggestion, not yet confirmed)* also recent runners from the watchlist on days
   they aren't moving, since day-2, first-red-day and panic-dip plays happen then.
+- **Tables are created by the system, seeded from the named traders' tables** (user, 2026-10-27).
+  It starts with tables reconstructed from what Dux, Sykes, Grittani and Kellogg track, and
+  creates new ones (for example splitting a table by float bucket) when the statistics justify
+  it. Their actual tables aren't published, so the seeds come from their setup criteria in the
+  Research section. *(Claude's proposed seed list)*:
+  - Day-1 big gap-up: up >100%, market cap under $100M, by float bucket 1–2M / 2–5M / 5–10M (Dux).
+  - Multi-day runner, first red day: ≥3 green days, market cap under ~$200M (Dux, Grittani).
+  - Overextended promoted runner: several green days, large % run (Grittani).
+  - Morning panic: ran ≈50%+, then drops 30–35%+ at or near the open, no bad news (Sykes).
+  - First green day: closes near highs after a down stretch (Sykes).
+  - Bounce into old resistance: price returns to a prior high-volume area within ~1 year (Dux).
+  - Pullback below VWAP on a liquid low-float runner (Kellogg).
+  - *(Claude's suggestion)* A new table must hold up on days it wasn't created from before
+    the system trusts it, and needs a minimum number of examples.
 - **Start small:** first slice proposed by Claude, not yet approved: a *movers journal* —
   each day, store each mover's full 4 AM–8 PM minute bars, a handful of measurements, and a
   chart image; backfill past days from Massive; recompute when a measurement is added.
