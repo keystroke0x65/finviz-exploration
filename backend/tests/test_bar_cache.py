@@ -70,3 +70,18 @@ def test_load_bars_refetches_stale_cache(db_conn):
 
     assert len(calls) == 2
     assert refreshed.fetched_at == TUESDAY_10AM + timedelta(minutes=2)
+
+
+def test_load_bars_refetches_fresh_cache_when_told_not_to_use_it(db_conn):
+    calls = []
+
+    def fetch(ticker, interval):
+        calls.append(ticker)
+        return BARS
+
+    load_bars(db_conn, "HOST", "1m", TUESDAY_10AM, fetch)
+    refreshed = load_bars(db_conn, "HOST", "1m", TUESDAY_10AM + timedelta(seconds=10), fetch, should_use_cache=False)
+
+    assert len(calls) == 2
+    assert refreshed.fetched_at == TUESDAY_10AM + timedelta(seconds=10)
+    assert read_cached_bars(db_conn, "HOST", "1m").fetched_at == TUESDAY_10AM + timedelta(seconds=10)

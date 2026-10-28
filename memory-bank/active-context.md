@@ -15,6 +15,8 @@ Docker runs from main on FRONTEND_PORT=5174 (now in .env). Backups in data/.
 - Deferred minors listed in progress.md (prog-0015).
 
 ## Recent changes
+- 2026-10-27: fixed stale chart after "Scan this stock" (one-stock scans skip the 1m/5m
+  bar cache; page reloads bars + fresh quote after a scan). Committed on fix/scan-stock-refresh (not merged), live in Docker.
 - 2026-10-26: trigger time, chart volume/session shading, news time, stock links, scan
   status notice; snapshot JSON hotfix; '-' news time fix; main pushed.
 - Track record (4 days, 3483 trades): generic setups lose (~-0.25R), mornings better,

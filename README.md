@@ -62,7 +62,9 @@ those the feeder just found, or with relative volume of 1.5 or more, or moving 5
 5 minutes, and until the next close), finds daily levels, runs the pattern detectors and
 records what it finds. "Scan watchlist" on the Setups tab and "Scan this stock" on the
 Stock tab run a scan on demand; a full scan takes about two minutes because Finviz is
-called at most once a second. If Finviz starts rate limiting, the scan stops and lists the
+called at most once a second. "Scan this stock" skips the 1m/5m bar cache and the quote
+cache so it always works from the latest bars, then reloads the chart, verdict, setups and
+quote. If Finviz starts rate limiting, the scan stops and lists the
 stocks it skipped. Only one scan runs at a time: "Scan watchlist" says so if a scheduled scan is
 already running. Expired watchlist entries are cleared on every 15-minute tick, including
 evenings and weekends.

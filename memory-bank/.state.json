@@ -6,13 +6,14 @@
     "dec": 4,
     "prog": 18,
     "dev-environment": 8,
-    "finviz": 7,
+    "finviz": 8,
     "conv": 1
   },
   "reminded_sessions": [
     "8526e8ea-be9e-4201-ba24-a0c6fc35964e",
-    "18086c86-3585-44fc-8c36-16cd608bf967"
+    "18086c86-3585-44fc-8c36-16cd608bf967",
+    "f561eb78-860b-4a8c-b7f1-1272f2356ebe"
   ],
   "created": "2026-09-17",
-  "batches": 15
+  "batches": 16
 }

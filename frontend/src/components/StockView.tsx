@@ -12,7 +12,7 @@ import {
   Verdict,
   Warning,
 } from "../api/setups";
-import { fetchQuote, Quote } from "../api/stocks";
+import { fetchQuote, Quote, refreshQuote } from "../api/stocks";
 import { finvizQuoteUrl, formatPrice } from "../format";
 import { describeSetupState } from "../setupState";
 import { CandleChart, ChartLevel } from "./CandleChart";
@@ -80,6 +80,8 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [selectedSetupId, setSelectedSetupId] = useState<number | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  // Bumped after a scan so the chart reloads the bars that scan just fetched.
+  const [barsReloadCount, setBarsReloadCount] = useState(0);
   // A scan takes seconds; if the user switches stocks meanwhile, its results
   // belong to the old ticker and must not land in the new one's view.
   const shownTicker = useRef(ticker);
@@ -125,7 +127,7 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
     return () => {
       isCurrent = false;
     };
-  }, [ticker, timeframe]);
+  }, [ticker, timeframe, barsReloadCount]);
 
   const allSetups = useMemo<(Setup | Warning)[]>(
     () => [...(setups?.setups ?? []), ...(setups?.warnings ?? [])],
@@ -152,13 +154,16 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
     setError(null);
     try {
       await runScan(scannedTicker);
-      const [freshSetups, freshVerdict] = await Promise.all([
+      const [freshSetups, freshVerdict, freshQuote] = await Promise.all([
         fetchStockSetups(scannedTicker),
         fetchStockVerdict(scannedTicker),
+        refreshQuote(scannedTicker),
       ]);
       if (shownTicker.current === scannedTicker) {
         setSetups(freshSetups);
         setVerdict(freshVerdict);
+        setQuote(freshQuote);
+        setBarsReloadCount((count) => count + 1);
       }
     } catch (scanError) {
       if (shownTicker.current === scannedTicker) {

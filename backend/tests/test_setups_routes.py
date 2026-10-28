@@ -66,6 +66,8 @@ def test_scan_route_scans_one_ticker(mock_scan, api_client):
         "setups_found": 2, "scanned_at": "2026-10-20T10:00:00-04:00",
     }
     assert mock_scan.call_args.kwargs["tickers"] == ["HOST"]
+    # Someone asking to scan one stock now wants its latest bars, not cached ones.
+    assert mock_scan.call_args.kwargs["should_refresh_intraday"] is True
 
 
 @patch("app.routes.setups.run_scan", return_value=ScanResult([], [], 0, NOW))
@@ -73,6 +75,7 @@ def test_scan_route_without_ticker_scans_watchlist(mock_scan, api_client):
     api_client.post("/api/scans", json={})
 
     assert mock_scan.call_args.kwargs["tickers"] is None
+    assert mock_scan.call_args.kwargs["should_refresh_intraday"] is False
 
 
 @patch("app.routes.setups.run_scan", return_value=ScanResult(["HOST", "WORX"], [("BAD", "rate limited")], 2, NOW))

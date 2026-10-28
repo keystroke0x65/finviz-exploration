@@ -251,9 +251,22 @@ def _resolve_inactive_tickers(conn: sqlite3.Connection, skip: set[str], now: dat
             return
 
 
-def scan_ticker(conn: sqlite3.Connection, ticker: str, snapshot: ScreenRow | None, now: datetime, deps: ScanDeps) -> int:
+def scan_ticker(
+    conn: sqlite3.Connection,
+    ticker: str,
+    snapshot: ScreenRow | None,
+    now: datetime,
+    deps: ScanDeps,
+    should_refresh_intraday: bool = False,
+) -> int:
+    # Daily bars stay cached even on a refresh: today's price comes from the
+    # intraday bars, and the daily history only changes at the close.
     bars_by_timeframe = {
-        timeframe: load_bars(conn, ticker, timeframe, now, deps.fetch_bars).bars for timeframe in TIMEFRAMES
+        timeframe: load_bars(
+            conn, ticker, timeframe, now, deps.fetch_bars,
+            should_use_cache=timeframe == "daily" or not should_refresh_intraday,
+        ).bars
+        for timeframe in TIMEFRAMES
     }
     setups = _usable_setups(_detect_all(bars_by_timeframe, now), bars_by_timeframe, now)
     relative_volume = snapshot.relative_volume if snapshot else None
@@ -281,9 +294,17 @@ def _fetch_snapshots(deps: ScanDeps, tickers: list[str]) -> tuple[dict[str, Scre
 
 
 def run_scan(
-    conn: sqlite3.Connection, now: datetime, deps: ScanDeps, tickers: list[str] | None = None
+    conn: sqlite3.Connection,
+    now: datetime,
+    deps: ScanDeps,
+    tickers: list[str] | None = None,
+    should_refresh_intraday: bool = False,
 ) -> ScanResult:
-    """Scan explicit tickers, or (tickers=None) the active part of the watchlist."""
+    """Scan explicit tickers, or (tickers=None) the active part of the watchlist.
+
+    should_refresh_intraday fetches new 1m/5m bars even when cached ones are
+    still fresh, for a scan someone asked for to see the latest move.
+    """
     failed: list[tuple[str, str]] = []
     if tickers is None:
         watchlist = [entry.ticker for entry in list_entries(conn)]
@@ -302,7 +323,9 @@ def run_scan(
     was_stopped_by_finviz = False
     for index, ticker in enumerate(tickers):
         try:
-            setups_found += scan_ticker(conn, ticker, snapshots.get(ticker), now, deps)
+            setups_found += scan_ticker(
+                conn, ticker, snapshots.get(ticker), now, deps, should_refresh_intraday=should_refresh_intraday
+            )
         except FinvizAuthError as exc:
             # Every later request would fail the same way.
             failed.append((ticker, str(exc)))

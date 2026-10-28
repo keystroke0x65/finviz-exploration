@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchQuote } from "./stocks";
+import { fetchQuote, refreshQuote } from "./stocks";
 
 describe("fetchQuote", () => {
   afterEach(() => {
@@ -68,5 +68,23 @@ describe("fetchQuote", () => {
 
     expect(result).toEqual({ Ticker: "AAPL", Price: "227.52" });
     expect(bodyReadCount).toBe(1);
+  });
+});
+
+describe("refreshQuote", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("asks the backend for a quote that skips its cache", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ Ticker: "AAPL", Price: "228.10" }) }),
+    );
+
+    const result = await refreshQuote("AAPL");
+
+    expect(result).toEqual({ Ticker: "AAPL", Price: "228.10" });
+    expect(fetch).toHaveBeenCalledWith("/api/stocks/AAPL/refresh");
   });
 });

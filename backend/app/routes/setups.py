@@ -54,7 +54,11 @@ def post_scan(body: ScanIn, conn: DbConnection) -> ScanOut:
             raise HTTPException(status_code=409, detail="A scan is already running; try again when it finishes")
         now = datetime.now(timezone.utc)
         try:
-            result = run_scan(conn, now, finviz_scan_deps(), tickers=tickers)
+            # A one-stock scan is someone wanting the latest move, so it skips the
+            # bar cache; full scans keep it to stay within Finviz's rate limit.
+            result = run_scan(
+                conn, now, finviz_scan_deps(), tickers=tickers, should_refresh_intraday=not is_full_scan
+            )
         except Exception as error:
             if is_full_scan:
                 save_scan_attempt(conn, CrashedScan(finished_at=now, error_type=type(error).__name__))
