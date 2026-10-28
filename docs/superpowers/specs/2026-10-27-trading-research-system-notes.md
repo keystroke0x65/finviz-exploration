@@ -47,6 +47,23 @@ make them; read news and occasionally SEC filings. No trade journal or statistic
    - *(Claude's reading)* So raw minute bars (including pre-market) for every mover-day are
      the source of truth, and measurements are computed from them and can be added or
      changed later and recomputed over all past days.
+3. **Patterns start from one stock, not from a time window.** Research is not "look back
+   weeks or months". A trader sees one stock do something interesting, notices a pattern,
+   then looks for other stocks that show the same pattern. One example comes first, then
+   the search for lookalikes.
+4. **Patterns get retired and come back.** Over time traders know when a pattern has stopped
+   working, so they retire it until it "catches steam" again. They also decide which patterns
+   to apply to which stocks. The user suspects this comes from knowing which tables the
+   stocks belong in, and testing patterns within those tables.
+5. **Applied statistics is how quality is judged.** The traders likely use applied statistics
+   to decide what is statistically significant: about a pattern, a stock, the information in
+   a table, the setup grade, or anything else needed to judge a pattern's quality and whether
+   it is improving.
+   - *(Claude's reading of 3–5)* A pattern belongs to a table (a group of similar stocks),
+     not to every stock. Each pattern has a lifecycle: candidate (from one example) →
+     testing (lookalikes found, measured) → active → retired (still tracked) → active again
+     if its numbers recover. Statistics decide each move between stages, and also what the
+     A–F grade means.
 
 ## The target experience (user's scenario, "a couple of months" out)
 
@@ -59,9 +76,8 @@ Monday morning, 5:00 AM: the user turns the computer and the software on.
   setup and levels so the user can trade manually.
 - During the session it keeps looking for the best setups. If nothing is good enough, so be
   it.
-- At end of day it may research new patterns, looking back weeks or months. If a new pattern
-  means nothing, it drops it, as long as it tried. It searches harder when it senses its
-  currently working patterns are fading.
+- At end of day it may research new patterns (see corrections 3–5 below for what that
+  means). If a new pattern means nothing, it drops it, as long as it tried.
 
 (Note: the example date, 18 Jan 2027, is MLK Day and US markets are closed; the system needs
 the trading calendar, which the dashboard doesn't model today.)
