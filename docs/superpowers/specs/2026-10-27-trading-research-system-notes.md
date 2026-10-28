@@ -101,6 +101,17 @@ the trading calendar, which the dashboard doesn't model today.)
   - Pullback below VWAP on a liquid low-float runner (Kellogg).
   - *(Claude's suggestion)* A new table must hold up on days it wasn't created from before
     the system trusts it, and needs a minimum number of examples.
+- **Long-biased tables too** (user, 2026-10-27). Dux and Grittani are mostly short-biased; the
+  user trades long, so the system must create and seed long-biased tables as well.
+  *(Claude's reading)* Each stock-day records what happened in both directions, so the same
+  table can test long and short patterns (Dux's post-open push of ~30–35% on 1–2M floats is
+  the long side of his gap-up short). Long-biased seeds: day-1 opening push / first
+  pullback, morning panic dip buy (Sykes), first green day (Sykes), VWAP pullback and reclaim
+  (Kellogg), multi-day runner breakout continuation.
+- **The user approves before anything goes live** (user, 2026-10-27). Research (creating
+  tables, finding candidates, testing, retiring) runs on its own. A new table or a pattern
+  promoted to active is proposed with its evidence and waits for the user's approval before it
+  appears in live alerts. Revisit after a couple of months of trust.
 - **Start small:** first slice proposed by Claude, not yet approved: a *movers journal* —
   each day, store each mover's full 4 AM–8 PM minute bars, a handful of measurements, and a
   chart image; backfill past days from Massive; recompute when a measurement is added.
