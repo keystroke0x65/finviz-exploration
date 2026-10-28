@@ -112,6 +112,12 @@ the trading calendar, which the dashboard doesn't model today.)
   tables, finding candidates, testing, retiring) runs on its own. A new table or a pattern
   promoted to active is proposed with its evidence and waits for the user's approval before it
   appears in live alerts. Revisit after a couple of months of trust.
+- **Worthwhile = makes money on average after costs** (user, 2026-10-27). No preference between
+  high-win-rate and big-winner patterns; patterns are ranked by average profit per trade (in R)
+  after slippage, and the win rate is always shown so the user knows how it will feel to trade.
+  *(Claude's proposal, not yet confirmed)* The A–F grade follows from this: it is the expected
+  profit per trade for this setup on this stock, from its table's and pattern's statistics,
+  marked down when the evidence is thin (A = clearly positive, F = expected to lose).
 - **Start small:** first slice proposed by Claude, not yet approved: a *movers journal* —
   each day, store each mover's full 4 AM–8 PM minute bars, a handful of measurements, and a
   chart image; backfill past days from Massive; recompute when a measurement is added.
