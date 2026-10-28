@@ -854,6 +854,33 @@ input[type="checkbox"] {
   height: 420px;
 }
 
+.candle-chart-frame {
+  position: relative;
+}
+
+/* Sits over the chart's top-left corner; ignores the mouse so hovering still
+   moves the chart's crosshair underneath. */
+.bar-legend {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  max-width: calc(100% - 90px);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.bar-legend-label {
+  margin-right: 3px;
+}
+
 /* Matches CHART_COLORS.preMarket / afterHours in CandleChart.tsx (canvas can't read CSS). */
 .chart-legend {
   display: flex;

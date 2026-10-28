@@ -232,6 +232,7 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
                     vwap={bars.vwap}
                     visibleBars={VISIBLE_BARS[timeframe]}
                     shadeSessions={hasSessions}
+                    isDaily={timeframe === "daily"}
                   />
                   {hasSessions && (
                     <p className="chart-legend muted">
