@@ -118,9 +118,19 @@ the trading calendar, which the dashboard doesn't model today.)
   *(Claude's proposal, not yet confirmed)* The A–F grade follows from this: it is the expected
   profit per trade for this setup on this stock, from its table's and pattern's statistics,
   marked down when the evidence is thin (A = clearly positive, F = expected to lose).
-- **Start small:** first slice proposed by Claude, not yet approved: a *movers journal* —
-  each day, store each mover's full 4 AM–8 PM minute bars, a handful of measurements, and a
-  chart image; backfill past days from Massive; recompute when a measurement is added.
+- **First slice: the movers journal** (user, 2026-10-27, "for now, yes"). Each day, store each
+  mover's full 4 AM–8 PM minute bars, the basic measurements, and a chart image; backfill past
+  months from Massive; sort each stock-day into the seed tables; recompute when a measurement
+  is added. No pattern finding yet. Useful on its own as a browsable record of every runner,
+  its table, and what happened next.
+- **Build order** (Claude's proposal, accepted for now). Each part gets its own design, plan
+  and build:
+  1. Movers journal (bars, measurements, chart images, backfill, seed tables).
+  2. Table statistics (how each seed setup has done, long and short, after costs).
+  3. Live A–F grades in the dashboard.
+  4. Lookalike search (start from one chart, find similar stock-days).
+  5. Pattern lifecycle (candidate → testing → active → retired → active again).
+  6. Approval screen for new tables and promoted patterns.
 - **Auto-trading** *(Claude's suggestion)*: a late, opt-in step behind a broker API with hard
   risk limits, after alerts have earned trust.
 
@@ -191,9 +201,22 @@ Sources: [Tradezella: Steven Dux small-cap short strategy](https://www.tradezell
 
 ## Open
 
-- Research what the named traders publicly say they scan for and trade (done above; primary
-  material such as their courses and videos wasn't available).
-- What "a worthwhile pattern" means in numbers (sample size, out-of-sample checks, costs).
-- What the A–F grade means.
-- Order of the sub-projects (Claude's proposal: journal → measurements/outcomes → pattern
-  search → charts/visual similarity → live strategies).
+- Confirm the A–F grade meaning proposed above.
+- Which stocks enter the journal beyond the current screens: recent runners on days they
+  aren't moving (Claude's suggestion, unconfirmed).
+- The journal's columns: Claude proposed a first list (ticker, date, float, market cap, gap %,
+  pre-market high and volume, consecutive green days, % run, open, post-open push and its
+  high, time of high of day, fade from high, low, close, volume pace vs pre-market, news yes/no,
+  next day's open and close, chart image); the user hasn't reviewed it yet.
+- Numbers for "worthwhile": minimum examples, how much must hold on unseen days, slippage
+  assumption.
+- Kellogg's reward:risk and setups: check primary sources (Chat With Traders ep. 249).
+
+## How to continue (for a new session)
+
+1. Read this file, then `memory-bank/active-context.md`.
+2. Continue the brainstorm (superpowers:brainstorming) on the movers journal only: settle the
+   open items above that it needs (journal columns, which stocks enter), then write
+   `docs/superpowers/specs/YYYY-MM-DD-movers-journal-design.md` and get the user's approval.
+3. Then superpowers:writing-plans for the journal, and build it on a branch in `.worktrees/`.
+4. Don't build parts 2–6 before the journal exists; each gets its own design.
