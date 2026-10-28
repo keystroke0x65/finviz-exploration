@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createChart,
   HistogramData,
@@ -6,10 +6,12 @@ import {
   IPriceLine,
   ISeriesApi,
   LineStyle,
+  MouseEventParams,
   UTCTimestamp,
   WhitespaceData,
 } from "lightweight-charts";
 import type { Bar } from "../api/bars";
+import { describeBar } from "../barLegend";
 import { barSession, BarSession, toChartTime } from "../chartTime";
 
 export type ChartLevelKind = "level" | "session" | "entry" | "stop" | "target";
@@ -29,6 +31,8 @@ interface CandleChartProps {
   visibleBars?: number;
   // Shade pre-market and after-hours bars (intraday charts only).
   shadeSessions?: boolean;
+  // Daily bars are labelled by date in the hover legend, intraday bars by time.
+  isDaily?: boolean;
 }
 
 // Mirrors the tokens in styles.css; the chart draws on canvas and can't read CSS variables.
@@ -95,7 +99,41 @@ function toSortedUniquePoints(points: [string, number][]): { time: UTCTimestamp;
   return [...byTime.entries()].sort(([left], [right]) => left - right).map(([time, value]) => ({ time, value }));
 }
 
-export function CandleChart({ bars, levels, outline, vwap, visibleBars, shadeSessions = false }: CandleChartProps) {
+function BarLegend({ bar, isDaily }: { bar: Bar; isDaily: boolean }) {
+  const text = describeBar(bar, isDaily);
+  const valueClass = text.direction === "up" ? "gain" : "loss";
+  return (
+    <div className="bar-legend" data-testid="bar-legend">
+      <span className="muted">{text.time}</span>
+      {(["open", "high", "low", "close"] as const).map((field) => (
+        <span key={field}>
+          <span className="muted bar-legend-label">{field[0].toUpperCase()}</span>
+          <span className={valueClass}>{text[field]}</span>
+        </span>
+      ))}
+      <span className={valueClass}>{text.change}</span>
+      <span>
+        <span className="muted">Vol </span>
+        {text.volume}
+      </span>
+    </div>
+  );
+}
+
+export function CandleChart({
+  bars,
+  levels,
+  outline,
+  vwap,
+  visibleBars,
+  shadeSessions = false,
+  isDaily = false,
+}: CandleChartProps) {
+  // Chart time of the bar under the mouse; null when the mouse is off the chart.
+  const [hoveredTime, setHoveredTime] = useState<number | null>(null);
+  const barsByTime = useMemo(() => new Map(bars.map((bar) => [toTime(bar.time) as number, bar])), [bars]);
+  // Off the chart, or on a time with no bar (e.g. right of the last one), show the latest bar.
+  const legendBar = (hoveredTime != null ? barsByTime.get(hoveredTime) : undefined) ?? bars[bars.length - 1];
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -139,7 +177,14 @@ export function CandleChart({ bars, levels, outline, vwap, visibleBars, shadeSes
     });
     volume.priceScale().applyOptions({ scaleMargins: VOLUME_MARGINS });
     volumeRef.current = volume;
+    // The crosshair snaps to a bar's time anywhere on the chart, so this works
+    // over candles, volume or empty space alike.
+    const handleCrosshairMove = (param: MouseEventParams) => {
+      setHoveredTime(typeof param.time === "number" ? param.time : null);
+    };
+    chart.subscribeCrosshairMove(handleCrosshairMove);
     return () => {
+      chart.unsubscribeCrosshairMove(handleCrosshairMove);
       chart.remove();
       chartRef.current = null;
       candlesRef.current = null;
@@ -204,5 +249,10 @@ export function CandleChart({ bars, levels, outline, vwap, visibleBars, shadeSes
     };
   }, [bars, levels, outline, vwap, visibleBars, shadeSessions]);
 
-  return <div ref={containerRef} className="candle-chart" />;
+  return (
+    <div className="candle-chart-frame">
+      <div ref={containerRef} className="candle-chart" />
+      {legendBar && <BarLegend bar={legendBar} isDaily={isDaily} />}
+    </div>
+  );
 }

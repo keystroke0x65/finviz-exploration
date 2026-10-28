@@ -1,4 +1,4 @@
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CandleChart, CHART_COLORS } from "./CandleChart";
@@ -21,7 +21,10 @@ const chart = vi.hoisted(() => {
   const sessionSeries = { setData: vi.fn(), priceScale: vi.fn(() => priceScale) };
   const histogramSeries = [sessionSeries, volumeSeries];
   const timeScale = { fitContent: vi.fn(), setVisibleLogicalRange: vi.fn() };
+  const crosshairHandlers: ((param: { time?: number }) => void)[] = [];
   const instance = {
+    subscribeCrosshairMove: vi.fn((handler: (param: { time?: number }) => void) => crosshairHandlers.push(handler)),
+    unsubscribeCrosshairMove: vi.fn(),
     addCandlestickSeries: vi.fn(() => candleSeries),
     addLineSeries: vi.fn(() => lineSeries),
     // The chart adds the session shading first (so it sits behind the candles), then volume.
@@ -36,7 +39,9 @@ const chart = vi.hoisted(() => {
     state.isRemoved = false;
     return instance;
   });
-  return { instance, candleSeries, lineSeries, volumeSeries, sessionSeries, timeScale, createChart };
+  // Simulates the mouse moving over the bar at a chart time (undefined: off the chart).
+  const moveCrosshair = (time?: number) => crosshairHandlers.forEach((handler) => handler({ time }));
+  return { instance, candleSeries, lineSeries, volumeSeries, sessionSeries, timeScale, createChart, moveCrosshair };
 });
 vi.mock("lightweight-charts", () => ({ createChart: chart.createChart, LineStyle: { Dashed: 2, Dotted: 1 } }));
 
@@ -122,6 +127,43 @@ describe("CandleChart", () => {
 
     expect(chart.instance.addLineSeries).toHaveBeenCalledTimes(2);
     expect(chart.lineSeries.setData).toHaveBeenCalledWith([expect.objectContaining({ value: 2.02 })]);
+  });
+
+  it("shows the latest bar's OHLCV when the mouse isn't over the chart", () => {
+    render(<CandleChart bars={BARS} levels={[]} outline={null} vwap={null} />);
+
+    const legend = screen.getByTestId("bar-legend");
+    expect(legend).toHaveTextContent("Oct 20, 9:31 AM");
+    expect(legend).toHaveTextContent("O2.05H2.20L2.00C2.15");
+    expect(legend).toHaveTextContent("Vol 1.5K");
+  });
+
+  it("shows the hovered bar's OHLCV and returns to the latest when the mouse leaves", () => {
+    render(<CandleChart bars={BARS} levels={[]} outline={null} vwap={null} />);
+    const firstBarTime = chart.candleSeries.setData.mock.calls[0][0][0].time;
+
+    act(() => chart.moveCrosshair(firstBarTime));
+    expect(screen.getByTestId("bar-legend")).toHaveTextContent("Oct 20, 9:30 AM");
+    expect(screen.getByTestId("bar-legend")).toHaveTextContent("O2.00H2.10L1.95C2.05");
+
+    act(() => chart.moveCrosshair(undefined));
+    expect(screen.getByTestId("bar-legend")).toHaveTextContent("Oct 20, 9:31 AM");
+  });
+
+  it("labels daily bars by date", () => {
+    render(
+      <CandleChart bars={[{ ...BARS[0], time: "2026-10-20T00:00:00-04:00" }]} levels={[]} outline={null} vwap={null} isDaily />,
+    );
+
+    expect(screen.getByTestId("bar-legend")).toHaveTextContent("Oct 20, 2026");
+  });
+
+  it("stops listening to the mouse when removed", () => {
+    const { unmount } = render(<CandleChart bars={BARS} levels={[]} outline={null} vwap={null} />);
+
+    unmount();
+
+    expect(chart.instance.unsubscribeCrosshairMove).toHaveBeenCalled();
   });
 
   it("removes the chart on unmount", () => {
