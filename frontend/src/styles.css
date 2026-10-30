@@ -944,7 +944,8 @@ input[type="checkbox"] {
   border-left: 3px solid transparent;
 }
 
-.setup-select[aria-pressed="true"] {
+.setup-select[aria-pressed="true"],
+.setup-select[aria-pressed="true"] + .setup-grades {
   background: var(--panel-raised);
   border-left-color: var(--amber);
 }
@@ -952,6 +953,72 @@ input[type="checkbox"] {
 .small-link {
   font-size: var(--size-small);
   color: var(--text-muted);
+}
+
+.setup-select:has(+ .setup-grades) {
+  padding-bottom: 0.3rem;
+}
+
+/* Sits under the select button but reads as part of the same row. */
+.setup-grades {
+  display: flex;
+  gap: 1.25rem;
+  padding: 0 0.8rem 0.6rem;
+  border-left: 3px solid transparent;
+}
+
+.setup-grade {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.setup-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.setup-heading .screen-meta {
+  text-align: right;
+}
+
+.plan-figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+}
+
+.plan-figure {
+  display: flex;
+  flex-direction: column;
+}
+
+.plan-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.plan-price {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Match CHART_COLORS.entry / stop / target in CandleChart.tsx. */
+.plan-entry {
+  color: var(--amber);
+}
+
+.plan-stop {
+  color: var(--loss);
+}
+
+.plan-target {
+  color: var(--gain);
 }
 
 @media (max-width: 760px) {

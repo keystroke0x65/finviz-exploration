@@ -47,7 +47,10 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
   after-hours (4:00-8:00 PM ET) purple; Finviz only has bars when a trade happened, so a
   thinly traded stock shows only a sliver of each. The top-left corner shows the open, high,
   low, close, change and volume of the bar under the mouse (the latest bar when the mouse is
-  off the chart). Click a setup to draw its entry, stop and target. Tickers anywhere in the app open this tab; the small "Finviz" link opens Finviz.
+  off the chart). Each setup in the side list shows its entry, stop, target (marked
+  "capped" when a nearby level limits it), reward:risk and risk %, plus its score and
+  Sykes grade (hover the grade for its factors); click it to draw its entry, stop and
+  target on the chart. Tickers anywhere in the app open this tab; the small "Finviz" link opens Finviz.
 - **Screens** tab: saved Finviz screens. Paste a Finviz screener URL (build it on
   finviz.com, copy the address bar) or use the form for country, price, float, market cap,
   volume and relative volume. Running a screen shows price, change, after-hours change,

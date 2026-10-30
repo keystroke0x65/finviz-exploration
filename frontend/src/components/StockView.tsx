@@ -13,10 +13,11 @@ import {
   Warning,
 } from "../api/setups";
 import { fetchQuote, Quote, refreshQuote } from "../api/stocks";
-import { finvizQuoteUrl, formatPrice } from "../format";
+import { finvizQuoteUrl, formatPrice, MISSING_VALUE } from "../format";
 import { describeSetupState } from "../setupState";
 import { CandleChart, ChartLevel } from "./CandleChart";
 import { QuoteTable } from "./QuoteTable";
+import { SlidingScaleBadge } from "./SlidingScaleBadge";
 import { StockSearch } from "./StockSearch";
 import { describeVerdictAge, VerdictBadge } from "./VerdictBadge";
 
@@ -68,6 +69,49 @@ function setupLevels(setup: Setup | Warning): ChartLevel[] {
     { price: setup.stop, label: "Stop", kind: "stop" },
     { price: setup.capped_target, label: setup.blocking_level != null ? "Target (capped)" : "Target 3R", kind: "target" },
   ];
+}
+
+function TradePlanFigures({ setup }: { setup: Setup }) {
+  // Coloured like the chart's entry, stop and target lines so the two read together.
+  const figures: [string, number, string][] = [
+    ["Entry", setup.entry, "entry"],
+    ["Stop", setup.stop, "stop"],
+    [setup.blocking_level != null ? "Target (capped)" : "Target", setup.capped_target, "target"],
+  ];
+  return (
+    <>
+      <span className="plan-figures">
+        {figures.map(([label, price, kind]) => (
+          <span key={kind} className="plan-figure">
+            <span className="plan-label">{label}</span>
+            <span className={`plan-price plan-${kind}`}>{formatPrice(price)}</span>
+          </span>
+        ))}
+      </span>
+      <span className="screen-meta">
+        {setup.available_reward_risk.toFixed(1)}R · risk {setup.risk_percent.toFixed(1)}%
+      </span>
+    </>
+  );
+}
+
+function SetupGrades({ setup }: { setup: Setup }) {
+  return (
+    <span className="setup-grades">
+      <span className="setup-grade">
+        <span className="plan-label">Score</span>
+        <span className="plan-price">{setup.score.toFixed(0)}</span>
+      </span>
+      <span className="setup-grade">
+        <span className="plan-label">Sykes</span>
+        {setup.sliding_scale ? (
+          <SlidingScaleBadge scale={setup.sliding_scale} ticker={setup.ticker} />
+        ) : (
+          <span className="plan-price">{MISSING_VALUE}</span>
+        )}
+      </span>
+    </span>
+  );
 }
 
 export function StockView({ ticker, onTickerChange }: StockViewProps) {
@@ -286,16 +330,20 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
                       aria-pressed={setup.id === selectedSetupId}
                       onClick={() => handleSelectSetup(setup)}
                     >
-                      <span className="screen-name">
-                        {patternName(setup.pattern)} <span className="muted">{setup.timeframe}</span>
+                      <span className="setup-heading">
+                        <span className="screen-name">
+                          {patternName(setup.pattern)} <span className="muted">{setup.timeframe}</span>
+                        </span>
+                        <span className="screen-meta">{describeSetupState(setup)}</span>
                       </span>
-                      <span className="screen-meta">
-                        {describeSetupState(setup)} ·{" "}
-                        {isTradeSetup(setup)
-                          ? `Entry ${formatPrice(setup.entry)}, stop ${formatPrice(setup.stop)}, ${setup.available_reward_risk.toFixed(1)}R`
-                          : `Bearish warning, breaks below ${formatPrice(setup.entry)}`}
-                      </span>
+                      {isTradeSetup(setup) ? (
+                        <TradePlanFigures setup={setup} />
+                      ) : (
+                        <span className="screen-meta">Bearish warning, breaks below {formatPrice(setup.entry)}</span>
+                      )}
                     </button>
+                    {/* Outside the select button: the Sykes grade is its own button. */}
+                    {isTradeSetup(setup) && <SetupGrades setup={setup} />}
                   </li>
                 ))}
               </ul>

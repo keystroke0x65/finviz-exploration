@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Setup } from "../api/setups";
 import { StockView } from "./StockView";
@@ -125,6 +125,72 @@ describe("StockView", () => {
 
     await vi.waitFor(() => expect(api.fetchStockSetups).toHaveBeenCalledTimes(2));
     expect(api.runScan).toHaveBeenCalledWith("HOST");
+  });
+
+  it("lists each setup's entry, stop, target, reward:risk and risk", async () => {
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+
+    const setupButton = await screen.findByRole("button", { name: /Bull flag/ });
+    expect(within(setupButton).getByText("Entry").nextElementSibling).toHaveTextContent("2.12");
+    expect(within(setupButton).getByText("Stop").nextElementSibling).toHaveTextContent("2.05");
+    expect(within(setupButton).getByText("Target").nextElementSibling).toHaveTextContent("2.33");
+    expect(within(setupButton).getByText("3.0R · risk 3.3%")).toBeInTheDocument();
+  });
+
+  it("says when a nearby level caps the target", async () => {
+    api.fetchStockSetups.mockResolvedValue({
+      setups: [{ ...SETUP, blocking_level: 2.3, capped_target: 2.3, available_reward_risk: 2.6 }], warnings: [],
+      show_short_setups: false,
+    });
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+
+    const setupButton = await screen.findByRole("button", { name: /Bull flag/ });
+    expect(within(setupButton).getByText("Target (capped)").nextElementSibling).toHaveTextContent("2.30");
+    expect(within(setupButton).getByText("2.6R · risk 3.3%")).toBeInTheDocument();
+  });
+
+  it("shows each setup's score and Sykes grade, with the grade's factors on hover", async () => {
+    api.fetchStockSetups.mockResolvedValue({
+      setups: [{
+        ...SETUP,
+        sliding_scale: { letter: "B", points: 10, factors: [{ name: "Risk/reward", grade: "good", detail: "3.0R (wants 3R+)" }] },
+      }],
+      warnings: [], show_short_setups: false,
+    });
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+
+    const setupItem = (await screen.findByRole("button", { name: /Bull flag/ })).closest("li")!;
+    expect(within(setupItem).getByText("Score").nextElementSibling).toHaveTextContent("80");
+    const grade = within(setupItem).getByRole("button", { name: "Sykes sliding scale B for HOST" });
+    fireEvent.mouseEnter(grade);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Sykes sliding scale: B (10/14)");
+    expect(screen.getByRole("tooltip")).toHaveTextContent("3.0R (wants 3R+)");
+  });
+
+  it("shows a dash for a setup not graded on the Sykes scale yet", async () => {
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+
+    const setupItem = (await screen.findByRole("button", { name: /Bull flag/ })).closest("li")!;
+    expect(within(setupItem).getByText("Sykes").nextElementSibling).toHaveTextContent("—");
+    expect(within(setupItem).queryByRole("button", { name: /Sykes sliding scale/ })).not.toBeInTheDocument();
+  });
+
+  it("shows a bearish warning's breakdown level instead of a trade plan", async () => {
+    api.fetchStockSetups.mockResolvedValue({
+      setups: [], show_short_setups: false,
+      warnings: [{
+        id: 3, ticker: "HOST", pattern: "bear_flag", direction: "short", timeframe: "5m", entry: 1.98,
+        state: "forming", triggered_at: null, key_points: [], detected_at: SETUP.detected_at,
+        last_seen_at: SETUP.last_seen_at,
+      }],
+    });
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+
+    const warningButton = await screen.findByRole("button", { name: /Bear flag/ });
+    expect(within(warningButton).getByText("Bearish warning, breaks below 1.98")).toBeInTheDocument();
+    expect(within(warningButton).queryByText("Target")).not.toBeInTheDocument();
+    // Warnings aren't scored or graded.
+    expect(within(warningButton.closest("li")!).queryByText("Score")).not.toBeInTheDocument();
   });
 
   it("reloads the chart and quote after a scan", async () => {
