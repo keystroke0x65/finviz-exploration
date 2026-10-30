@@ -335,6 +335,21 @@ class SettingsIn(BaseModel):
     show_short_setups: Annotated[bool, Field(strict=True)]
 
 
+# Column widths in pixels. The bounds keep a saved layout usable: no column too thin to
+# grab again, none wider than a screen, no more columns than a table has.
+MIN_COLUMN_WIDTH = 40
+MAX_COLUMN_WIDTH = 2000
+MAX_SAVED_COLUMNS = 40
+ColumnKey = Annotated[str, StringConstraints(pattern=r"^[a-z_]{1,40}$")]
+ColumnWidth = Annotated[int, Field(strict=True, ge=MIN_COLUMN_WIDTH, le=MAX_COLUMN_WIDTH)]
+
+
+class ColumnWidths(BaseModel):
+    """Column widths the user dragged on the Screens table; empty means automatic."""
+
+    widths: Annotated[dict[ColumnKey, ColumnWidth], Field(max_length=MAX_SAVED_COLUMNS)]
+
+
 # --- Track record (phase 2, milestone 3) ---
 
 

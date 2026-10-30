@@ -1,7 +1,13 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScreenRow, ScreenRun } from "../api/screens";
 import { ScreenResultsTable } from "./ScreenResultsTable";
+
+const settingsApi = vi.hoisted(() => ({ fetchScreenColumnWidths: vi.fn(), saveScreenColumnWidths: vi.fn() }));
+vi.mock("../api/settings", () => ({
+  fetchScreenColumnWidths: () => settingsApi.fetchScreenColumnWidths(),
+  saveScreenColumnWidths: (widths: Record<string, number>) => settingsApi.saveScreenColumnWidths(widths),
+}));
 
 const HOST: ScreenRow = {
   ticker: "HOST", company: "Host Digital Inc", country: "USA", market_cap_millions: 79.8,
@@ -16,8 +22,15 @@ function run(overrides: Partial<ScreenRun> = {}): ScreenRun {
 }
 
 describe("ScreenResultsTable", () => {
+  beforeEach(() => {
+    settingsApi.fetchScreenColumnWidths.mockResolvedValue({});
+    settingsApi.saveScreenColumnWidths.mockImplementation((widths) => Promise.resolve(widths));
+  });
+
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   it("renders a row with formatted numbers and a news link", () => {
@@ -156,5 +169,92 @@ describe("ScreenResultsTable", () => {
     render(<ScreenResultsTable run={run()} onAddToWatchlist={vi.fn()} watchlistTickers={new Set(["HOST"])} onOpenStock={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: "HOST is on the watchlist" })).toBeDisabled();
+  });
+
+  describe("column widths", () => {
+    const SAVED = {
+      ticker: 180, price: 90, change_percent: 80, after_hours_change_percent: 90, volume: 100, relative_volume: 70,
+      float_millions: 80, market_cap_millions: 90, news: 300, score: 90, sykes: 60, verdict: 110, actions: 120,
+    };
+
+    function renderTable() {
+      render(<ScreenResultsTable run={run()} onAddToWatchlist={vi.fn()} watchlistTickers={new Set()} onOpenStock={vi.fn()} />);
+    }
+
+    function header(label: string) {
+      return screen.getByRole("button", { name: `Sort by ${label}` }).closest("th")!;
+    }
+
+    it("uses the widths saved earlier", async () => {
+      settingsApi.fetchScreenColumnWidths.mockResolvedValue(SAVED);
+      renderTable();
+
+      expect(await screen.findByRole("separator", { name: "Resize Price column" })).toHaveAttribute("aria-valuenow", "90");
+      expect(header("Price")).toHaveStyle({ width: "90px" });
+    });
+
+    it("resizes a column by dragging its edge and saves the new width", async () => {
+      settingsApi.fetchScreenColumnWidths.mockResolvedValue(SAVED);
+      renderTable();
+      const edge = await screen.findByRole("separator", { name: "Resize Price column" });
+      await waitFor(() => expect(edge).toHaveAttribute("aria-valuenow", "90"));
+
+      fireEvent.mouseDown(edge, { clientX: 100 });
+      fireEvent.mouseMove(window, { clientX: 140 });
+      expect(header("Price")).toHaveStyle({ width: "130px" });
+      expect(settingsApi.saveScreenColumnWidths).not.toHaveBeenCalled();
+      fireEvent.mouseUp(window, { clientX: 140 });
+
+      expect(settingsApi.saveScreenColumnWidths).toHaveBeenCalledWith({ ...SAVED, price: 130 });
+    });
+
+    it("never makes a column thinner than its edge can be grabbed again", async () => {
+      settingsApi.fetchScreenColumnWidths.mockResolvedValue(SAVED);
+      renderTable();
+      const edge = await screen.findByRole("separator", { name: "Resize Price column" });
+      await waitFor(() => expect(edge).toHaveAttribute("aria-valuenow", "90"));
+
+      fireEvent.mouseDown(edge, { clientX: 100 });
+      fireEvent.mouseMove(window, { clientX: -500 });
+      fireEvent.mouseUp(window);
+
+      expect(settingsApi.saveScreenColumnWidths).toHaveBeenCalledWith({ ...SAVED, price: 40 });
+    });
+
+    it("starts from the columns' current widths the first time one is resized", async () => {
+      vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width: 100 } as DOMRect);
+      renderTable();
+      await waitFor(() => expect(settingsApi.fetchScreenColumnWidths).toHaveBeenCalled());
+
+      fireEvent.keyDown(screen.getByRole("separator", { name: "Resize Latest news column" }), { key: "ArrowRight" });
+
+      const saved = settingsApi.saveScreenColumnWidths.mock.calls[0][0];
+      expect(saved.news).toBe(110);
+      expect(saved.price).toBe(100);
+      expect(Object.keys(saved)).toHaveLength(Object.keys(SAVED).length);
+    });
+
+    it("goes back to automatic widths on reset", async () => {
+      settingsApi.fetchScreenColumnWidths.mockResolvedValue(SAVED);
+      renderTable();
+
+      fireEvent.click(await screen.findByRole("button", { name: "Reset column widths" }));
+
+      expect(settingsApi.saveScreenColumnWidths).toHaveBeenCalledWith({});
+      await waitFor(() => expect(header("Price").style.width).toBe(""));
+      expect(screen.queryByRole("button", { name: "Reset column widths" })).not.toBeInTheDocument();
+    });
+
+    it("says when the widths couldn't be saved", async () => {
+      settingsApi.fetchScreenColumnWidths.mockResolvedValue(SAVED);
+      settingsApi.saveScreenColumnWidths.mockRejectedValue(new Error("Request failed (500)"));
+      renderTable();
+      const edge = await screen.findByRole("separator", { name: "Resize Price column" });
+      await waitFor(() => expect(edge).toHaveAttribute("aria-valuenow", "90"));
+
+      fireEvent.keyDown(edge, { key: "ArrowLeft" });
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't save column widths: Request failed (500)");
+    });
   });
 });

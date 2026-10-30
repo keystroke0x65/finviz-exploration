@@ -59,7 +59,10 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
   the hover card) and its verdict, with links to Finviz and an "add to watchlist" button.
   Stocks without a setup in the latest scan (or never scanned) show "—"; short setups only
   count when "Show short setups" is on. The page uses the full window width, so the table
-  fits from about 1600px wide; on narrower windows it scrolls sideways with the ticker pinned. Two screens are created on first start: "Top gainers —
+  fits from about 1600px wide; on narrower windows it scrolls sideways with the ticker pinned.
+  Drag the right edge of any header to resize that column (or focus the edge with Tab and
+  use the arrow keys). Widths are saved in the database, so they stay after restarting
+  the app or browser; "Reset column widths" goes back to automatic sizing. Two screens are created on first start: "Top gainers —
   low float" (feeds the watchlist) and "After-hours".
 - **Watchlist** tab: filled automatically from every screen marked "feeds watchlist".
   While the backend runs, the feeder runs every 15 minutes on weekdays from 04:00 to 20:00

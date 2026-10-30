@@ -1209,3 +1209,45 @@ input[type="checkbox"] {
 .sticky-first-column th:first-child {
   z-index: 2;
 }
+
+/* Resizable Screens columns: drag a header's right edge (or focus it and use the arrow keys). */
+.results-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.column-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  border-right: 2px solid transparent;
+}
+
+.column-resizer:hover,
+.column-resizer:focus-visible {
+  border-right-color: var(--amber);
+  outline: none;
+}
+
+/* Saved widths: columns keep exactly the width dragged, and long text is cut with "…". */
+.has-column-widths {
+  table-layout: fixed;
+}
+
+.has-column-widths th,
+.has-column-widths td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.has-column-widths .company,
+.has-column-widths .headline,
+.has-column-widths .top-setup-name {
+  min-width: 0;
+  max-width: 100%;
+}

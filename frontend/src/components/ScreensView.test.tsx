@@ -20,6 +20,10 @@ vi.mock("../api/screens", async (importOriginal) => ({
   deleteScreen: (id: number) => api.deleteScreen(id),
 }));
 const addToWatchlist = vi.fn();
+vi.mock("../api/settings", () => ({
+  fetchScreenColumnWidths: () => Promise.resolve({}),
+  saveScreenColumnWidths: (widths: Record<string, number>) => Promise.resolve(widths),
+}));
 vi.mock("../api/watchlist", () => ({
   addToWatchlist: (ticker: string) => addToWatchlist(ticker),
   listWatchlist: () => Promise.resolve([]),
