@@ -215,3 +215,44 @@ def test_parse_url_reports_unused_url_parts(api_client):
     body = api_client.post("/api/screens/parse-url", json={"url": url}).json()
 
     assert body["ignored_params"] == ["t", "r"]
+
+
+WORX_ROW = ScreenRow(**{**HOST_ROW.__dict__, "ticker": "WORX"})
+
+
+@patch("app.routes.screens.run_screen", return_value=ScreenResult([HOST_ROW, WORX_ROW]))
+def test_run_screen_adds_each_stocks_best_setup_and_verdict(mock_run_screen, api_client, db_conn):
+    from app.patterns.sliding_scale import SlidingScale
+    from app.patterns.verdict import Verdict
+    from app.scanning.verdicts import save_verdict
+    from tests.test_setups_routes import NOW, store_setup
+
+    store_setup(db_conn, "HOST", pattern="bull_flag", score=70.0, sliding_scale=SlidingScale("C", 8, []))
+    store_setup(db_conn, "HOST", pattern="flat_top_breakout", score=85.0, sliding_scale=SlidingScale("B", 10, []))
+    save_verdict(db_conn, "HOST", Verdict("leans_long", 0.4, {}, ["Above 5 of 5 trend lines"]), NOW)
+    created = _create(api_client)
+
+    rows = {row["ticker"]: row for row in api_client.post(f"/api/screens/{created['id']}/run").json()["rows"]}
+
+    assert rows["HOST"]["top_setup"] == {
+        "pattern": "flat_top_breakout", "timeframe": "1m", "score": 85.0,
+        "sliding_scale": {"letter": "B", "points": 10, "factors": []},
+    }
+    assert rows["HOST"]["verdict"]["call"] == "leans_long"
+    assert rows["WORX"]["top_setup"] is None
+    assert rows["WORX"]["verdict"] is None
+
+
+@patch("app.routes.screens.run_screen", return_value=ScreenResult([HOST_ROW]))
+def test_run_screen_skips_short_setups_while_they_are_hidden(mock_run_screen, api_client, db_conn):
+    from tests.test_setups_routes import store_setup
+
+    store_setup(db_conn, "HOST", direction="short", pattern="low_of_day_break")
+    created = _create(api_client)
+
+    hidden = api_client.post(f"/api/screens/{created['id']}/run").json()["rows"][0]
+    api_client.put("/api/settings", json={"show_short_setups": True})
+    shown = api_client.post(f"/api/screens/{created['id']}/run").json()["rows"][0]
+
+    assert hidden["top_setup"] is None
+    assert shown["top_setup"]["pattern"] == "low_of_day_break"

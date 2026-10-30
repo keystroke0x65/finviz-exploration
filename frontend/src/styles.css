@@ -191,9 +191,10 @@ input[type="checkbox"] {
   border-bottom-color: var(--amber);
 }
 
+/* No width cap: the Screens and Setups tables have many columns and should use a wide
+   window instead of scrolling sideways next to empty space. */
 .app-main {
   padding: var(--gutter);
-  max-width: 1500px;
 }
 
 /* Session strip: the trading day from 4:00 AM to 8:00 PM ET */
@@ -485,7 +486,7 @@ input[type="checkbox"] {
 }
 
 .company {
-  max-width: 22ch;
+  max-width: 18ch;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -497,12 +498,16 @@ input[type="checkbox"] {
   font-size: 0.85em;
 }
 
+/* One line when the window is wide; wraps to two (down to 16ch) when the table is
+   short of room, so the columns after it don't get pushed out of view. */
 .headline {
-  display: inline-block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  min-width: 16ch;
   max-width: 28ch;
   overflow: hidden;
-  text-overflow: ellipsis;
-  vertical-align: bottom;
+  white-space: normal;
 }
 
 .row-actions {
@@ -950,11 +955,6 @@ input[type="checkbox"] {
   border-left-color: var(--amber);
 }
 
-.small-link {
-  font-size: var(--size-small);
-  color: var(--text-muted);
-}
-
 .setup-select:has(+ .setup-grades) {
   padding-bottom: 0.3rem;
 }
@@ -1019,6 +1019,11 @@ input[type="checkbox"] {
 
 .plan-target {
   color: var(--gain);
+}
+
+.small-link {
+  font-size: var(--size-small);
+  color: var(--text-muted);
 }
 
 @media (max-width: 760px) {
@@ -1181,4 +1186,26 @@ input[type="checkbox"] {
 
 .sort-arrow {
   font-size: 0.7em;
+}
+
+/* Wraps under the score rather than widening the column. */
+.top-setup-name {
+  font-size: 0.75rem;
+  min-width: 13ch;
+  max-width: 13ch;
+  margin-left: auto;
+  white-space: normal;
+}
+
+/* The Screens table is wider than the page; keep the ticker in view while it scrolls. */
+.sticky-first-column th:first-child,
+.sticky-first-column td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--panel);
+}
+
+.sticky-first-column th:first-child {
+  z-index: 2;
 }

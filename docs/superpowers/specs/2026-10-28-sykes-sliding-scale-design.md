@@ -49,6 +49,9 @@ Short setups are graded the same way.
   this change show "—".
 - `GET /api/setups` and `/api/stocks/{ticker}/setups` return `sliding_scale` on each
   setup (null when not graded).
+- `POST /api/screens/{id}/run` adds `top_setup` (pattern, timeframe, score,
+  sliding_scale of the stock's highest-scoring current setup, or null) and `verdict` to
+  each row, so the Screens tab shows Score, Sykes and Verdict after Latest news.
 
 ## Sources
 

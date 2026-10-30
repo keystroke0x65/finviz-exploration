@@ -88,11 +88,6 @@ class ScreenRowOut(BaseModel):
     news_title: str | None
 
 
-class ScreenRunOut(BaseModel):
-    rows: list[ScreenRowOut]
-    fetched_at: datetime
-
-
 class FormFieldsOut(BaseModel):
     options: dict[str, list]
     signals: dict[str, str]
@@ -242,6 +237,26 @@ class SlidingScaleOut(BaseModel):
     letter: Literal["A", "B", "C", "D", "F"]
     points: int
     factors: list[SlidingScaleFactorOut]
+
+
+class ScreenSetupOut(BaseModel):
+    """A stock's best current setup, as shown beside a screen result."""
+
+    pattern: str
+    timeframe: Literal["1m", "5m", "daily"]
+    score: float
+    sliding_scale: SlidingScaleOut | None
+
+
+class ScreenResultRowOut(ScreenRowOut):
+    # None when the stock has no setup in the latest scan (or was never scanned).
+    top_setup: ScreenSetupOut | None = None
+    verdict: VerdictOut | None = None
+
+
+class ScreenRunOut(BaseModel):
+    rows: list[ScreenResultRowOut]
+    fetched_at: datetime
 
 
 class SetupOut(BaseModel):

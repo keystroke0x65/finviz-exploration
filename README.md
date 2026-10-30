@@ -54,8 +54,12 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
 - **Screens** tab: saved Finviz screens. Paste a Finviz screener URL (build it on
   finviz.com, copy the address bar) or use the form for country, price, float, market cap,
   volume and relative volume. Running a screen shows price, change, after-hours change,
-  volume, relative volume, float, market cap and the latest headline (with the date and time it came out, Eastern; older years show the year), with links to Finviz
-  and an "add to watchlist" button. Two screens are created on first start: "Top gainers —
+  volume, relative volume, float, market cap and the latest headline (with the date and time it came out, Eastern; older years show the year), then the
+  stock's best setup from the latest scan (its score and pattern, and its Sykes grade with
+  the hover card) and its verdict, with links to Finviz and an "add to watchlist" button.
+  Stocks without a setup in the latest scan (or never scanned) show "—"; short setups only
+  count when "Show short setups" is on. The page uses the full window width, so the table
+  fits from about 1600px wide; on narrower windows it scrolls sideways with the ticker pinned. Two screens are created on first start: "Top gainers —
   low float" (feeds the watchlist) and "After-hours".
 - **Watchlist** tab: filled automatically from every screen marked "feeds watchlist".
   While the backend runs, the feeder runs every 15 minutes on weekdays from 04:00 to 20:00

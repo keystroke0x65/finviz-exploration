@@ -120,6 +120,38 @@ describe("ScreenResultsTable", () => {
     expect(onOpenStock).toHaveBeenCalledWith("HOST");
   });
 
+  it("shows the stock's best setup score, its Sykes grade and the verdict after the news", () => {
+    const graded: ScreenRow = {
+      ...HOST,
+      top_setup: {
+        pattern: "flat_top_breakout", timeframe: "5m", score: 81.4,
+        sliding_scale: { letter: "C", points: 8, factors: [{ name: "Time", grade: "poor", detail: "Pre-market (8:21 AM)" }] },
+      },
+      verdict: { call: "leans_long", score: 0.4, parts: {}, reasons: ["Above 2 of 3 trend lines"], computed_at: "2026-10-20T14:00:00Z" },
+    };
+    render(<ScreenResultsTable run={run({ rows: [graded] })} onAddToWatchlist={vi.fn()} watchlistTickers={new Set()} onOpenStock={vi.fn()} />);
+
+    const headers = screen.getAllByRole("columnheader").map((header) => header.textContent);
+    expect(headers.slice(headers.indexOf("Latest news"), headers.indexOf("Latest news") + 4)).toEqual([
+      "Latest news", "Score", "Sykes", "Verdict",
+    ]);
+    const row = screen.getByRole("row", { name: /HOST/ });
+    expect(within(row).getByText("81")).toBeInTheDocument();
+    expect(within(row).getByText("Flat-top breakout 5m")).toBeInTheDocument();
+    expect(within(row).getByText("Leans long")).toBeInTheDocument();
+    expect(within(row).queryByText("Entry")).not.toBeInTheDocument();
+    fireEvent.mouseEnter(within(row).getByRole("button", { name: "Sykes sliding scale C for HOST" }));
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Pre-market (8:21 AM)");
+  });
+
+  it("shows dashes for a stock with no current setup or verdict", () => {
+    render(<ScreenResultsTable run={run({ rows: [{ ...HOST, top_setup: null, verdict: null }] })} onAddToWatchlist={vi.fn()} watchlistTickers={new Set()} onOpenStock={vi.fn()} />);
+
+    const cells = within(screen.getByRole("row", { name: /HOST/ })).getAllByRole("cell");
+    // Score, Sykes and Verdict sit just before the actions cell.
+    expect(cells.slice(-4, -1).map((cell) => cell.textContent)).toEqual(["—", "—", "—"]);
+  });
+
   it("shows tickers already on the watchlist as added", () => {
     render(<ScreenResultsTable run={run()} onAddToWatchlist={vi.fn()} watchlistTickers={new Set(["HOST"])} onOpenStock={vi.fn()} />);
 

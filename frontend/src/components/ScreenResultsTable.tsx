@@ -1,5 +1,6 @@
 import { useState } from "react";
-import type { ScreenRow, ScreenRun } from "../api/screens";
+import type { ScreenRow, ScreenRun, ScreenSetup } from "../api/screens";
+import { patternName } from "../api/setups";
 import {
   changeClass,
   finvizQuoteUrl,
@@ -10,7 +11,9 @@ import {
   isWebUrl,
   MISSING_VALUE,
 } from "../format";
+import { SlidingScaleBadge } from "./SlidingScaleBadge";
 import { StockLink } from "./StockLink";
+import { VerdictBadge } from "./VerdictBadge";
 
 interface ScreenResultsTableProps {
   run: ScreenRun;
@@ -63,6 +66,31 @@ function compareRows(left: ScreenRow, right: ScreenRow, sort: SortState): number
   return sort.isDescending ? -order : order;
 }
 
+function TopSetupCells({ setup, ticker }: { setup: ScreenSetup | null | undefined; ticker: string }) {
+  if (!setup) {
+    return (
+      <>
+        <td className="number">{MISSING_VALUE}</td>
+        <td className="number">{MISSING_VALUE}</td>
+      </>
+    );
+  }
+  return (
+    <>
+      <td className="number">
+        {setup.score.toFixed(0)}
+        {/* A stock can have several setups; say which one the score belongs to. */}
+        <div className="muted top-setup-name">
+          {patternName(setup.pattern)} {setup.timeframe}
+        </div>
+      </td>
+      <td className="number">
+        {setup.sliding_scale ? <SlidingScaleBadge scale={setup.sliding_scale} ticker={ticker} /> : MISSING_VALUE}
+      </td>
+    </>
+  );
+}
+
 export function ScreenResultsTable({ run, onAddToWatchlist, watchlistTickers, onOpenStock }: ScreenResultsTableProps) {
   // Null keeps Finviz's own order (the screen's sort setting).
   const [sort, setSort] = useState<SortState | null>(null);
@@ -88,7 +116,7 @@ export function ScreenResultsTable({ run, onAddToWatchlist, watchlistTickers, on
     <>
       <p className="fetched-at">Fetched {new Date(run.fetched_at).toLocaleTimeString()}</p>
       <div className="table-scroll">
-      <table className="data-table">
+      <table className="data-table sticky-first-column">
         <thead>
           <tr>
             {COLUMNS.map((column) => (
@@ -106,6 +134,9 @@ export function ScreenResultsTable({ run, onAddToWatchlist, watchlistTickers, on
               </th>
             ))}
             <th>Latest news</th>
+            <th className="number">Score</th>
+            <th className="number">Sykes</th>
+            <th>Verdict</th>
             <th>
               <span className="visually-hidden">Actions</span>
             </th>
@@ -151,6 +182,10 @@ export function ScreenResultsTable({ run, onAddToWatchlist, watchlistTickers, on
                 ) : (
                   <span className="headline">{row.news_title ?? MISSING_VALUE}</span>
                 )}
+              </td>
+              <TopSetupCells setup={row.top_setup} ticker={row.ticker} />
+              <td>
+                <VerdictBadge verdict={row.verdict} />
               </td>
               <td>
                 <div className="row-actions">
