@@ -43,6 +43,17 @@ export interface Setup {
   has_conflict: boolean;
   verdict?: Verdict | null;
   track_record?: TrackRecordSummary | null;
+  // null for setups recorded before the grade existed, until their next scan.
+  sliding_scale?: SlidingScale | null;
+}
+
+export type SlidingScaleFactorGrade = "good" | "ok" | "poor" | "no_data";
+
+// Our grading of Tim Sykes's sliding scale: seven factors worth 2/1/0 points each.
+export interface SlidingScale {
+  letter: "A" | "B" | "C" | "D" | "F";
+  points: number;
+  factors: { name: string; grade: SlidingScaleFactorGrade; detail: string }[];
 }
 
 export interface TrackRecordSummary {

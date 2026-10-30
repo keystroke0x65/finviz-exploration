@@ -50,6 +50,86 @@ describe("SetupsView", () => {
     vi.clearAllMocks();
   });
 
+  it("shows each setup's Sykes sliding scale grade next to its score", async () => {
+    respond([
+      setup({
+        sliding_scale: {
+          letter: "B", points: 10,
+          factors: [
+            { name: "Risk/reward", grade: "good", detail: "3.0R (wants 3R+)" },
+            { name: "Time", grade: "poor", detail: "Pre-market (7:05 AM)" },
+            { name: "Market", grade: "no_data", detail: "No market data" },
+          ],
+        },
+      }),
+      setup({ id: 2, ticker: "WORX", sliding_scale: null }),
+    ]);
+    render(<SetupsView onOpenStock={vi.fn()} />);
+
+    const headers = (await screen.findAllByRole("columnheader")).map((header) => header.textContent);
+    expect(headers.slice(-2)).toEqual(["Score", "Sykes"]);
+    const grade = screen.getByRole("button", { name: "Sykes sliding scale B for HOST" });
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    fireEvent.mouseEnter(grade);
+    const card = screen.getByRole("tooltip");
+    expect(card).toHaveTextContent("Sykes sliding scale: B (10/14)");
+    expect(within(card).getByText("Risk/reward").closest("li")).toHaveTextContent("3.0R (wants 3R+)");
+    expect(within(card).getByText("Time").closest("li")).toHaveAttribute("data-grade", "poor");
+    expect(within(card).getByText("Market").closest("li")).toHaveTextContent("No market data");
+
+    fireEvent.mouseLeave(grade);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("opens the sliding scale card from the keyboard too", async () => {
+    respond([setup({ sliding_scale: { letter: "A", points: 13, factors: [] } })]);
+    render(<SetupsView onOpenStock={vi.fn()} />);
+
+    fireEvent.focus(await screen.findByRole("button", { name: "Sykes sliding scale A for HOST" }));
+
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Sykes sliding scale: A (13/14)");
+  });
+
+  it("sorts by Sykes grade when its header is clicked, and back by score when clicked again", async () => {
+    const graded = (letter: "A" | "B" | "C" | "D" | "F", points: number) => ({ letter, points, factors: [] });
+    respond([
+      setup({ id: 1, ticker: "AAA", score: 90, sliding_scale: graded("C", 8) }),
+      setup({ id: 2, ticker: "BBB", score: 80, sliding_scale: null }),
+      setup({ id: 3, ticker: "CCC", score: 70, sliding_scale: graded("B", 10) }),
+      setup({ id: 4, ticker: "DDD", score: 60, sliding_scale: graded("B", 11) }),
+      setup({ id: 5, ticker: "EEE", score: 50, sliding_scale: graded("C", 8) }),
+    ]);
+    render(<SetupsView onOpenStock={vi.fn()} />);
+    const tickerOrder = () =>
+      screen.getAllByRole("button", { name: /^Score details for/ }).map((button) =>
+        (button.getAttribute("aria-label") ?? "").replace("Score details for ", ""),
+      );
+    expect(await screen.findByRole("button", { name: "Score details for AAA" })).toBeInTheDocument();
+    expect(tickerOrder()).toEqual(["AAA", "BBB", "CCC", "DDD", "EEE"]);
+
+    const sortButton = screen.getByRole("button", { name: "Sykes" });
+    fireEvent.click(sortButton);
+
+    // Best letter first, more points first within a letter, then score; ungraded last.
+    expect(tickerOrder()).toEqual(["DDD", "CCC", "AAA", "EEE", "BBB"]);
+    expect(sortButton).toHaveAttribute("aria-pressed", "true");
+    expect(sortButton.closest("th")).toHaveAttribute("aria-sort", "descending");
+
+    fireEvent.click(sortButton);
+
+    expect(tickerOrder()).toEqual(["AAA", "BBB", "CCC", "DDD", "EEE"]);
+    expect(sortButton).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("shows a dash for setups not graded yet", async () => {
+    respond([setup({ sliding_scale: null })]);
+    render(<SetupsView onOpenStock={vi.fn()} />);
+
+    const row = (await screen.findByRole("button", { name: "Score details for HOST" })).closest("tr") as HTMLElement;
+    expect(row.lastElementChild).toHaveTextContent("—");
+  });
+
   it("says when the last scan ran", async () => {
     respond([setup()]);
     render(<SetupsView onOpenStock={vi.fn()} />);

@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import date, datetime
 
 import pytest
@@ -250,3 +251,51 @@ def test_refreshing_scan_refetches_intraday_bars_but_keeps_daily_cache(db_conn):
     run_scan(db_conn, NOW.replace(second=20), scan_deps, tickers=["HOST"], should_refresh_intraday=True)
 
     assert sorted(fetched) == ["1m", "1m", "5m", "5m", "daily"]
+
+
+def movers_deps(changes):
+    fetched = []
+
+    def fetch_market_movers():
+        fetched.append(True)
+        return [replace(snapshot(f"M{index}"), change_percent=change) for index, change in enumerate(changes)]
+
+    return replace(deps(), fetch_market_movers=fetch_market_movers), fetched
+
+
+def test_full_scan_grades_setups_on_the_sliding_scale_with_the_market_count(db_conn):
+    add_manual_entry(db_conn, "HOST", NOW)
+    scan_deps, fetched = movers_deps([35.0] * 11 + [22.0])
+
+    run_scan(db_conn, NOW, scan_deps)
+
+    assert fetched == [True]
+    grades = [setup.sliding_scale for setup in list_current_setups(db_conn, "HOST")]
+    assert grades and all(grade is not None for grade in grades)
+    market = next(factor for factor in grades[0].factors if factor.name == "Market")
+    assert (market.grade, market.detail) == ("good", "11 US stocks up 30%+ today")
+
+
+def test_one_stock_scan_reuses_todays_market_count_without_fetching_it(db_conn):
+    add_manual_entry(db_conn, "HOST", NOW)
+    run_scan(db_conn, NOW, movers_deps([35.0] * 6)[0])
+    scan_deps, fetched = movers_deps([35.0] * 20)
+
+    run_scan(db_conn, NOW.replace(minute=50), scan_deps, tickers=["HOST"])
+
+    assert fetched == []
+    grade = list_current_setups(db_conn, "HOST")[0].sliding_scale
+    assert next(factor for factor in grade.factors if factor.name == "Market").detail == "6 US stocks up 30%+ today"
+
+
+def test_market_count_failure_does_not_stop_the_scan(db_conn):
+    add_manual_entry(db_conn, "HOST", NOW)
+
+    def failing_movers():
+        raise FinvizUnavailableError("market movers", "ReadTimeout")
+
+    result = run_scan(db_conn, NOW, replace(deps(), fetch_market_movers=failing_movers))
+
+    assert result.scanned == ["HOST"]
+    grade = list_current_setups(db_conn, "HOST")[0].sliding_scale
+    assert next(factor for factor in grade.factors if factor.name == "Market").grade == "no_data"

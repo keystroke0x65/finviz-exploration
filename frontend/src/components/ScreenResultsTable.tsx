@@ -1,5 +1,7 @@
-import { useState } from "react";
-import type { ScreenRow, ScreenRun } from "../api/screens";
+import { useRef, useState } from "react";
+import type { ColumnWidths } from "../api/settings";
+import type { ScreenRow, ScreenRun, ScreenSetup } from "../api/screens";
+import { patternName } from "../api/setups";
 import {
   changeClass,
   finvizQuoteUrl,
@@ -10,7 +12,10 @@ import {
   isWebUrl,
   MISSING_VALUE,
 } from "../format";
+import { clampColumnWidth, MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH, useScreenColumnWidths } from "../screenColumnWidths";
+import { SlidingScaleBadge } from "./SlidingScaleBadge";
 import { StockLink } from "./StockLink";
+import { VerdictBadge } from "./VerdictBadge";
 
 interface ScreenResultsTableProps {
   run: ScreenRun;
@@ -48,6 +53,19 @@ const COLUMNS: Column[] = [
   { key: "market_cap_millions", label: "Mkt cap (M)", isNumeric: true },
 ];
 
+// The headers after the sortable ones; actions has no label or resize handle.
+const OTHER_HEADERS: { key: string; label: string; isNumeric: boolean }[] = [
+  { key: "news", label: "Latest news", isNumeric: false },
+  { key: "score", label: "Score", isNumeric: true },
+  { key: "sykes", label: "Sykes", isNumeric: true },
+  { key: "verdict", label: "Verdict", isNumeric: false },
+];
+const ACTIONS_KEY = "actions";
+const WIDTH_KEYS = [...COLUMNS.map((column) => column.key), ...OTHER_HEADERS.map((header) => header.key), ACTIONS_KEY];
+// For a column added after a layout was saved.
+const DEFAULT_COLUMN_WIDTH = 100;
+const KEYBOARD_STEPS: Record<string, number> = { ArrowLeft: -10, ArrowRight: 10 };
+
 interface SortState {
   column: SortableColumn;
   isDescending: boolean;
@@ -63,9 +81,124 @@ function compareRows(left: ScreenRow, right: ScreenRow, sort: SortState): number
   return sort.isDescending ? -order : order;
 }
 
+function TopSetupCells({ setup, ticker }: { setup: ScreenSetup | null | undefined; ticker: string }) {
+  if (!setup) {
+    return (
+      <>
+        <td className="number">{MISSING_VALUE}</td>
+        <td className="number">{MISSING_VALUE}</td>
+      </>
+    );
+  }
+  return (
+    <>
+      <td className="number">
+        {setup.score.toFixed(0)}
+        {/* A stock can have several setups; say which one the score belongs to. */}
+        <div className="muted top-setup-name">
+          {patternName(setup.pattern)} {setup.timeframe}
+        </div>
+      </td>
+      <td className="number">
+        {setup.sliding_scale ? <SlidingScaleBadge scale={setup.sliding_scale} ticker={ticker} /> : MISSING_VALUE}
+      </td>
+    </>
+  );
+}
+
+interface ColumnResizerProps {
+  label: string;
+  width: number | undefined;
+  onDragStart: (startX: number) => void;
+  onStep: (step: number) => void;
+}
+
+function ColumnResizer({ label, width, onDragStart, onStep }: ColumnResizerProps) {
+  return (
+    <span
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={`Resize ${label} column`}
+      aria-valuenow={width}
+      aria-valuemin={MIN_COLUMN_WIDTH}
+      aria-valuemax={MAX_COLUMN_WIDTH}
+      tabIndex={0}
+      className="column-resizer"
+      onMouseDown={(event) => {
+        event.preventDefault(); // don't start selecting header text
+        onDragStart(event.clientX);
+      }}
+      onKeyDown={(event) => {
+        const step = KEYBOARD_STEPS[event.key];
+        if (step === undefined) return;
+        event.preventDefault();
+        onStep(step);
+      }}
+    />
+  );
+}
+
 export function ScreenResultsTable({ run, onAddToWatchlist, watchlistTickers, onOpenStock }: ScreenResultsTableProps) {
   // Null keeps Finviz's own order (the screen's sort setting).
   const [sort, setSort] = useState<SortState | null>(null);
+  const columnWidths = useScreenColumnWidths();
+  const headerCells = useRef<Record<string, HTMLTableCellElement | null>>({});
+
+  // The first resize pins every column at the width it has now, so only the dragged one moves.
+  function currentWidths(): ColumnWidths {
+    if (columnWidths.widths) return columnWidths.widths;
+    return Object.fromEntries(
+      WIDTH_KEYS.map((key) => [key, clampColumnWidth(headerCells.current[key]?.getBoundingClientRect().width ?? 0)]),
+    );
+  }
+
+  function withWidth(base: ColumnWidths, key: string, width: number): ColumnWidths {
+    return { ...base, [key]: clampColumnWidth(width) };
+  }
+
+  function startDrag(key: string, startX: number) {
+    const base = currentWidths();
+    const startWidth = base[key] ?? DEFAULT_COLUMN_WIDTH;
+    let latest = base;
+    function handleMove(event: MouseEvent) {
+      latest = withWidth(base, key, startWidth + event.clientX - startX);
+      columnWidths.showWidths(latest);
+    }
+    function handleUp() {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+      // A click without a drag shouldn't pin the automatic layout.
+      if (latest !== base) columnWidths.saveWidths(latest);
+    }
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+  }
+
+  function stepWidth(key: string, step: number) {
+    const base = currentWidths();
+    columnWidths.saveWidths(withWidth(base, key, (base[key] ?? DEFAULT_COLUMN_WIDTH) + step));
+  }
+
+  function headerProps(key: string) {
+    const width = columnWidths.widths ? (columnWidths.widths[key] ?? DEFAULT_COLUMN_WIDTH) : undefined;
+    return {
+      ref: (cell: HTMLTableCellElement | null) => {
+        headerCells.current[key] = cell;
+      },
+      style: width === undefined ? undefined : { width },
+    };
+  }
+
+  function resizer(key: string, label: string) {
+    return (
+      <ColumnResizer
+        label={label}
+        width={columnWidths.widths?.[key]}
+        onDragStart={(startX) => startDrag(key, startX)}
+        onStep={(step) => stepWidth(key, step)}
+      />
+    );
+  }
 
   function handleSort(column: Column) {
     const isSameColumn = sort?.column === column.key;
@@ -83,16 +216,36 @@ export function ScreenResultsTable({ run, onAddToWatchlist, watchlistTickers, on
   }
 
   const rows = sort ? [...run.rows].sort((left, right) => compareRows(left, right, sort)) : run.rows;
+  const savedWidths = columnWidths.widths;
+  // Saved widths need a fixed layout, or the browser stretches columns back to fit their content.
+  const tableStyle = savedWidths
+    ? { width: WIDTH_KEYS.reduce((total, key) => total + (savedWidths[key] ?? DEFAULT_COLUMN_WIDTH), 0) }
+    : undefined;
 
   return (
     <>
-      <p className="fetched-at">Fetched {new Date(run.fetched_at).toLocaleTimeString()}</p>
+      <div className="results-meta">
+        <p className="fetched-at">Fetched {new Date(run.fetched_at).toLocaleTimeString()}</p>
+        {savedWidths && (
+          <button type="button" className="button-quiet" onClick={columnWidths.resetWidths}>
+            Reset column widths
+          </button>
+        )}
+      </div>
+      {columnWidths.error && (
+        <p role="alert" className="alert">
+          {columnWidths.error}
+        </p>
+      )}
       <div className="table-scroll">
-      <table className="data-table">
+      <table
+        className={`data-table sticky-first-column${savedWidths ? " has-column-widths" : ""}`}
+        style={tableStyle}
+      >
         <thead>
           <tr>
             {COLUMNS.map((column) => (
-              <th key={column.key} className={column.isNumeric ? "number" : undefined}>
+              <th key={column.key} className={column.isNumeric ? "number" : undefined} {...headerProps(column.key)}>
                 <button
                   type="button"
                   className="sort-button"
@@ -103,10 +256,16 @@ export function ScreenResultsTable({ run, onAddToWatchlist, watchlistTickers, on
                   {column.label}
                   {sort?.column === column.key && (sort.isDescending ? " ▼" : " ▲")}
                 </button>
+                {resizer(column.key, column.label)}
               </th>
             ))}
-            <th>Latest news</th>
-            <th>
+            {OTHER_HEADERS.map((header) => (
+              <th key={header.key} className={header.isNumeric ? "number" : undefined} {...headerProps(header.key)}>
+                {header.label}
+                {resizer(header.key, header.label)}
+              </th>
+            ))}
+            <th {...headerProps(ACTIONS_KEY)}>
               <span className="visually-hidden">Actions</span>
             </th>
           </tr>
@@ -151,6 +310,10 @@ export function ScreenResultsTable({ run, onAddToWatchlist, watchlistTickers, on
                 ) : (
                   <span className="headline">{row.news_title ?? MISSING_VALUE}</span>
                 )}
+              </td>
+              <TopSetupCells setup={row.top_setup} ticker={row.ticker} />
+              <td>
+                <VerdictBadge verdict={row.verdict} />
               </td>
               <td>
                 <div className="row-actions">

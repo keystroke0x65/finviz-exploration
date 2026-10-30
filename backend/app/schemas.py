@@ -88,11 +88,6 @@ class ScreenRowOut(BaseModel):
     news_title: str | None
 
 
-class ScreenRunOut(BaseModel):
-    rows: list[ScreenRowOut]
-    fetched_at: datetime
-
-
 class FormFieldsOut(BaseModel):
     options: dict[str, list]
     signals: dict[str, str]
@@ -230,6 +225,40 @@ class ScanStatusOut(BaseModel):
     is_overdue: bool
 
 
+class SlidingScaleFactorOut(BaseModel):
+    name: str
+    grade: Literal["good", "ok", "poor", "no_data"]
+    detail: str
+
+
+class SlidingScaleOut(BaseModel):
+    """Our grading of Tim Sykes's sliding scale: seven factors, 2/1/0 points each."""
+
+    letter: Literal["A", "B", "C", "D", "F"]
+    points: int
+    factors: list[SlidingScaleFactorOut]
+
+
+class ScreenSetupOut(BaseModel):
+    """A stock's best current setup, as shown beside a screen result."""
+
+    pattern: str
+    timeframe: Literal["1m", "5m", "daily"]
+    score: float
+    sliding_scale: SlidingScaleOut | None
+
+
+class ScreenResultRowOut(ScreenRowOut):
+    # None when the stock has no setup in the latest scan (or was never scanned).
+    top_setup: ScreenSetupOut | None = None
+    verdict: VerdictOut | None = None
+
+
+class ScreenRunOut(BaseModel):
+    rows: list[ScreenResultRowOut]
+    fetched_at: datetime
+
+
 class SetupOut(BaseModel):
     id: int
     ticker: str
@@ -258,6 +287,7 @@ class SetupOut(BaseModel):
     has_conflict: bool
     verdict: VerdictOut | None = None
     track_record: "TrackRecordSummaryOut | None" = None
+    sliding_scale: SlidingScaleOut | None = None
 
 
 class WarningOut(BaseModel):
@@ -303,6 +333,21 @@ class SettingsOut(BaseModel):
 
 class SettingsIn(BaseModel):
     show_short_setups: Annotated[bool, Field(strict=True)]
+
+
+# Column widths in pixels. The bounds keep a saved layout usable: no column too thin to
+# grab again, none wider than a screen, no more columns than a table has.
+MIN_COLUMN_WIDTH = 40
+MAX_COLUMN_WIDTH = 2000
+MAX_SAVED_COLUMNS = 40
+ColumnKey = Annotated[str, StringConstraints(pattern=r"^[a-z_]{1,40}$")]
+ColumnWidth = Annotated[int, Field(strict=True, ge=MIN_COLUMN_WIDTH, le=MAX_COLUMN_WIDTH)]
+
+
+class ColumnWidths(BaseModel):
+    """Column widths the user dragged on the Screens table; empty means automatic."""
+
+    widths: Annotated[dict[ColumnKey, ColumnWidth], Field(max_length=MAX_SAVED_COLUMNS)]
 
 
 # --- Track record (phase 2, milestone 3) ---

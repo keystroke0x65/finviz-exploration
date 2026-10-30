@@ -1,4 +1,5 @@
 import { jsonRequest, requestJson } from "./http";
+import type { SlidingScale, Timeframe, Verdict } from "./setups";
 
 export type MarketCapOption =
   | "large_and_under"
@@ -55,6 +56,16 @@ export interface ScreenRow {
   news_time: string | null; // ISO timestamp, Eastern offset
   news_url: string | null;
   news_title: string | null;
+  // The stock's highest-scoring setup from the latest scan; null when it has none.
+  top_setup?: ScreenSetup | null;
+  verdict?: Verdict | null;
+}
+
+export interface ScreenSetup {
+  pattern: string;
+  timeframe: Timeframe;
+  score: number;
+  sliding_scale: SlidingScale | null;
 }
 
 export interface ScreenRun {

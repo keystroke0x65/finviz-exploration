@@ -191,9 +191,10 @@ input[type="checkbox"] {
   border-bottom-color: var(--amber);
 }
 
+/* No width cap: the Screens and Setups tables have many columns and should use a wide
+   window instead of scrolling sideways next to empty space. */
 .app-main {
   padding: var(--gutter);
-  max-width: 1500px;
 }
 
 /* Session strip: the trading day from 4:00 AM to 8:00 PM ET */
@@ -485,7 +486,7 @@ input[type="checkbox"] {
 }
 
 .company {
-  max-width: 22ch;
+  max-width: 18ch;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -497,12 +498,16 @@ input[type="checkbox"] {
   font-size: 0.85em;
 }
 
+/* One line when the window is wide; wraps to two (down to 16ch) when the table is
+   short of room, so the columns after it don't get pushed out of view. */
 .headline {
-  display: inline-block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  min-width: 16ch;
   max-width: 28ch;
   overflow: hidden;
-  text-overflow: ellipsis;
-  vertical-align: bottom;
+  white-space: normal;
 }
 
 .row-actions {
@@ -944,9 +949,76 @@ input[type="checkbox"] {
   border-left: 3px solid transparent;
 }
 
-.setup-select[aria-pressed="true"] {
+.setup-select[aria-pressed="true"],
+.setup-select[aria-pressed="true"] + .setup-grades {
   background: var(--panel-raised);
   border-left-color: var(--amber);
+}
+
+.setup-select:has(+ .setup-grades) {
+  padding-bottom: 0.3rem;
+}
+
+/* Sits under the select button but reads as part of the same row. */
+.setup-grades {
+  display: flex;
+  gap: 1.25rem;
+  padding: 0 0.8rem 0.6rem;
+  border-left: 3px solid transparent;
+}
+
+.setup-grade {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.setup-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.setup-heading .screen-meta {
+  text-align: right;
+}
+
+.plan-figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+}
+
+.plan-figure {
+  display: flex;
+  flex-direction: column;
+}
+
+.plan-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.plan-price {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Match CHART_COLORS.entry / stop / target in CandleChart.tsx. */
+.plan-entry {
+  color: var(--amber);
+}
+
+.plan-stop {
+  color: var(--loss);
+}
+
+.plan-target {
+  color: var(--gain);
 }
 
 .small-link {
@@ -1018,4 +1090,164 @@ input[type="checkbox"] {
 
 .data-table tr[data-thin="true"] td {
   color: var(--text-muted);
+}
+
+/* Sykes sliding scale grade: A/B green, C amber, D/F red. */
+.sykes-grade {
+  min-width: 2.25rem;
+  font-weight: 700;
+}
+
+.sykes-grade[data-letter="A"],
+.sykes-grade[data-letter="B"] {
+  color: var(--gain);
+  border-color: color-mix(in srgb, var(--gain) 50%, var(--line));
+}
+
+.sykes-grade[data-letter="C"] {
+  color: var(--amber);
+  border-color: color-mix(in srgb, var(--amber) 50%, var(--line));
+}
+
+.sykes-grade[data-letter="D"],
+.sykes-grade[data-letter="F"] {
+  color: var(--loss);
+  border-color: color-mix(in srgb, var(--loss) 50%, var(--line));
+}
+
+.sykes-card {
+  position: fixed;
+  z-index: 20;
+  width: min(360px, calc(100vw - 32px));
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-raised);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  text-align: left;
+  font-size: var(--size-small);
+  pointer-events: none;
+}
+
+.sykes-card-title {
+  margin: 0 0 0.4rem;
+  font-weight: 600;
+}
+
+.sykes-card ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.sykes-card li {
+  display: grid;
+  grid-template-columns: 1rem 7.5rem minmax(0, 1fr);
+  gap: 0.4rem;
+}
+
+.sykes-card li[data-grade="good"] .sykes-symbol {
+  color: var(--gain);
+}
+
+.sykes-card li[data-grade="ok"] .sykes-symbol {
+  color: var(--amber);
+}
+
+.sykes-card li[data-grade="poor"] .sykes-symbol {
+  color: var(--loss);
+}
+
+.sykes-card li[data-grade="no_data"] .sykes-symbol {
+  color: var(--text-muted);
+}
+
+.sykes-card-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.75rem;
+}
+
+/* Header that toggles sorting: looks like the other headers, arrow when on. */
+.sort-toggle {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sort-toggle:hover,
+.sort-toggle[aria-pressed="true"] {
+  color: var(--text);
+}
+
+.sort-arrow {
+  font-size: 0.7em;
+}
+
+/* Wraps under the score rather than widening the column. */
+.top-setup-name {
+  font-size: 0.75rem;
+  min-width: 13ch;
+  max-width: 13ch;
+  margin-left: auto;
+  white-space: normal;
+}
+
+/* The Screens table is wider than the page; keep the ticker in view while it scrolls. */
+.sticky-first-column th:first-child,
+.sticky-first-column td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--panel);
+}
+
+.sticky-first-column th:first-child {
+  z-index: 2;
+}
+
+/* Resizable Screens columns: drag a header's right edge (or focus it and use the arrow keys). */
+.results-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.column-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  border-right: 2px solid transparent;
+}
+
+.column-resizer:hover,
+.column-resizer:focus-visible {
+  border-right-color: var(--amber);
+  outline: none;
+}
+
+/* Saved widths: columns keep exactly the width dragged, and long text is cut with "…". */
+.has-column-widths {
+  table-layout: fixed;
+}
+
+.has-column-widths th,
+.has-column-widths td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.has-column-widths .company,
+.has-column-widths .headline,
+.has-column-widths .top-setup-name {
+  min-width: 0;
+  max-width: 100%;
 }

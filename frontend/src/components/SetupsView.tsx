@@ -9,15 +9,17 @@ import {
   ScanResult,
   SCORE_PART_NAMES,
   Setup,
+  SlidingScale,
   ScanStatus,
   SetupsResponse,
   TrackRecordSummary,
 } from "../api/setups";
 import { saveSettings } from "../api/settings";
-import { formatPrice } from "../format";
+import { formatPrice, MISSING_VALUE } from "../format";
 import { describeScanStatus } from "../scanStatus";
 import { describeSetupState } from "../setupState";
 import { VerdictBadge } from "./VerdictBadge";
+import { SlidingScaleBadge } from "./SlidingScaleBadge";
 import { StockLink } from "./StockLink";
 
 interface SetupsViewProps {
@@ -42,6 +44,8 @@ export function SetupsView({ onOpenStock }: SetupsViewProps) {
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  // Off: setups stay in the backend's order, best score first.
+  const [isSortedBySykes, setIsSortedBySykes] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -145,10 +149,25 @@ export function SetupsView({ onOpenStock }: SetupsViewProps) {
                 <th className="number">Reward:risk</th>
                 <th className="number">Risk</th>
                 <th className="number">Score</th>
+                <th className="number" aria-sort={isSortedBySykes ? "descending" : "none"}>
+                  <button
+                    type="button"
+                    className="sort-toggle"
+                    aria-pressed={isSortedBySykes}
+                    onClick={() => setIsSortedBySykes(!isSortedBySykes)}
+                  >
+                    Sykes
+                    {isSortedBySykes && (
+                      <span className="sort-arrow" aria-hidden="true">
+                        {" "}▼
+                      </span>
+                    )}
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {response.setups.map((setup) => (
+              {(isSortedBySykes ? sortBySykesGrade(response.setups) : response.setups).map((setup) => (
                 <Fragment key={setup.id}>
                   <SetupRow
                     setup={setup}
@@ -159,7 +178,7 @@ export function SetupsView({ onOpenStock }: SetupsViewProps) {
                   />
                   {expandedId === setup.id && (
                     <tr>
-                      <td colSpan={11}>
+                      <td colSpan={12}>
                         <ScoreDetails setup={setup} />
                       </td>
                     </tr>
@@ -191,6 +210,20 @@ export function SetupsView({ onOpenStock }: SetupsViewProps) {
         </section>
       )}
     </section>
+  );
+}
+
+const SYKES_LETTER_RANK: Record<SlidingScale["letter"], number> = { A: 0, B: 1, C: 2, D: 3, F: 4 };
+const UNGRADED_RANK = 5;
+
+// Best letter first, more points within a letter, then score; ungraded setups last.
+function sortBySykesGrade(setups: Setup[]): Setup[] {
+  const rank = (setup: Setup) => (setup.sliding_scale ? SYKES_LETTER_RANK[setup.sliding_scale.letter] : UNGRADED_RANK);
+  return [...setups].sort(
+    (left, right) =>
+      rank(left) - rank(right) ||
+      (right.sliding_scale?.points ?? 0) - (left.sliding_scale?.points ?? 0) ||
+      right.score - left.score,
   );
 }
 
@@ -244,6 +277,9 @@ function SetupRow({ setup, showDirection, isExpanded, onToggleScore, onOpenStock
         >
           {setup.score.toFixed(0)}
         </button>
+      </td>
+      <td className="number">
+        {setup.sliding_scale ? <SlidingScaleBadge scale={setup.sliding_scale} ticker={setup.ticker} /> : MISSING_VALUE}
       </td>
     </tr>
   );

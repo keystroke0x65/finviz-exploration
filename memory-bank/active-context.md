@@ -20,6 +20,14 @@ FRONTEND_PORT=5174 (in .env). Backups in data/.
 - Deferred minors listed in progress.md (prog-0015).
 
 ## Recent changes
+- 2026-10-28 (uncommitted on main): Stock tab setup list shows entry/stop/target/R/risk;
+  Setups tab "Sykes" column = our A-F sliding scale grade with hover card
+  (spec docs/superpowers/specs/2026-10-28-sykes-sliding-scale-design.md).
+  Sykes header click sorts by grade (click again = score order). 2026-10-29: Stock tab
+  setup list also shows score + Sykes grade (hover card). Screens results add Score / Sykes / Verdict
+  after Latest news (best current setup per stock; ticker column pinned). Page width cap
+  (1500px) removed. Screens columns resizable, widths saved in app_meta
+  (GET/PUT /api/settings/screen-column-widths).
 - 2026-10-27: "Scan this stock" now skips the 1m/5m bar cache and reloads chart + fresh
   quote; chart has a top-left OHLCV hover legend. Both merged to main and pushed (efda591).
 - 2026-10-26: trigger time, chart volume/session shading, news time, stock links, scan

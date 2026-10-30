@@ -8,6 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from app.errors import FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError
 from app.finviz_client import find_unrecognised_codes, run_screen
 from app.routes.dependencies import finviz_error_to_http, get_db_connection
+from app.routes.setups import to_verdict_out
+from app.scanning.verdicts import read_verdicts
 from app.schemas import (
     FormFieldsOut,
     ParseUrlIn,
@@ -16,7 +18,10 @@ from app.schemas import (
     ScreenFormModel,
     ScreenIn,
     ScreenOut,
+    ScreenResultRowOut,
     ScreenRunOut,
+    ScreenSetupOut,
+    SlidingScaleOut,
 )
 from app.screens.filter_form import (
     FORM_OPTIONS,
@@ -42,6 +47,8 @@ from app.screens.store import (
     list_screens,
     update_screen,
 )
+from app.setups.store import SetupRecord, list_current_setups
+from app.user_settings import get_show_short_setups
 
 router = APIRouter(prefix="/api/screens", tags=["screens"])
 
@@ -163,7 +170,38 @@ def post_run_screen(screen_id: int, conn: DbConnection) -> ScreenRunOut:
         result = run_screen(criteria.filters, criteria.signal, criteria.order)
     except (FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError) as exc:
         raise finviz_error_to_http(exc) from exc
+    top_setups = _top_setup_by_ticker(conn)
+    verdicts = read_verdicts(conn)
     return ScreenRunOut(
-        rows=[asdict(row) for row in result.rows],
+        rows=[
+            ScreenResultRowOut(
+                **asdict(row),
+                top_setup=top_setups.get(row.ticker),
+                verdict=to_verdict_out(verdicts.get(row.ticker)),
+            )
+            for row in result.rows
+        ],
         fetched_at=datetime.now(timezone.utc),
+    )
+
+
+def _top_setup_by_ticker(conn: sqlite3.Connection) -> dict[str, ScreenSetupOut]:
+    """Each stock's highest-scoring setup from the latest scan, as on the Setups tab."""
+    show_shorts = get_show_short_setups(conn)
+    top_setups: dict[str, ScreenSetupOut] = {}
+    # Current setups come best score first, so the first one per ticker wins.
+    for record in list_current_setups(conn):
+        if record.ticker in top_setups or (record.direction == "short" and not show_shorts):
+            continue
+        top_setups[record.ticker] = _to_screen_setup_out(record)
+    return top_setups
+
+
+def _to_screen_setup_out(record: SetupRecord) -> ScreenSetupOut:
+    scale = record.sliding_scale
+    return ScreenSetupOut(
+        pattern=record.pattern,
+        timeframe=record.timeframe,
+        score=record.score,
+        sliding_scale=SlidingScaleOut.model_validate(asdict(scale)) if scale else None,
     )

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from app.patterns.ranking import ScoreBreakdown
+from app.patterns.sliding_scale import Factor, SlidingScale
 from app.patterns.trade_plan import TradePlan
 from app.patterns.types import PatternMatch, SetupState
 from app.setups.resolver import Outcome, Resolution
@@ -55,10 +56,27 @@ class SetupRecord:
     verdict: str | None = None
     # When price last reached the entry; None while forming.
     triggered_at: datetime | None = None
+    # The latest scan's Sykes sliding scale grade; None for records from before it existed.
+    sliding_scale: SlidingScale | None = None
 
 
 def _optional_time(stored: str | None) -> datetime | None:
     return None if stored is None else datetime.fromisoformat(stored)
+
+
+def _encode_sliding_scale(scale: SlidingScale | None) -> str | None:
+    if scale is None:
+        return None
+    factors = [{"name": factor.name, "grade": factor.grade, "detail": factor.detail} for factor in scale.factors]
+    return json.dumps({"letter": scale.letter, "points": scale.points, "factors": factors})
+
+
+def _decode_sliding_scale(stored: str | None) -> SlidingScale | None:
+    if stored is None:
+        return None
+    payload = json.loads(stored)
+    factors = [Factor(item["name"], item["grade"], item["detail"]) for item in payload["factors"]]
+    return SlidingScale(letter=payload["letter"], points=payload["points"], factors=factors)
 
 
 def _to_record(row: sqlite3.Row) -> SetupRecord:
@@ -69,6 +87,7 @@ def _to_record(row: sqlite3.Row) -> SetupRecord:
     values["last_seen_at"] = datetime.fromisoformat(row["last_seen_at"])
     values["resolved_at"] = _optional_time(row["resolved_at"])
     values["triggered_at"] = _optional_time(row["triggered_at"])
+    values["sliding_scale"] = _decode_sliding_scale(row["sliding_scale"])
     return SetupRecord(**values)
 
 
@@ -84,6 +103,7 @@ def record_match(
     now: datetime,
     verdict: str | None = None,
     triggered_at: datetime | None = None,
+    sliding_scale: SlidingScale | None = None,
 ) -> SetupRecord:
     entry = round(match.entry, ENTRY_DECIMALS)
     key_points = json.dumps([[moment.isoformat(), price] for moment, price in match.key_points])
@@ -95,18 +115,19 @@ def record_match(
             ticker, pattern, direction, timeframe, entry, stop, capped_target, target_3r,
             available_reward_risk, risk_percent, blocking_level, partial_1r, partial_2r, trailing_stop,
             quality, score, score_parts, key_points, state, first_state, session, float_at_detection,
-            detected_at, last_seen_at, verdict, triggered_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            detected_at, last_seen_at, verdict, triggered_at, sliding_scale
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (ticker, pattern, direction, timeframe, entry) WHERE outcome = 'open' DO UPDATE SET
             score = excluded.score, score_parts = excluded.score_parts, state = excluded.state,
-            last_seen_at = excluded.last_seen_at, triggered_at = excluded.triggered_at
+            last_seen_at = excluded.last_seen_at, triggered_at = excluded.triggered_at,
+            sliding_scale = excluded.sliding_scale
         """,
         (
             ticker, match.pattern, match.direction, match.timeframe, entry, match.stop, plan.capped_target,
             plan.target_3r, plan.available_reward_risk, plan.risk_percent, plan.blocking_level, plan.partial_1r,
             plan.partial_2r, plan.trailing_stop, match.quality, score.total, json.dumps(score.parts), key_points,
             state, state, session, float_millions, match.detected_at.isoformat(), now.isoformat(), verdict,
-            None if triggered_at is None else triggered_at.isoformat(),
+            None if triggered_at is None else triggered_at.isoformat(), _encode_sliding_scale(sliding_scale),
         ),
     )
     conn.commit()

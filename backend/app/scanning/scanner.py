@@ -8,17 +8,24 @@ from typing import Callable
 
 from app.bars.loader import load_bars
 from app.errors import FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError
-from app.finviz_client import Bar, Interval, ScreenRow, get_bars, get_snapshots
+from app.finviz_client import Bar, Interval, ScreenRow, get_bars, get_snapshots, run_screen
 from app.market_time import EASTERN
 from app.patterns.candles import candle_points
 from app.patterns.detectors import run_detectors
 from app.patterns.indicators import session_levels, session_vwap
 from app.patterns.levels import find_daily_levels
 from app.patterns.ranking import score_setup
+from app.patterns.sliding_scale import MarketGainers, SlidingScaleInputs, count_spike_days, grade_sliding_scale
 from app.patterns.trade_plan import TradePlan, build_trade_plan, classify_state, find_trigger_time
 from app.patterns.types import DetectorContext, PatternMatch, SetupState
 from app.patterns.verdict import Verdict, compute_verdict
 from app.scanning.active import select_active_tickers
+from app.scanning.market_gainers import (
+    MARKET_MOVERS_FILTERS,
+    count_big_gainers,
+    read_market_gainers,
+    save_market_gainers,
+)
 from app.scanning.snapshots import save_snapshots
 from app.scanning.verdicts import save_verdict
 from app.setups.resolver import has_deadline_passed, resolve_outcome
@@ -53,10 +60,16 @@ MAX_INACTIVE_RESOLUTIONS = 10
 class ScanDeps:
     fetch_bars: Callable[[str, Interval], list[Bar]]
     fetch_snapshots: Callable[[list[str]], list[ScreenRow]]
+    # None skips the market count; the sliding scale's market factor then shows "no data".
+    fetch_market_movers: Callable[[], list[ScreenRow]] | None = None
+
+
+def _fetch_finviz_market_movers() -> list[ScreenRow]:
+    return run_screen(MARKET_MOVERS_FILTERS, None, None).rows
 
 
 def finviz_scan_deps() -> ScanDeps:
-    return ScanDeps(fetch_bars=get_bars, fetch_snapshots=get_snapshots)
+    return ScanDeps(fetch_bars=get_bars, fetch_snapshots=get_snapshots, fetch_market_movers=_fetch_finviz_market_movers)
 
 
 @dataclass(frozen=True)
@@ -198,8 +211,11 @@ def _record_setups(
     snapshot: ScreenRow | None,
     now: datetime,
     verdict_call: str | None,
+    market_gainers: MarketGainers | None,
 ) -> int:
     matches = [setup.match for setup in setups]
+    daily = bars_by_timeframe["daily"]
+    spike_days = count_spike_days(daily, now.astimezone(EASTERN).date()) if daily else None
     relative_volume = snapshot.relative_volume if snapshot else None
     float_millions = snapshot.float_millions if snapshot else None
     history: dict[tuple[str, str], PatternStats | None] = {}
@@ -213,9 +229,16 @@ def _record_setups(
             setup.match, setup.plan, setup.state, relative_volume, others,
             track_record=history[key], candle_points=candle_points(setup.plan, recent_bars),
         )
+        sliding_scale = grade_sliding_scale(
+            SlidingScaleInputs(
+                quality=setup.match.quality, state=setup.state, reward_risk=setup.plan.available_reward_risk,
+                snapshot=snapshot, spike_days=spike_days, setup_time=setup.triggered_at or now,
+                market_gainers=market_gainers, now=now,
+            )
+        )
         record_match(
             conn, ticker, setup.match, setup.plan, setup.state, score, _session_label(setup.match),
-            float_millions, now, verdict=verdict_call, triggered_at=setup.triggered_at,
+            float_millions, now, verdict=verdict_call, triggered_at=setup.triggered_at, sliding_scale=sliding_scale,
         )
     return len(setups)
 
@@ -258,6 +281,7 @@ def scan_ticker(
     now: datetime,
     deps: ScanDeps,
     should_refresh_intraday: bool = False,
+    market_gainers: MarketGainers | None = None,
 ) -> int:
     # Daily bars stay cached even on a refresh: today's price comes from the
     # intraday bars, and the daily history only changes at the close.
@@ -272,7 +296,7 @@ def scan_ticker(
     relative_volume = snapshot.relative_volume if snapshot else None
     verdict = _verdict_for(bars_by_timeframe, [setup.match for setup in setups], now, relative_volume)
     save_verdict(conn, ticker, verdict, now)
-    recorded = _record_setups(conn, ticker, setups, bars_by_timeframe, snapshot, now, verdict.call)
+    recorded = _record_setups(conn, ticker, setups, bars_by_timeframe, snapshot, now, verdict.call, market_gainers)
     _resolve_open_records(conn, ticker, bars_by_timeframe, now)
     mark_ticker_scanned(conn, ticker, now)
     return recorded
@@ -291,6 +315,19 @@ def _fetch_snapshots(deps: ScanDeps, tickers: list[str]) -> tuple[dict[str, Scre
     except (FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError) as exc:
         return {}, str(exc)
     return {row.ticker: row for row in rows}, None
+
+
+def _count_market_gainers(conn: sqlite3.Connection, deps: ScanDeps, now: datetime) -> None:
+    if deps.fetch_market_movers is None:
+        return
+    try:
+        rows = deps.fetch_market_movers()
+    except (FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError) as exc:
+        # Best effort: without today's count the market factor shows "no data",
+        # which shouldn't cost the whole scan.
+        logger.warning("could not count market gainers: %s", exc)
+        return
+    save_market_gainers(conn, count_big_gainers(rows), now)
 
 
 def run_scan(
@@ -313,10 +350,13 @@ def run_scan(
             return ScanResult([], [(SNAPSHOT_FAILURE_LABEL, snapshot_error)], 0, now)
         save_snapshots(conn, list(snapshots.values()), now)
         tickers = select_active_tickers(list(snapshots.values()), _screen_hits(conn))
+        _count_market_gainers(conn, deps, now)
     else:
         # Snapshots only improve the score here (relative volume), so a failure
         # to get them doesn't stop an explicit scan.
         snapshots, _ = _fetch_snapshots(deps, tickers)
+    # One-stock scans reuse the latest full scan's count from today.
+    market_gainers = read_market_gainers(conn, now)
 
     scanned: list[str] = []
     setups_found = 0
@@ -324,7 +364,8 @@ def run_scan(
     for index, ticker in enumerate(tickers):
         try:
             setups_found += scan_ticker(
-                conn, ticker, snapshots.get(ticker), now, deps, should_refresh_intraday=should_refresh_intraday
+                conn, ticker, snapshots.get(ticker), now, deps,
+                should_refresh_intraday=should_refresh_intraday, market_gainers=market_gainers,
             )
         except FinvizAuthError as exc:
             # Every later request would fail the same way.

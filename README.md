@@ -21,6 +21,16 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
   reward:risk actually available, risk as a % of price, and a 0-100 score you can expand
   to see how it was built. Targets are 3R unless a daily support/resistance level sits in
   the way; then the target stops at that level and the row says "capped by level at …".
+  The **Sykes** column grades each setup A-F on our version of Tim Sykes's sliding scale:
+  his seven P.R.E.P.A.R.E. factors (pattern and price, risk/reward, ease of entry and
+  exit, history of spiking, time of day, catalyst, market environment), each good / ok /
+  poor. Hover over the grade to see every factor. Click the Sykes header to rank by grade
+  (best letter first, then points, then score; ungraded last); click it again to go back
+  to score order. Sykes doesn't publish a formula, so the
+  thresholds and their sources are in
+  `docs/superpowers/specs/2026-10-28-sykes-sliding-scale-design.md`. Each full scan also
+  counts US stocks up 30%+ on Finviz for the market factor (one extra request). Setups
+  recorded before the grade existed show "—" until they're scanned again.
   Above the table a grey line says when the last full scan ran ("Last scan 3:45 PM · 40
   stocks"); it turns into a red warning if that scan failed, or if no scan has finished for
   30 minutes during scan hours (4 AM-8 PM ET), since the setups shown are then out of date.
@@ -37,12 +47,22 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
   after-hours (4:00-8:00 PM ET) purple; Finviz only has bars when a trade happened, so a
   thinly traded stock shows only a sliver of each. The top-left corner shows the open, high,
   low, close, change and volume of the bar under the mouse (the latest bar when the mouse is
-  off the chart). Click a setup to draw its entry, stop and target. Tickers anywhere in the app open this tab; the small "Finviz" link opens Finviz.
+  off the chart). Each setup in the side list shows its entry, stop, target (marked
+  "capped" when a nearby level limits it), reward:risk and risk %, plus its score and
+  Sykes grade (hover the grade for its factors); click it to draw its entry, stop and
+  target on the chart. Tickers anywhere in the app open this tab; the small "Finviz" link opens Finviz.
 - **Screens** tab: saved Finviz screens. Paste a Finviz screener URL (build it on
   finviz.com, copy the address bar) or use the form for country, price, float, market cap,
   volume and relative volume. Running a screen shows price, change, after-hours change,
-  volume, relative volume, float, market cap and the latest headline (with the date and time it came out, Eastern; older years show the year), with links to Finviz
-  and an "add to watchlist" button. Two screens are created on first start: "Top gainers —
+  volume, relative volume, float, market cap and the latest headline (with the date and time it came out, Eastern; older years show the year), then the
+  stock's best setup from the latest scan (its score and pattern, and its Sykes grade with
+  the hover card) and its verdict, with links to Finviz and an "add to watchlist" button.
+  Stocks without a setup in the latest scan (or never scanned) show "—"; short setups only
+  count when "Show short setups" is on. The page uses the full window width, so the table
+  fits from about 1600px wide; on narrower windows it scrolls sideways with the ticker pinned.
+  Drag the right edge of any header to resize that column (or focus the edge with Tab and
+  use the arrow keys). Widths are saved in the database, so they stay after restarting
+  the app or browser; "Reset column widths" goes back to automatic sizing. Two screens are created on first start: "Top gainers —
   low float" (feeds the watchlist) and "After-hours".
 - **Watchlist** tab: filled automatically from every screen marked "feeds watchlist".
   While the backend runs, the feeder runs every 15 minutes on weekdays from 04:00 to 20:00
