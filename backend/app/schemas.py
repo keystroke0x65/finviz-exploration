@@ -230,6 +230,20 @@ class ScanStatusOut(BaseModel):
     is_overdue: bool
 
 
+class SlidingScaleFactorOut(BaseModel):
+    name: str
+    grade: Literal["good", "ok", "poor", "no_data"]
+    detail: str
+
+
+class SlidingScaleOut(BaseModel):
+    """Our grading of Tim Sykes's sliding scale: seven factors, 2/1/0 points each."""
+
+    letter: Literal["A", "B", "C", "D", "F"]
+    points: int
+    factors: list[SlidingScaleFactorOut]
+
+
 class SetupOut(BaseModel):
     id: int
     ticker: str
@@ -258,6 +272,7 @@ class SetupOut(BaseModel):
     has_conflict: bool
     verdict: VerdictOut | None = None
     track_record: "TrackRecordSummaryOut | None" = None
+    sliding_scale: SlidingScaleOut | None = None
 
 
 class WarningOut(BaseModel):

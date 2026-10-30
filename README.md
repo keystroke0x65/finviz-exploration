@@ -21,6 +21,16 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
   reward:risk actually available, risk as a % of price, and a 0-100 score you can expand
   to see how it was built. Targets are 3R unless a daily support/resistance level sits in
   the way; then the target stops at that level and the row says "capped by level at …".
+  The **Sykes** column grades each setup A-F on our version of Tim Sykes's sliding scale:
+  his seven P.R.E.P.A.R.E. factors (pattern and price, risk/reward, ease of entry and
+  exit, history of spiking, time of day, catalyst, market environment), each good / ok /
+  poor. Hover over the grade to see every factor. Click the Sykes header to rank by grade
+  (best letter first, then points, then score; ungraded last); click it again to go back
+  to score order. Sykes doesn't publish a formula, so the
+  thresholds and their sources are in
+  `docs/superpowers/specs/2026-10-28-sykes-sliding-scale-design.md`. Each full scan also
+  counts US stocks up 30%+ on Finviz for the market factor (one extra request). Setups
+  recorded before the grade existed show "—" until they're scanned again.
   Above the table a grey line says when the last full scan ran ("Last scan 3:45 PM · 40
   stocks"); it turns into a red warning if that scan failed, or if no scan has finished for
   30 minutes during scan hours (4 AM-8 PM ET), since the setups shown are then out of date.

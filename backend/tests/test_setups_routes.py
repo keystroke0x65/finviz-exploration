@@ -14,7 +14,7 @@ NOW = datetime(2026, 10, 20, 10, 0, tzinfo=EASTERN)
 
 
 def store_setup(conn, ticker="HOST", direction="long", pattern="high_of_day_break", score=70.0, state="forming",
-                triggered_at=None):
+                triggered_at=None, sliding_scale=None):
     sign = 1 if direction == "long" else -1
     match = PatternMatch(pattern=pattern, direction=direction, timeframe="1m", entry=2.0, stop=2.0 - 0.1 * sign,
                          detected_at=NOW, quality=0.7, quality_parts={}, key_points=[(NOW, 2.0)])
@@ -23,7 +23,7 @@ def store_setup(conn, ticker="HOST", direction="long", pattern="high_of_day_brea
                      blocking_level=2.0 + 0.15 * sign, partial_1r=2.0 + 0.1 * sign, partial_2r=2.0 + 0.2 * sign,
                      trailing_stop=None)
     record_match(conn, ticker, match, plan, state, ScoreBreakdown(score, {"reward_risk": 20.0}), "regular", 5.0, NOW,
-                 triggered_at=triggered_at)
+                 triggered_at=triggered_at, sliding_scale=sliding_scale)
     mark_ticker_scanned(conn, ticker, NOW)
 
 
@@ -251,3 +251,19 @@ def test_setups_include_when_they_triggered(api_client, db_conn):
 
     assert setups["HOST"]["triggered_at"] == "2026-10-20T09:42:00-04:00"
     assert setups["WORX"]["triggered_at"] is None
+
+
+def test_setups_include_their_sliding_scale_grade(api_client, db_conn):
+    from app.patterns.sliding_scale import Factor, SlidingScale
+
+    grade = SlidingScale(letter="B", points=10, factors=[Factor("Risk/reward", "good", "3.0R (wants 3R+)")])
+    store_setup(db_conn, "HOST", sliding_scale=grade)
+    store_setup(db_conn, "WORX")
+
+    setups = {setup["ticker"]: setup for setup in api_client.get("/api/setups").json()["setups"]}
+
+    assert setups["HOST"]["sliding_scale"] == {
+        "letter": "B", "points": 10,
+        "factors": [{"name": "Risk/reward", "grade": "good", "detail": "3.0R (wants 3R+)"}],
+    }
+    assert setups["WORX"]["sliding_scale"] is None

@@ -155,3 +155,21 @@ def test_record_match_stores_and_refreshes_the_trigger_time(db_conn):
 
     back_to_forming = record_match(db_conn, "HOST", match(), plan(), "forming", SCORE, "regular", 5.46, SCAN_2)
     assert back_to_forming.triggered_at is None
+
+
+def test_record_match_stores_and_refreshes_the_sliding_scale(db_conn):
+    from app.patterns.sliding_scale import Factor, SlidingScale
+
+    first_grade = SlidingScale(letter="C", points=8, factors=[Factor("Time", "poor", "Pre-market (7:05 AM)")])
+    later_grade = SlidingScale(letter="B", points=10, factors=[Factor("Time", "good", "Power hour (9:45 AM)")])
+    record_match(db_conn, "HOST", match(), plan(), "forming", SCORE, "regular", 5.0, SCAN_1, sliding_scale=first_grade)
+
+    refreshed = record_match(
+        db_conn, "HOST", match(), plan(), "triggered", SCORE, "regular", 5.0, SCAN_2, sliding_scale=later_grade
+    )
+
+    assert refreshed.sliding_scale == later_grade
+
+
+def test_records_without_a_sliding_scale_read_back_as_none(db_conn):
+    assert record(db_conn).sliding_scale is None

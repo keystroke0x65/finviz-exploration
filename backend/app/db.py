@@ -108,6 +108,7 @@ CREATE TABLE IF NOT EXISTS app_meta (
 ADDED_COLUMNS = [
     ("setup_records", "verdict", "TEXT"),
     ("setup_records", "triggered_at", "TEXT"),
+    ("setup_records", "sliding_scale", "TEXT"),
 ]
 
 

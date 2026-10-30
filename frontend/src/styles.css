@@ -1019,3 +1019,99 @@ input[type="checkbox"] {
 .data-table tr[data-thin="true"] td {
   color: var(--text-muted);
 }
+
+/* Sykes sliding scale grade: A/B green, C amber, D/F red. */
+.sykes-grade {
+  min-width: 2.25rem;
+  font-weight: 700;
+}
+
+.sykes-grade[data-letter="A"],
+.sykes-grade[data-letter="B"] {
+  color: var(--gain);
+  border-color: color-mix(in srgb, var(--gain) 50%, var(--line));
+}
+
+.sykes-grade[data-letter="C"] {
+  color: var(--amber);
+  border-color: color-mix(in srgb, var(--amber) 50%, var(--line));
+}
+
+.sykes-grade[data-letter="D"],
+.sykes-grade[data-letter="F"] {
+  color: var(--loss);
+  border-color: color-mix(in srgb, var(--loss) 50%, var(--line));
+}
+
+.sykes-card {
+  position: fixed;
+  z-index: 20;
+  width: min(360px, calc(100vw - 32px));
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-raised);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  text-align: left;
+  font-size: var(--size-small);
+  pointer-events: none;
+}
+
+.sykes-card-title {
+  margin: 0 0 0.4rem;
+  font-weight: 600;
+}
+
+.sykes-card ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.sykes-card li {
+  display: grid;
+  grid-template-columns: 1rem 7.5rem minmax(0, 1fr);
+  gap: 0.4rem;
+}
+
+.sykes-card li[data-grade="good"] .sykes-symbol {
+  color: var(--gain);
+}
+
+.sykes-card li[data-grade="ok"] .sykes-symbol {
+  color: var(--amber);
+}
+
+.sykes-card li[data-grade="poor"] .sykes-symbol {
+  color: var(--loss);
+}
+
+.sykes-card li[data-grade="no_data"] .sykes-symbol {
+  color: var(--text-muted);
+}
+
+.sykes-card-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.75rem;
+}
+
+/* Header that toggles sorting: looks like the other headers, arrow when on. */
+.sort-toggle {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sort-toggle:hover,
+.sort-toggle[aria-pressed="true"] {
+  color: var(--text);
+}
+
+.sort-arrow {
+  font-size: 0.7em;
+}
