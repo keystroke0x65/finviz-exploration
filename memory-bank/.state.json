@@ -3,7 +3,7 @@
   "counters": {
     "brief": 4,
     "stack": 7,
-    "dec": 4,
+    "dec": 5,
     "prog": 19,
     "dev-environment": 8,
     "finviz": 8,
@@ -15,5 +15,5 @@
     "f561eb78-860b-4a8c-b7f1-1272f2356ebe"
   ],
   "created": "2026-09-17",
-  "batches": 17
+  "batches": 18
 }
