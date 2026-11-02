@@ -21,9 +21,20 @@ traders like Steven Dux, Tim Sykes, Tim Grattani and Jack Kellogg do:
 
 - Watch the stocks that move (including repeat movers) and put them into the appropriate
   tables to track them.
-- Look at the charts and find patterns visually.
-- Use the kind of applied statistics used in finance on those tables to find patterns that
-  are actually worthwhile.
+- Look at the charts and find patterns visually. *(Clarified 2026-11-01)* One chart is
+  rarely enough to see a pattern, so the agent looks at many stocks at once, each with a
+  daily, 1-hour, 15-minute, 5-minute and 1-minute chart, plus what else is known about them:
+  news, filings, earnings or other catalysts, sector, industry, country, fundamentals, and so
+  on. It may then notice a pattern that describes a number of them.
+- Use applied and descriptive statistics to turn that into something testable:
+  1. Describe what it seems to be seeing in numbers (descriptive statistics over the group).
+  2. Create a table whose columns track that hypothesis.
+  3. Use logic, finance and statistics/maths to decide whether the pattern is actually worth
+     trading.
+  4. Check it from a real trader's point of view too. The dashboard already has two such
+     lenses: the setup **score** column and the **Sykes sliding scale** grade
+     (`docs/superpowers/specs/2026-10-28-sykes-sliding-scale-design.md`). The user finds the
+     Sykes sliding scale very good in live use.
 - This means the system takes and uses meaningful chart screenshots, and creates, reads,
   updates and analyses tables (like Excel sheets).
 
@@ -50,7 +61,10 @@ make them; read news and occasionally SEC filings. No trade journal or statistic
 3. **Patterns start from one stock, not from a time window.** Research is not "look back
    weeks or months". A trader sees one stock do something interesting, notices a pattern,
    then looks for other stocks that show the same pattern. One example comes first, then
-   the search for lookalikes.
+   the search for lookalikes. *(Refined 2026-11-01)* For the agent, a pattern is more likely
+   to show up across a group of charts viewed together than in one chart alone, so it can
+   start from a single stock or from a group; either way the lookalike search and the table
+   follow.
 4. **Patterns get retired and come back.** Over time traders know when a pattern has stopped
    working, so they retire it until it "catches steam" again. They also decide which patterns
    to apply to which stocks. The user suspects this comes from knowing which tables the
