@@ -3,11 +3,12 @@
   "counters": {
     "brief": 4,
     "stack": 7,
-    "dec": 5,
+    "dec": 6,
     "prog": 19,
     "dev-environment": 8,
     "finviz": 8,
-    "conv": 1
+    "conv": 1,
+    "frontend": 1
   },
   "reminded_sessions": [
     "8526e8ea-be9e-4201-ba24-a0c6fc35964e",
@@ -15,5 +16,5 @@
     "f561eb78-860b-4a8c-b7f1-1272f2356ebe"
   ],
   "created": "2026-09-17",
-  "batches": 18
+  "batches": 19
 }
