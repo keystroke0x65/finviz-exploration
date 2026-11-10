@@ -65,14 +65,14 @@ def _optional_time(stored: str | None) -> datetime | None:
     return None if stored is None else datetime.fromisoformat(stored)
 
 
-def _encode_sliding_scale(scale: SlidingScale | None) -> str | None:
+def encode_sliding_scale(scale: SlidingScale | None) -> str | None:
     if scale is None:
         return None
     factors = [{"name": factor.name, "grade": factor.grade, "detail": factor.detail} for factor in scale.factors]
     return json.dumps({"letter": scale.letter, "points": scale.points, "factors": factors})
 
 
-def _decode_sliding_scale(stored: str | None) -> SlidingScale | None:
+def decode_sliding_scale(stored: str | None) -> SlidingScale | None:
     if stored is None:
         return None
     payload = json.loads(stored)
@@ -88,7 +88,7 @@ def _to_record(row: sqlite3.Row) -> SetupRecord:
     values["last_seen_at"] = datetime.fromisoformat(row["last_seen_at"])
     values["resolved_at"] = _optional_time(row["resolved_at"])
     values["triggered_at"] = _optional_time(row["triggered_at"])
-    values["sliding_scale"] = _decode_sliding_scale(row["sliding_scale"])
+    values["sliding_scale"] = decode_sliding_scale(row["sliding_scale"])
     return SetupRecord(**values)
 
 
@@ -138,7 +138,7 @@ def record_match(
             plan.target_3r, plan.available_reward_risk, plan.risk_percent, plan.blocking_level, plan.partial_1r,
             plan.partial_2r, plan.trailing_stop, match.quality, score.total, json.dumps(score.parts), key_points,
             state, state, session, float_millions, match.detected_at.isoformat(), now.isoformat(), verdict,
-            None if triggered_at is None else triggered_at.isoformat(), _encode_sliding_scale(sliding_scale),
+            None if triggered_at is None else triggered_at.isoformat(), encode_sliding_scale(sliding_scale),
         ),
     )
     conn.commit()
@@ -150,7 +150,7 @@ def record_match(
         """,
         (ticker, match.pattern, match.direction, match.timeframe, entry),
     ).fetchone()
-    _append_history(conn, row["id"], now, score.total, state, verdict, _encode_sliding_scale(sliding_scale))
+    _append_history(conn, row["id"], now, score.total, state, verdict, encode_sliding_scale(sliding_scale))
     return _to_record(row)
 
 
@@ -200,7 +200,7 @@ def setup_values_at(conn: sqlite3.Connection, record_id: int, at: datetime) -> S
     # Stored times carry different offsets, so compare as datetimes, not strings.
     seen = [row for row in rows if datetime.fromisoformat(row["seen_at"]) <= at] or rows[:1]
     row = seen[-1]
-    return SetupValues(row["score"], row["state"], row["verdict"], _decode_sliding_scale(row["sliding_scale"]))
+    return SetupValues(row["score"], row["state"], row["verdict"], decode_sliding_scale(row["sliding_scale"]))
 
 
 def list_setups_for_day(conn: sqlite3.Connection, ticker: str, day: date) -> list[SetupRecord]:

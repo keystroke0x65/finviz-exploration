@@ -110,6 +110,48 @@ CREATE TABLE IF NOT EXISTS ticker_verdicts (
     computed_at TEXT NOT NULL
 );
 
+-- The user's own decisions: trades taken (with fills) and setups passed on.
+-- setup and stock hold JSON copies of how things looked at decided_at.
+CREATE TABLE IF NOT EXISTS journal_entries (
+    id INTEGER PRIMARY KEY,
+    kind TEXT NOT NULL CHECK (kind IN ('trade', 'pass')),
+    ticker TEXT NOT NULL,
+    direction TEXT NOT NULL CHECK (direction IN ('long', 'short')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    decided_at TEXT NOT NULL,
+    setup_record_id INTEGER REFERENCES setup_records (id) ON DELETE SET NULL,
+    setup TEXT,
+    stock TEXT NOT NULL,
+    plan_stop REAL,
+    plan_target REAL,
+    fees REAL NOT NULL DEFAULT 0,
+    reasons TEXT NOT NULL DEFAULT '[]',
+    mistakes TEXT NOT NULL DEFAULT '[]',
+    note TEXT NOT NULL DEFAULT '',
+    pass_price REAL
+);
+
+CREATE TABLE IF NOT EXISTS journal_fills (
+    id INTEGER PRIMARY KEY,
+    entry_id INTEGER NOT NULL REFERENCES journal_entries (id) ON DELETE CASCADE,
+    side TEXT NOT NULL CHECK (side IN ('buy', 'sell')),
+    time TEXT NOT NULL,
+    price REAL NOT NULL,
+    shares INTEGER NOT NULL
+);
+
+-- 1-minute bars (4:00 AM-8:00 PM ET) kept for journal charts after Finviz drops
+-- them (~2 weeks). One row per stock-day, shared by every entry on that day.
+CREATE TABLE IF NOT EXISTS journal_bar_days (
+    ticker TEXT NOT NULL,
+    day TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('partial', 'complete', 'missing')),
+    saved_at TEXT NOT NULL,
+    bars TEXT NOT NULL DEFAULT '[]',
+    PRIMARY KEY (ticker, day)
+);
+
 CREATE TABLE IF NOT EXISTS app_meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
