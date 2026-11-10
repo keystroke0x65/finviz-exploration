@@ -35,6 +35,8 @@ class ClosedPnl:
 @dataclass(frozen=True)
 class TradeFigures:
     status: Literal["open", "closed"]
+    # Price of the first fill; R is measured from it.
+    first_price: float
     average_entry: float
     average_exit: float | None
     shares_held: int
@@ -136,6 +138,7 @@ def compute_trade_figures(
     risk = None if plan_stop is None else abs(first_price - plan_stop) * max_shares
     return TradeFigures(
         status="closed" if is_closed else "open",
+        first_price=first_price,
         average_entry=opened_value / opened_shares,
         average_exit=closed_value / closed_shares if closed_shares else None,
         shares_held=held,
