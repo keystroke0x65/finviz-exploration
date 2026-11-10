@@ -27,3 +27,18 @@ export async function saveScreenColumnWidths(widths: ColumnWidths): Promise<Colu
   );
   return body.widths;
 }
+
+// Dollars; null means not set.
+export interface JournalSettings {
+  risk_per_trade: number | null;
+  max_position: number | null;
+  max_daily_loss: number | null;
+}
+
+export function fetchJournalSettings(): Promise<JournalSettings> {
+  return requestJson<JournalSettings>("/api/settings/journal");
+}
+
+export function saveJournalSettings(settings: JournalSettings): Promise<JournalSettings> {
+  return requestJson<JournalSettings>("/api/settings/journal", jsonRequest("PUT", settings));
+}

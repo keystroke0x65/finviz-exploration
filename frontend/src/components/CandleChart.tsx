@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
 import {
   createChart,
   HistogramData,
@@ -7,6 +7,8 @@ import {
   ISeriesApi,
   LineStyle,
   MouseEventParams,
+  SeriesMarker,
+  Time,
   UTCTimestamp,
   WhitespaceData,
 } from "lightweight-charts";
@@ -22,6 +24,14 @@ export interface ChartLevel {
   kind: ChartLevelKind;
 }
 
+// A logged fill, drawn as an arrow on the bar it happened in.
+export interface ChartMarker {
+  time: string;
+  side: "buy" | "sell";
+  shares: number;
+  price: number;
+}
+
 interface CandleChartProps {
   bars: Bar[];
   levels: ChartLevel[];
@@ -33,6 +43,10 @@ interface CandleChartProps {
   shadeSessions?: boolean;
   // Daily bars are labelled by date in the hover legend, intraday bars by time.
   isDaily?: boolean;
+  markers?: ChartMarker[];
+  onBarClick?: (bar: Bar) => void;
+  // Filled with a function that returns the chart as a canvas (for "Save as image").
+  screenshotRef?: MutableRefObject<(() => HTMLCanvasElement) | null>;
 }
 
 // Mirrors the tokens in styles.css; the chart draws on canvas and can't read CSS variables.
@@ -99,6 +113,40 @@ function toSortedUniquePoints(points: [string, number][]): { time: UTCTimestamp;
   return [...byTime.entries()].sort(([left], [right]) => left - right).map(([time, value]) => ({ time, value }));
 }
 
+const MAX_MARKER_SIZE = 3;
+
+// A fill's time is rarely a bar's exact start; the arrow goes on the bar that contains it.
+function barTimeFor(fillTime: UTCTimestamp, barTimes: UTCTimestamp[]): UTCTimestamp | null {
+  let found: UTCTimestamp | null = null;
+  for (const barTime of barTimes) {
+    if (barTime > fillTime) break;
+    found = barTime;
+  }
+  return found;
+}
+
+function toSeriesMarkers(markers: ChartMarker[], bars: Bar[]): SeriesMarker<Time>[] {
+  const barTimes = bars.map((bar) => toTime(bar.time)).sort((left, right) => left - right);
+  const largest = Math.max(...markers.map((marker) => marker.shares), 1);
+  return markers
+    .flatMap((marker) => {
+      const time = barTimeFor(toTime(marker.time), barTimes);
+      if (time == null) return [];
+      const isBuy = marker.side === "buy";
+      return [
+        {
+          time,
+          position: isBuy ? ("belowBar" as const) : ("aboveBar" as const),
+          shape: isBuy ? ("arrowUp" as const) : ("arrowDown" as const),
+          color: isBuy ? CHART_COLORS.up : CHART_COLORS.down,
+          text: `${isBuy ? "B" : "S"} ${marker.shares} @ ${marker.price.toFixed(2)}`,
+          size: Math.max(1, Math.round((MAX_MARKER_SIZE * marker.shares) / largest)),
+        },
+      ];
+    })
+    .sort((left, right) => left.time - right.time);
+}
+
 function BarLegend({ bar, isDaily }: { bar: Bar; isDaily: boolean }) {
   const text = describeBar(bar, isDaily);
   const valueClass = text.direction === "up" ? "gain" : "loss";
@@ -128,6 +176,9 @@ export function CandleChart({
   visibleBars,
   shadeSessions = false,
   isDaily = false,
+  markers,
+  onBarClick,
+  screenshotRef,
 }: CandleChartProps) {
   // Chart time of the bar under the mouse; null when the mouse is off the chart.
   const [hoveredTime, setHoveredTime] = useState<number | null>(null);
@@ -139,6 +190,11 @@ export function CandleChart({
   const candlesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const sessionsRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  // Read through refs so the click subscription, made once, always sees the latest bars and handler.
+  const barsByTimeRef = useRef(barsByTime);
+  barsByTimeRef.current = barsByTime;
+  const onBarClickRef = useRef(onBarClick);
+  onBarClickRef.current = onBarClick;
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -183,8 +239,20 @@ export function CandleChart({
       setHoveredTime(typeof param.time === "number" ? param.time : null);
     };
     chart.subscribeCrosshairMove(handleCrosshairMove);
+    const handleClick = (param: MouseEventParams) => {
+      const clicked = typeof param.time === "number" ? barsByTimeRef.current.get(param.time) : undefined;
+      if (clicked) onBarClickRef.current?.(clicked);
+    };
+    chart.subscribeClick(handleClick);
+    if (screenshotRef) {
+      screenshotRef.current = () => chart.takeScreenshot();
+    }
     return () => {
       chart.unsubscribeCrosshairMove(handleCrosshairMove);
+      chart.unsubscribeClick(handleClick);
+      if (screenshotRef) {
+        screenshotRef.current = null;
+      }
       chart.remove();
       chartRef.current = null;
       candlesRef.current = null;
@@ -202,6 +270,7 @@ export function CandleChart({
     candles.setData(
       bars.map((bar) => ({ time: toTime(bar.time), open: bar.open, high: bar.high, low: bar.low, close: bar.close })),
     );
+    candles.setMarkers(markers && markers.length > 0 ? toSeriesMarkers(markers, bars) : []);
     volumeRef.current?.setData(toVolumePoints(bars));
     sessionsRef.current?.setData(shadeSessions ? toSessionShading(bars) : []);
 
@@ -247,7 +316,7 @@ export function CandleChart({
       priceLines.forEach((line) => candles.removePriceLine(line));
       extraSeries.forEach((series) => chart.removeSeries(series));
     };
-  }, [bars, levels, outline, vwap, visibleBars, shadeSessions]);
+  }, [bars, levels, outline, vwap, visibleBars, shadeSessions, markers]);
 
   return (
     <div className="candle-chart-frame">

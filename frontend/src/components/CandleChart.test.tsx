@@ -14,6 +14,7 @@ const chart = vi.hoisted(() => {
     createPriceLine: vi.fn((options) => options),
     priceScale: vi.fn(() => priceScale),
     removePriceLine: vi.fn(throwIfRemoved),
+    setMarkers: vi.fn(),
   };
   const lineSeries = { setData: vi.fn() };
   const priceScale = { applyOptions: vi.fn() };
@@ -22,9 +23,13 @@ const chart = vi.hoisted(() => {
   const histogramSeries = [sessionSeries, volumeSeries];
   const timeScale = { fitContent: vi.fn(), setVisibleLogicalRange: vi.fn() };
   const crosshairHandlers: ((param: { time?: number }) => void)[] = [];
+  const clickHandlers: ((param: { time?: number }) => void)[] = [];
   const instance = {
     subscribeCrosshairMove: vi.fn((handler: (param: { time?: number }) => void) => crosshairHandlers.push(handler)),
     unsubscribeCrosshairMove: vi.fn(),
+    subscribeClick: vi.fn((handler: (param: { time?: number }) => void) => clickHandlers.push(handler)),
+    unsubscribeClick: vi.fn(),
+    takeScreenshot: vi.fn(() => "canvas"),
     addCandlestickSeries: vi.fn(() => candleSeries),
     addLineSeries: vi.fn(() => lineSeries),
     // The chart adds the session shading first (so it sits behind the candles), then volume.
@@ -41,7 +46,8 @@ const chart = vi.hoisted(() => {
   });
   // Simulates the mouse moving over the bar at a chart time (undefined: off the chart).
   const moveCrosshair = (time?: number) => crosshairHandlers.forEach((handler) => handler({ time }));
-  return { instance, candleSeries, lineSeries, volumeSeries, sessionSeries, timeScale, createChart, moveCrosshair };
+  const click = (time?: number) => clickHandlers.forEach((handler) => handler({ time }));
+  return { instance, candleSeries, lineSeries, volumeSeries, sessionSeries, timeScale, createChart, moveCrosshair, click };
 });
 vi.mock("lightweight-charts", () => ({ createChart: chart.createChart, LineStyle: { Dashed: 2, Dotted: 1 } }));
 
@@ -202,5 +208,54 @@ describe("CandleChart", () => {
     render(<CandleChart bars={BARS} levels={[]} outline={null} vwap={null} visibleBars={192} />);
 
     expect(chart.timeScale.fitContent).toHaveBeenCalled();
+  });
+});
+
+
+describe("CandleChart fills", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("marks buys below and sells above the bar they happened in, sized by shares", () => {
+    render(
+      <CandleChart
+        bars={BARS}
+        levels={[]}
+        outline={null}
+        vwap={null}
+        markers={[
+          { time: "2026-10-20T09:31:40-04:00", side: "sell", shares: 50, price: 2.18 },
+          { time: "2026-10-20T09:30:10-04:00", side: "buy", shares: 150, price: 2.01 },
+        ]}
+      />,
+    );
+
+    const markers = chart.candleSeries.setMarkers.mock.calls[chart.candleSeries.setMarkers.mock.calls.length - 1][0];
+    expect(markers).toEqual([
+      expect.objectContaining({ position: "belowBar", shape: "arrowUp", color: CHART_COLORS.up, text: "B 150 @ 2.01", size: 3 }),
+      expect.objectContaining({ position: "aboveBar", shape: "arrowDown", color: CHART_COLORS.down, text: "S 50 @ 2.18", size: 1 }),
+    ]);
+    expect(markers[0].time).toBeLessThan(markers[1].time);
+  });
+
+  it("reports the clicked bar", () => {
+    const onBarClick = vi.fn();
+    render(<CandleChart bars={BARS} levels={[]} outline={null} vwap={null} onBarClick={onBarClick} />);
+    const secondBarTime = chart.candleSeries.setData.mock.calls[0][0][1].time;
+
+    act(() => chart.click(secondBarTime));
+    act(() => chart.click(undefined));
+
+    expect(onBarClick).toHaveBeenCalledTimes(1);
+    expect(onBarClick).toHaveBeenCalledWith(BARS[1]);
+  });
+
+  it("can hand out a screenshot of the chart", () => {
+    const screenshotRef: { current: (() => HTMLCanvasElement) | null } = { current: null };
+    render(<CandleChart bars={BARS} levels={[]} outline={null} vwap={null} screenshotRef={screenshotRef} />);
+
+    expect(screenshotRef.current?.()).toBe("canvas");
   });
 });
