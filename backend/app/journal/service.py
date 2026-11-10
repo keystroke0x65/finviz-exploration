@@ -136,8 +136,17 @@ def review_trade(conn: sqlite3.Connection, entry: JournalEntry, now: datetime) -
     )
 
 
+def _price_at(bars: list[Bar], moment: datetime) -> float | None:
+    earlier = [bar for bar in bars if bar.time <= moment]
+    return earlier[-1].close if earlier else None
+
+
 def score_saved_pass(conn: sqlite3.Connection, entry: JournalEntry, now: datetime) -> ScoredPass:
-    return ScoredPass(entry, score_pass(entry.setup, entry.decided_at, entry.pass_price, _entry_bars(conn, entry, now)))
+    bars = _entry_bars(conn, entry, now)
+    # A pass saved while Finviz was down has no price; once the bars arrive, take it from them.
+    # Without it the pass would be judged from the setup's ideal entry, overstating a "missed it".
+    pass_price = entry.pass_price if entry.pass_price is not None else _price_at(bars, entry.decided_at)
+    return ScoredPass(entry, score_pass(entry.setup, entry.decided_at, pass_price, bars))
 
 
 def load_reviewed(conn: sqlite3.Connection, now: datetime) -> tuple[list[ReviewedTrade], list[ScoredPass]]:

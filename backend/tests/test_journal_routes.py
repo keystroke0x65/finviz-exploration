@@ -264,3 +264,18 @@ def test_editing_while_finviz_is_down_keeps_the_saved_stock_facts(api_client, fi
     assert updated["note"] == "edited"
     assert updated["stock"]["industry"] == "Software"
     assert updated["stock"]["change_percent"] == pytest.approx(created["stock"]["change_percent"])
+
+
+def test_a_pass_saved_while_finviz_was_down_is_scored_from_its_moment_once_bars_arrive(api_client, db_conn, finviz):
+    from app.journal.bars import complete_pending_days
+
+    saved_setup = record_setup(db_conn)
+    get_bars, _ = finviz
+    get_bars.side_effect = FinvizUnavailableError("bars HOST", "timeout")
+    created = api_client.post("/api/journal/entries", json=pass_body(setup_record_id=saved_setup.id)).json()
+    assert created["pass_price"] is None
+
+    complete_pending_days(db_conn, at(21, 0), fake_bars)
+
+    # 2.20 at the 9:50 pass was already past the 2.15 target: no trade was left to take.
+    assert api_client.get(f"/api/journal/entries/{created['id']}").json()["pass_score"]["outcome"] == "not_scored"
