@@ -1,4 +1,4 @@
-import { MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
+import { MouseEvent as ReactMouseEvent, MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
 import {
   createChart,
   HistogramData,
@@ -114,6 +114,8 @@ function toSortedUniquePoints(points: [string, number][]): { time: UTCTimestamp;
 }
 
 const MAX_MARKER_SIZE = 3;
+// Further than this between press and release is a drag (scrolling the chart), not a click.
+const CLICK_SLOP_PX = 5;
 
 // A fill's time is rarely a bar's exact start; the arrow goes on the bar that contains it.
 function barTimeFor(fillTime: UTCTimestamp, barTimes: UTCTimestamp[]): UTCTimestamp | null {
@@ -190,11 +192,9 @@ export function CandleChart({
   const candlesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const sessionsRef = useRef<ISeriesApi<"Histogram"> | null>(null);
-  // Read through refs so the click subscription, made once, always sees the latest bars and handler.
-  const barsByTimeRef = useRef(barsByTime);
-  barsByTimeRef.current = barsByTime;
-  const onBarClickRef = useRef(onBarClick);
-  onBarClickRef.current = onBarClick;
+  // Read on click, so it must be current without waiting for a re-render.
+  const hoveredTimeRef = useRef<number | null>(null);
+  const pressedAtRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -236,20 +236,16 @@ export function CandleChart({
     // The crosshair snaps to a bar's time anywhere on the chart, so this works
     // over candles, volume or empty space alike.
     const handleCrosshairMove = (param: MouseEventParams) => {
-      setHoveredTime(typeof param.time === "number" ? param.time : null);
+      const time = typeof param.time === "number" ? param.time : null;
+      hoveredTimeRef.current = time;
+      setHoveredTime(time);
     };
     chart.subscribeCrosshairMove(handleCrosshairMove);
-    const handleClick = (param: MouseEventParams) => {
-      const clicked = typeof param.time === "number" ? barsByTimeRef.current.get(param.time) : undefined;
-      if (clicked) onBarClickRef.current?.(clicked);
-    };
-    chart.subscribeClick(handleClick);
     if (screenshotRef) {
       screenshotRef.current = () => chart.takeScreenshot();
     }
     return () => {
       chart.unsubscribeCrosshairMove(handleCrosshairMove);
-      chart.unsubscribeClick(handleClick);
       if (screenshotRef) {
         screenshotRef.current = null;
       }
@@ -318,9 +314,28 @@ export function CandleChart({
     };
   }, [bars, levels, outline, vwap, visibleBars, shadeSessions, markers]);
 
+  // A plain DOM click, not the library's subscribeClick: lightweight-charts 4.2 drops a second
+  // click within its double-click window when it lands 5px or more from the first (it fires
+  // neither click nor dblclick), which would lose a quick exit click right after an entry click.
+  function handleMouseDown(event: ReactMouseEvent) {
+    pressedAtRef.current = { x: event.clientX, y: event.clientY };
+  }
+
+  function handleClick(event: ReactMouseEvent) {
+    const pressedAt = pressedAtRef.current;
+    if (pressedAt && Math.abs(event.clientX - pressedAt.x) + Math.abs(event.clientY - pressedAt.y) >= CLICK_SLOP_PX) return;
+    const clicked = hoveredTimeRef.current == null ? undefined : barsByTime.get(hoveredTimeRef.current);
+    if (clicked) onBarClick?.(clicked);
+  }
+
   return (
     <div className="candle-chart-frame">
-      <div ref={containerRef} className="candle-chart" />
+      <div
+        ref={containerRef}
+        className="candle-chart"
+        onMouseDown={onBarClick ? handleMouseDown : undefined}
+        onClick={onBarClick ? handleClick : undefined}
+      />
       {legendBar && <BarLegend bar={legendBar} isDaily={isDaily} />}
     </div>
   );

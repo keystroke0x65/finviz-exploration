@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CandleChart, CHART_COLORS } from "./CandleChart";
@@ -23,12 +23,9 @@ const chart = vi.hoisted(() => {
   const histogramSeries = [sessionSeries, volumeSeries];
   const timeScale = { fitContent: vi.fn(), setVisibleLogicalRange: vi.fn() };
   const crosshairHandlers: ((param: { time?: number }) => void)[] = [];
-  const clickHandlers: ((param: { time?: number }) => void)[] = [];
   const instance = {
     subscribeCrosshairMove: vi.fn((handler: (param: { time?: number }) => void) => crosshairHandlers.push(handler)),
     unsubscribeCrosshairMove: vi.fn(),
-    subscribeClick: vi.fn((handler: (param: { time?: number }) => void) => clickHandlers.push(handler)),
-    unsubscribeClick: vi.fn(),
     takeScreenshot: vi.fn(() => "canvas"),
     addCandlestickSeries: vi.fn(() => candleSeries),
     addLineSeries: vi.fn(() => lineSeries),
@@ -46,8 +43,7 @@ const chart = vi.hoisted(() => {
   });
   // Simulates the mouse moving over the bar at a chart time (undefined: off the chart).
   const moveCrosshair = (time?: number) => crosshairHandlers.forEach((handler) => handler({ time }));
-  const click = (time?: number) => clickHandlers.forEach((handler) => handler({ time }));
-  return { instance, candleSeries, lineSeries, volumeSeries, sessionSeries, timeScale, createChart, moveCrosshair, click };
+  return { instance, candleSeries, lineSeries, volumeSeries, sessionSeries, timeScale, createChart, moveCrosshair };
 });
 vi.mock("lightweight-charts", () => ({ createChart: chart.createChart, LineStyle: { Dashed: 2, Dotted: 1 } }));
 
@@ -240,16 +236,45 @@ describe("CandleChart fills", () => {
     expect(markers[0].time).toBeLessThan(markers[1].time);
   });
 
-  it("reports the clicked bar", () => {
+  it("reports the bar under the crosshair when the chart is clicked", () => {
     const onBarClick = vi.fn();
-    render(<CandleChart bars={BARS} levels={[]} outline={null} vwap={null} onBarClick={onBarClick} />);
+    const { container } = render(<CandleChart bars={BARS} levels={[]} outline={null} vwap={null} onBarClick={onBarClick} />);
     const secondBarTime = chart.candleSeries.setData.mock.calls[0][0][1].time;
+    const surface = container.querySelector(".candle-chart") as HTMLElement;
 
-    act(() => chart.click(secondBarTime));
-    act(() => chart.click(undefined));
+    act(() => chart.moveCrosshair(secondBarTime));
+    fireEvent.click(surface);
+    act(() => chart.moveCrosshair(undefined));
+    fireEvent.click(surface);
 
     expect(onBarClick).toHaveBeenCalledTimes(1);
     expect(onBarClick).toHaveBeenCalledWith(BARS[1]);
+  });
+
+  it("counts quick clicks on different bars, which the chart library would drop", () => {
+    const onBarClick = vi.fn();
+    const { container } = render(<CandleChart bars={BARS} levels={[]} outline={null} vwap={null} onBarClick={onBarClick} />);
+    const [firstTime, secondTime] = chart.candleSeries.setData.mock.calls[0][0].map((point: { time: number }) => point.time);
+    const surface = container.querySelector(".candle-chart") as HTMLElement;
+
+    act(() => chart.moveCrosshair(firstTime));
+    fireEvent.click(surface);
+    act(() => chart.moveCrosshair(secondTime));
+    fireEvent.click(surface);
+
+    expect(onBarClick.mock.calls.map(([bar]) => bar)).toEqual([BARS[0], BARS[1]]);
+  });
+
+  it("ignores the click at the end of a drag, which scrolls the chart", () => {
+    const onBarClick = vi.fn();
+    const { container } = render(<CandleChart bars={BARS} levels={[]} outline={null} vwap={null} onBarClick={onBarClick} />);
+    const surface = container.querySelector(".candle-chart") as HTMLElement;
+    act(() => chart.moveCrosshair(chart.candleSeries.setData.mock.calls[0][0][0].time));
+
+    fireEvent.mouseDown(surface, { clientX: 100, clientY: 100 });
+    fireEvent.click(surface, { clientX: 160, clientY: 102 });
+
+    expect(onBarClick).not.toHaveBeenCalled();
   });
 
   it("can hand out a screenshot of the chart", () => {
