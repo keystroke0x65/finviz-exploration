@@ -312,6 +312,18 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
 
   const closePanel = useCallback(() => setPanel(NO_PANEL), []);
 
+  async function startNewTrade() {
+    if (!ticker) return;
+    setClickedBar(null);
+    try {
+      // The open trade's setups were for its own day; a new trade starts from today's.
+      const setups = await fetchDaySetups(ticker, easternToday(), new Date().toISOString());
+      setPanel({ kind: "trade", existing: null, setups });
+    } catch (startError) {
+      setError(errorMessage(startError));
+    }
+  }
+
   useJournalShortcuts({ onLogTrade: openTradePanel, onPass: openPassPanel, onClose: closePanel }, Boolean(ticker));
 
   function handleBarClick(bar: Bar) {
@@ -396,7 +408,8 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
                     shadeSessions={hasSessions}
                     isDaily={timeframe === "daily"}
                     markers={hasSessions ? loggedFills : undefined}
-                    onBarClick={handleBarClick}
+                    // A daily candle has no time of day to fill at.
+                    onBarClick={hasSessions ? handleBarClick : undefined}
                   />
                   {hasSessions && (
                     <p className="chart-legend muted">
@@ -427,7 +440,7 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
                 {panel.existing && (
                   <p className="muted">
                     Adding to your open {ticker} trade.{" "}
-                    <button type="button" onClick={() => setPanel({ ...panel, existing: null })}>
+                    <button type="button" onClick={startNewTrade}>
                       Start a new trade instead
                     </button>
                   </p>

@@ -361,6 +361,42 @@ describe("StockView journal", () => {
     expect(await screen.findByRole("region", { name: "pass panel" })).toBeInTheDocument();
   });
 
+  it("keeps the panel open when Escape is pressed while typing", async () => {
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+    await screen.findByTestId("chart");
+    fireEvent.keyDown(window, { key: "l" });
+    await screen.findByRole("region", { name: "trade panel" });
+
+    fireEvent.keyDown(screen.getByLabelText("Stock ticker"), { key: "Escape" });
+
+    expect(screen.getByRole("region", { name: "trade panel" })).toBeInTheDocument();
+  });
+
+  it("starts a new trade without replaying the last candle click", async () => {
+    api.fetchOpenTrade.mockResolvedValue({ id: 4, ticker: "HOST", fills: [], decided_at: "2026-10-19T14:00:00Z" });
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+    await screen.findByTestId("chart");
+    fireEvent.click(screen.getByRole("button", { name: "Log trade" }));
+    await screen.findByRole("region", { name: "trade panel" });
+    act(() => api.chartProps[api.chartProps.length - 1].onBarClick?.(BARS_RESPONSE.bars[0]));
+
+    fireEvent.click(screen.getByRole("button", { name: "Start a new trade instead" }));
+
+    await vi.waitFor(() => expect(api.tradePanelProps[api.tradePanelProps.length - 1].existing).toBeNull());
+    expect(api.tradePanelProps[api.tradePanelProps.length - 1].clickedBar).toBeNull();
+    // The open trade's setups were for its own day; a new trade gets today's.
+    expect(api.fetchDaySetups).toHaveBeenLastCalledWith("HOST", expect.not.stringMatching("2026-10-19"), expect.any(String));
+  });
+
+  it("doesn't take fills from the daily chart", async () => {
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+    await screen.findByTestId("chart");
+    fireEvent.click(screen.getByRole("button", { name: "daily" }));
+
+    await vi.waitFor(() => expect(api.fetchBars).toHaveBeenCalledWith("HOST", "daily"));
+    await vi.waitFor(() => expect(api.chartProps[api.chartProps.length - 1].onBarClick).toBeUndefined());
+  });
+
   it("ignores shortcuts while typing", async () => {
     render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
     await screen.findByTestId("chart");
