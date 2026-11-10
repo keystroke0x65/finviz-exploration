@@ -76,6 +76,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS setup_records_open_key
     ON setup_records (ticker, pattern, direction, timeframe, entry)
     WHERE outcome = 'open';
 
+-- How an open setup looked on each scan where its score, state, verdict or Sykes
+-- grade changed; setup_records only keeps the latest values.
+CREATE TABLE IF NOT EXISTS setup_history (
+    id INTEGER PRIMARY KEY,
+    setup_record_id INTEGER NOT NULL REFERENCES setup_records (id) ON DELETE CASCADE,
+    seen_at TEXT NOT NULL,
+    score REAL NOT NULL,
+    state TEXT NOT NULL,
+    verdict TEXT,
+    sliding_scale TEXT
+);
+
+CREATE INDEX IF NOT EXISTS setup_history_by_record ON setup_history (setup_record_id, seen_at);
+
 CREATE TABLE IF NOT EXISTS ticker_scans (
     ticker TEXT PRIMARY KEY,
     scanned_at TEXT NOT NULL

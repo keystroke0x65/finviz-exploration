@@ -6,11 +6,14 @@ from app.patterns.trade_plan import TradePlan
 from app.patterns.types import PatternMatch
 from app.setups.resolver import Resolution
 from app.setups.store import (
+    get_setup_record,
     list_current_setups,
+    list_setups_for_day,
     list_open_records,
     mark_ticker_scanned,
     record_match,
     save_outcome,
+    setup_values_at,
 )
 
 DETECTED = datetime(2026, 10, 20, 10, 0, tzinfo=EASTERN)
@@ -173,3 +176,82 @@ def test_record_match_stores_and_refreshes_the_sliding_scale(db_conn):
 
 def test_records_without_a_sliding_scale_read_back_as_none(db_conn):
     assert record(db_conn).sliding_scale is None
+
+
+def _history_count(conn):
+    return conn.execute("SELECT COUNT(*) FROM setup_history").fetchone()[0]
+
+
+def record_scored(conn, now, total, state="forming", verdict=None):
+    saved = record_match(
+        conn, "HOST", match(), plan(), state, ScoreBreakdown(total=total, parts={}), "regular", 5.46, now,
+        verdict=verdict,
+    )
+    mark_ticker_scanned(conn, "HOST", now)
+    return saved
+
+
+def test_record_match_appends_history_when_values_change(db_conn):
+    record_scored(db_conn, SCAN_1, 70.0)
+    record_scored(db_conn, SCAN_2, 85.0)
+
+    assert _history_count(db_conn) == 2
+
+
+def test_record_match_skips_history_when_nothing_changed(db_conn):
+    record_scored(db_conn, SCAN_1, 70.0)
+    record_scored(db_conn, SCAN_2, 70.0)
+
+    assert _history_count(db_conn) == 1
+
+
+def test_setup_values_at_returns_values_seen_before_time(db_conn):
+    saved = record_scored(db_conn, SCAN_1, 70.0, verdict="leans_long")
+    record_scored(db_conn, SCAN_2, 85.0, state="triggered", verdict="no_clear_edge")
+
+    between = setup_values_at(db_conn, saved.id, SCAN_1 + timedelta(minutes=5))
+    after = setup_values_at(db_conn, saved.id, SCAN_2 + timedelta(minutes=1))
+
+    assert (between.score, between.state, between.verdict) == (70.0, "forming", "leans_long")
+    assert (after.score, after.state, after.verdict) == (85.0, "triggered", "no_clear_edge")
+
+
+def test_setup_values_at_before_first_scan_uses_first_values(db_conn):
+    saved = record_scored(db_conn, SCAN_1, 70.0)
+
+    assert setup_values_at(db_conn, saved.id, SCAN_1 - timedelta(minutes=5)).score == 70.0
+
+
+def test_setup_values_at_falls_back_to_record_without_history(db_conn):
+    saved = record_scored(db_conn, SCAN_1, 70.0)
+    db_conn.execute("DELETE FROM setup_history")
+
+    assert setup_values_at(db_conn, saved.id, SCAN_2).score == 70.0
+
+
+def test_setup_values_at_unknown_record_is_none(db_conn):
+    assert setup_values_at(db_conn, 999, SCAN_1) is None
+
+
+def test_list_setups_for_day_includes_resolved_setups(db_conn):
+    stopped = record(db_conn, now=SCAN_1, pattern="bull_flag")
+    record(db_conn, now=SCAN_1, pattern="flat_top_breakout")
+    save_outcome(db_conn, stopped.id, Resolution("stop", SCAN_2, 0.2, -1.0))
+
+    patterns = [setup.pattern for setup in list_setups_for_day(db_conn, "HOST", DETECTED.date())]
+
+    assert sorted(patterns) == ["bull_flag", "flat_top_breakout"]
+
+
+def test_list_setups_for_day_skips_other_days_and_tickers(db_conn):
+    record(db_conn, now=SCAN_1)
+
+    assert list_setups_for_day(db_conn, "HOST", DETECTED.date() + timedelta(days=1)) == []
+    assert list_setups_for_day(db_conn, "OTHER", DETECTED.date()) == []
+
+
+def test_get_setup_record(db_conn):
+    saved = record(db_conn)
+
+    assert get_setup_record(db_conn, saved.id) == saved
+    assert get_setup_record(db_conn, 999) is None
