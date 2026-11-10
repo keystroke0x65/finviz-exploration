@@ -75,3 +75,16 @@ def test_no_flags_for_open_trade_within_stop():
     open_figures = compute_trade_figures("long", FILLS[:1], 1.9, 2.3, 0.0, at(12))
 
     assert plan_flags("long", open_figures, 1.9, 2.3, FILLS[:1], [bar(at(10, 10), 1.95, 2.1)]) == []
+
+
+def test_a_trade_without_a_plan_gets_no_plan_flags():
+    figures = compute_trade_figures("long", FILLS, None, None, 0.0, at(12))
+
+    assert plan_flags("long", figures, None, None, FILLS, []) == []
+
+
+def test_stopping_out_at_the_plan_stop_follows_the_plan():
+    fills = [Fill("buy", at(10, 0), 2.0, 100), Fill("sell", at(10, 30), 1.9, 100)]
+    figures = compute_trade_figures("long", fills, 1.9, 2.3, 0.0, at(12))
+
+    assert plan_flags("long", figures, 1.9, 2.3, fills, [bar(at(10, 10), 1.95, 2.05)]) == ["followed_plan"]

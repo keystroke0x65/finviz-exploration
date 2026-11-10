@@ -66,12 +66,17 @@ def plan_flags(
     fills: list[Fill],
     bars: list[Bar],
 ) -> list[PlanFlag]:
+    if plan_stop is None and plan_target is None:
+        return []
     flags: list[PlanFlag] = []
     if plan_stop is not None and fills and _held_past_stop(direction, figures, plan_stop, bars):
         flags.append("held_past_stop")
-    if figures.status == "open":
+    if figures.status == "open" or figures.average_exit is None:
         return flags
     sign = 1 if direction == "long" else -1
-    if plan_target is not None and figures.average_exit is not None and (figures.average_exit - plan_target) * sign < 0:
+    # Getting out at (or through) the stop is the plan working, not an early exit.
+    is_stopped_out = plan_stop is not None and (figures.average_exit - plan_stop) * sign <= 0
+    is_short_of_target = plan_target is not None and (figures.average_exit - plan_target) * sign < 0
+    if is_short_of_target and not is_stopped_out:
         flags.append("exited_before_target")
     return flags or ["followed_plan"]
