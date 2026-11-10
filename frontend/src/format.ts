@@ -84,3 +84,19 @@ export function formatNewsTime(isoTimestamp: string, now: Date): string {
   const isThisYear = EASTERN_YEAR.format(published) === EASTERN_YEAR.format(now);
   return (isThisYear ? NEWS_TIME : NEWS_TIME_WITH_YEAR).format(published);
 }
+
+const MINUS_SIGN = "−";
+
+export function formatDollars(value: number | null, decimals = 2): string {
+  if (value == null) return MISSING_VALUE;
+  const amount = Math.abs(value).toLocaleString("en-US", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+  return `${value < 0 ? MINUS_SIGN : ""}$${amount}`;
+}
+
+export function formatSignedDollars(value: number | null, decimals = 2): string {
+  if (value == null) return MISSING_VALUE;
+  return `${value > 0 ? "+" : ""}${formatDollars(value, decimals)}`;
+}
