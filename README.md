@@ -127,6 +127,22 @@ The journal records your own decisions: trades you took with your real account (
 of buy and sell fills, long or short) and setups you passed on, with the reason. It is
 stored in the same SQLite file (`journal_entries`, `journal_fills`, `journal_bar_days`).
 
+- **Journal tab** (between Stock and Track record): pick Today, This week (default), This
+  month or All time. Tiles show net P&L, trades (and how many are still open), win rate,
+  average gain and loss, largest win and loss, average planned R:R next to the average R
+  made, average duration, average Sykes grade and score of what you traded, how much price
+  kept going after your exits, and passes. Below: a cumulative P&L chart (one bar per
+  closing fill), the list of trades and passes (filter Trades / Passes / Both; click the
+  time to open one), and breakdowns by pattern, mistake, time of day (by entry), duration,
+  country and industry (count and P&L each), passes by reason with what each passed setup
+  would have done, and "You vs. the system" (your results per pattern next to the Track
+  record's; muted where the system's history is too short). An open entry shows its saved
+  chart (1m/5m) with every fill and the plan's stop and target, notes about days whose bars
+  are missing or not yet complete, the plan check (exited before target, held past stop,
+  followed the plan), and "Kept going +1.40R after you sold" / "Dropped 0.50R after you
+  sold". Edit (passes keep their time), Delete (asks first) and "Save as image" (PNG) are on
+  each entry. "Export entries (CSV)" / "Export fills (CSV)" download the period, and "Risk
+  settings" sets risk per trade, max position and max daily loss (empty = off).
 - **Logging, from the Stock tab:** "Log trade" (key `L`) and "Pass" (key `P`) above the
   chart; `Esc` closes the panel (keys are ignored while typing). In the trade panel, click a
   candle to add a fill at its time and close (the first click is the buy, later ones sells,

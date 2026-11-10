@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { JournalView } from "./components/JournalView";
 import { ScreensView } from "./components/ScreensView";
 import { SessionStrip } from "./components/SessionStrip";
 import { SetupsView } from "./components/SetupsView";
@@ -7,7 +8,7 @@ import { TrackRecordView } from "./components/TrackRecordView";
 import { WatchlistView } from "./components/WatchlistView";
 import { readTickerFromSearch, stockUrl } from "./stockLink";
 
-const TABS = ["Setups", "Screens", "Watchlist", "Stock", "Track record"] as const;
+const TABS = ["Setups", "Screens", "Watchlist", "Stock", "Journal", "Track record"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function App() {
@@ -54,6 +55,7 @@ export default function App() {
         {activeTab === "Screens" && <ScreensView onOpenStock={openStock} />}
         {activeTab === "Watchlist" && <WatchlistView onOpenStock={openStock} />}
         {activeTab === "Stock" && <StockView ticker={stockTicker} onTickerChange={setStockTicker} />}
+        {activeTab === "Journal" && <JournalView onOpenStock={openStock} />}
         {activeTab === "Track record" && <TrackRecordView />}
       </main>
     </>
