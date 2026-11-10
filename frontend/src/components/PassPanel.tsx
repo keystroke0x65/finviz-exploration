@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createEntry, DaySetup, fetchReasons, JournalEntry, ReasonCatalog } from "../api/journal";
+import { createEntry, DaySetup, fetchReasons, JournalEntry, PassDraft, ReasonCatalog, updateEntry } from "../api/journal";
 import { ReasonChips, toggled } from "./ReasonChips";
 import { SetupPicker } from "./SetupPicker";
 
@@ -9,6 +9,8 @@ interface PassPanelProps {
   ticker: string;
   setups: DaySetup[];
   defaultSetupId: number | null;
+  // A saved pass being edited; it keeps the moment it was made.
+  existing?: JournalEntry | null;
   onSaved: (entry: JournalEntry) => void;
   onClose: () => void;
 }
@@ -17,10 +19,10 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function PassPanel({ ticker, setups, defaultSetupId, onSaved, onClose }: PassPanelProps) {
+export function PassPanel({ ticker, setups, defaultSetupId, existing = null, onSaved, onClose }: PassPanelProps) {
   const [catalog, setCatalog] = useState<ReasonCatalog | null>(null);
-  const [reasons, setReasons] = useState<string[]>([]);
-  const [note, setNote] = useState("");
+  const [reasons, setReasons] = useState<string[]>(existing?.reasons ?? []);
+  const [note, setNote] = useState(existing?.note ?? "");
   const [setupId, setSetupId] = useState<number | null>(defaultSetupId);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,10 +41,10 @@ export function PassPanel({ ticker, setups, defaultSetupId, onSaved, onClose }: 
     setIsSaving(true);
     setError(null);
     try {
-      const saved = await createEntry({
-        kind: "pass", ticker, direction, setup_record_id: setupId, reasons, note, decided_at: null,
-      });
-      onSaved(saved);
+      const draft: PassDraft = {
+        kind: "pass", ticker, direction, setup_record_id: setupId, reasons, note, decided_at: existing?.decided_at ?? null,
+      };
+      onSaved(existing ? await updateEntry(existing.id, draft) : await createEntry(draft));
     } catch (saveError) {
       setError(errorText(saveError));
     } finally {

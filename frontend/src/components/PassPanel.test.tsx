@@ -1,12 +1,14 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DaySetup } from "../api/journal";
+import { passEntry } from "../test/journalFixtures";
 import { PassPanel } from "./PassPanel";
 
-const api = vi.hoisted(() => ({ fetchReasons: vi.fn(), createEntry: vi.fn() }));
+const api = vi.hoisted(() => ({ fetchReasons: vi.fn(), createEntry: vi.fn(), updateEntry: vi.fn() }));
 vi.mock("../api/journal", () => ({
   fetchReasons: () => api.fetchReasons(),
   createEntry: (draft: unknown) => api.createEntry(draft),
+  updateEntry: (id: number, draft: unknown) => api.updateEntry(id, draft),
 }));
 
 const CATALOG = {
@@ -74,5 +76,19 @@ describe("PassPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save pass" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Setup not found (id 7).");
+  });
+
+  it("edits a saved pass in place, keeping when it was made", async () => {
+    api.updateEntry.mockResolvedValue({ id: 4, kind: "pass", bar_warning: null });
+    const existing = passEntry({ reasons: ["low_sykes"], note: "thin" });
+    render(<PassPanel ticker="HOST" setups={[SETUP]} defaultSetupId={7} existing={existing} onSaved={vi.fn()} onClose={vi.fn()} />);
+
+    expect(await screen.findByRole("button", { name: "Low Sykes grade" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Save pass" }));
+
+    await vi.waitFor(() => expect(api.updateEntry).toHaveBeenCalled());
+    expect(api.updateEntry).toHaveBeenCalledWith(4, expect.objectContaining({
+      reasons: ["low_sykes"], note: "thin", decided_at: existing.decided_at,
+    }));
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDollars, formatNewsTime, formatSignedDollars } from "./format";
+import { formatDollars, formatDuration, formatNewsTime, formatR, formatSignedDollars } from "./format";
 
 const NOW = new Date("2026-10-26T15:00:00-04:00");
 
@@ -28,5 +28,24 @@ describe("formatDollars", () => {
     expect(formatSignedDollars(50)).toBe("+$50.00");
     expect(formatSignedDollars(-12.5)).toBe("−$12.50");
     expect(formatSignedDollars(0)).toBe("$0.00");
+  });
+});
+
+describe("formatR", () => {
+  it("shows R multiples with their sign", () => {
+    expect(formatR(1.4)).toBe("+1.40R");
+    expect(formatR(-1)).toBe("−1.00R");
+    expect(formatR(0)).toBe("0.00R");
+    expect(formatR(null)).toBe("—");
+  });
+});
+
+describe("formatDuration", () => {
+  it("shows durations in the largest sensible unit", () => {
+    expect(formatDuration(45)).toBe("45s");
+    expect(formatDuration(1200)).toBe("20m");
+    expect(formatDuration(5400)).toBe("1h 30m");
+    expect(formatDuration(200000)).toBe("2d 7h");
+    expect(formatDuration(null)).toBe("—");
   });
 });
