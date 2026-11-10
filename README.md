@@ -127,6 +127,19 @@ The journal records your own decisions: trades you took with your real account (
 of buy and sell fills, long or short) and setups you passed on, with the reason. It is
 stored in the same SQLite file (`journal_entries`, `journal_fills`, `journal_bar_days`).
 
+- **Logging, from the Stock tab:** "Log trade" (key `L`) and "Pass" (key `P`) above the
+  chart; `Esc` closes the panel (keys are ignored while typing). In the trade panel, click a
+  candle to add a fill at its time and close (the first click is the buy, later ones sells,
+  for a long), or type date, time (Eastern), price and shares; a price outside the clicked
+  candle's range gets a warning. Figures (average entry/exit, shares held, money in, P&L,
+  R) update as you type. The setup list offers every setup the stock had that day, even
+  ones that already stopped out; its stop and target fill in the plan. If the stock has an
+  open trade, "Log trade" adds to it ("Start a new trade instead" starts another). Passing
+  takes reason chips (more than one allowed; "Other" needs a note). Your logged fills show
+  as arrows on the Stock chart (1m/5m). With a risk per trade set, each setup shows a
+  position size ("Size 625 sh ($1,150.00) to risk $50.00", capped by the max position).
+  With a max daily loss set, Setups and Stock show an amber note at 80% of it and a red
+  banner once it's reached; nothing is ever blocked.
 - Each entry keeps a copy of the setup (pattern, plan, score, Sykes grade, verdict, state)
   and the stock (company, country, sector, industry, float, market cap, price, change,
   volume so far) **as they were when you traded or passed**, even if you log it hours
