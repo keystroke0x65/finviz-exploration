@@ -3,7 +3,7 @@ from dataclasses import asdict
 from datetime import date, datetime, timezone
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Response
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 from fastapi.responses import PlainTextResponse
 
 from app.cache import get_cached_quote, set_cached_quote
@@ -29,6 +29,7 @@ from app.journal.service import (
     EntryDraft,
     SetupNotFoundError,
     load_reviewed,
+    load_trade_figures,
     prepare_entry,
     review_trade,
     score_saved_pass,
@@ -36,7 +37,7 @@ from app.journal.service import (
 from app.journal.store import JournalEntry, create_entry, delete_entry, find_open_trade, get_entry, list_entries, update_entry
 from app.journal.summary import Period, daily_realised_pnl, period_start, summarise
 from app.routes.dependencies import get_db_connection
-from app.routes.stocks import TickerPath
+from app.routes.stocks import TICKER_PATTERN, TickerPath
 from app.setups.store import list_setups_for_day, setup_values_at
 from app.setups.track_record import stats_for
 from app.user_settings import get_journal_settings
@@ -110,11 +111,15 @@ def get_reasons() -> ReasonCatalogOut:
 
 @router.get("/entries", response_model=list[JournalEntryOut])
 def get_entries(
-    conn: DbConnection, kind: Literal["trade", "pass"] | None = None, period: Period = "all"
+    conn: DbConnection,
+    kind: Literal["trade", "pass"] | None = None,
+    period: Period = "all",
+    ticker: Annotated[str | None, Query(pattern=TICKER_PATTERN)] = None,
 ) -> list[JournalEntryOut]:
     now = _now()
     start = period_start(period, now)
-    entries = [entry for entry in list_entries(conn, kind) if start is None or entry.decided_at >= start]
+    matching = list_entries(conn, kind, ticker.upper() if ticker else None)
+    entries = [entry for entry in matching if start is None or entry.decided_at >= start]
     return [_to_out(conn, entry, now) for entry in entries]
 
 
@@ -206,8 +211,9 @@ def _system_stats(conn: sqlite3.Connection):
 @router.get("/summary", response_model=JournalSummaryOut)
 def get_summary(conn: DbConnection, period: Period = "week") -> JournalSummaryOut:
     now = _now()
-    trades, passes = load_reviewed(conn, now)
-    summary = asdict(summarise(trades, passes, period_start(period, now), _system_stats(conn)))
+    start = period_start(period, now)
+    trades, passes = load_reviewed(conn, now, start)
+    summary = asdict(summarise(trades, passes, start, _system_stats(conn)))
     # The track record's response shape also says whether the history is trusted.
     for row in summary["versus_system"]:
         if row["system"] is not None:
@@ -218,8 +224,7 @@ def get_summary(conn: DbConnection, period: Period = "week") -> JournalSummaryOu
 @router.get("/daily-loss", response_model=DailyLossOut)
 def get_daily_loss(conn: DbConnection) -> DailyLossOut:
     now = _now()
-    trades, _ = load_reviewed(conn, now)
-    pnl = daily_realised_pnl(trades, now)
+    pnl = daily_realised_pnl(load_trade_figures(conn, now), now)
     limit = get_journal_settings(conn)["max_daily_loss"]
     level: Literal["ok", "warning", "reached"] = "ok"
     if limit is not None and -pnl >= limit:
@@ -238,7 +243,7 @@ def _csv_response(text: str, filename: str) -> PlainTextResponse:
 def _period_entries(conn: sqlite3.Connection, period: Period):
     now = _now()
     start = period_start(period, now)
-    trades, passes = load_reviewed(conn, now)
+    trades, passes = load_reviewed(conn, now, start)
     in_period = [trade for trade in trades if start is None or trade.figures.last_fill_at >= start]
     passed = [scored for scored in passes if start is None or scored.entry.decided_at >= start]
     return in_period, passed

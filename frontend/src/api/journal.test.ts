@@ -48,6 +48,14 @@ describe("journal api", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/journal/entries?period=week&kind=trade");
   });
 
+  it("lists one stock's entries", async () => {
+    const fetchMock = stubFetch([]);
+
+    await fetchEntries("trade", "all", "HOST");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/journal/entries?period=all&kind=trade&ticker=HOST");
+  });
+
   it("asks for a summary of a period", async () => {
     const fetchMock = stubFetch({});
 

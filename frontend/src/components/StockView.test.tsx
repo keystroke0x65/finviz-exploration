@@ -403,10 +403,10 @@ describe("StockView journal", () => {
   it("marks this stock's logged fills on the chart", async () => {
     api.fetchEntries.mockResolvedValue([
       { ticker: "HOST", fills: [{ side: "buy", time: "2026-10-20T09:30:00-04:00", price: 2, shares: 100 }] },
-      { ticker: "OTHER", fills: [{ side: "buy", time: "2026-10-20T09:30:00-04:00", price: 5, shares: 10 }] },
     ]);
     render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
 
+    await vi.waitFor(() => expect(api.fetchEntries).toHaveBeenCalledWith("trade", "all", "HOST"));
     await vi.waitFor(() =>
       expect(api.chartProps[api.chartProps.length - 1].markers).toEqual([
         { side: "buy", time: "2026-10-20T09:30:00-04:00", price: 2, shares: 100 },

@@ -149,8 +149,31 @@ def score_saved_pass(conn: sqlite3.Connection, entry: JournalEntry, now: datetim
     return ScoredPass(entry, score_pass(entry.setup, entry.decided_at, pass_price, bars))
 
 
-def load_reviewed(conn: sqlite3.Connection, now: datetime) -> tuple[list[ReviewedTrade], list[ScoredPass]]:
-    entries = list_entries(conn)
-    trades = [review_trade(conn, entry, now) for entry in entries if entry.kind == "trade" and entry.fills]
-    passes = [score_saved_pass(conn, entry, now) for entry in entries if entry.kind == "pass"]
+def _figures_only(entry: JournalEntry, now: datetime) -> ReviewedTrade:
+    figures = compute_trade_figures(entry.direction, entry.fills, entry.plan_stop, entry.plan_target, entry.fees, now)
+    return ReviewedTrade(entry, figures, None, [])
+
+
+def load_trade_figures(conn: sqlite3.Connection, now: datetime) -> list[ReviewedTrade]:
+    """Every trade's figures without reading saved bars: enough for P&L totals."""
+    return [_figures_only(entry, now) for entry in list_entries(conn, kind="trade") if entry.fills]
+
+
+def load_reviewed(
+    conn: sqlite3.Connection, now: datetime, start: datetime | None = None
+) -> tuple[list[ReviewedTrade], list[ScoredPass]]:
+    """Trades and passes for a period's summary or export.
+
+    Only trades closed in the period (and passes made in it) need their saved bars read;
+    the rest only contribute P&L, which their fills alone give.
+    """
+    trades: list[ReviewedTrade] = []
+    for trade in load_trade_figures(conn, now):
+        is_in_period = trade.figures.status == "closed" and (start is None or trade.figures.last_fill_at >= start)
+        trades.append(review_trade(conn, trade.entry, now) if is_in_period else trade)
+    passes = [
+        score_saved_pass(conn, entry, now)
+        for entry in list_entries(conn, kind="pass")
+        if start is None or entry.decided_at >= start
+    ]
     return trades, passes

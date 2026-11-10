@@ -279,3 +279,23 @@ def test_a_pass_saved_while_finviz_was_down_is_scored_from_its_moment_once_bars_
 
     # 2.20 at the 9:50 pass was already past the 2.15 target: no trade was left to take.
     assert api_client.get(f"/api/journal/entries/{created['id']}").json()["pass_score"]["outcome"] == "not_scored"
+
+
+def test_entries_can_be_filtered_by_ticker(api_client):
+    api_client.post("/api/journal/entries", json=trade_body())
+    api_client.post("/api/journal/entries", json=trade_body(ticker="OTHR"))
+
+    rows = api_client.get("/api/journal/entries?kind=trade&period=all&ticker=host").json()
+
+    assert [row["ticker"] for row in rows] == ["HOST"]
+
+
+def test_daily_loss_needs_only_fills_not_saved_bars(api_client, monkeypatch):
+    api_client.post("/api/journal/entries", json=trade_body())
+
+    def no_bars(*args, **kwargs):
+        raise AssertionError("daily loss must not read saved bars")
+
+    monkeypatch.setattr("app.journal.service.read_bars", no_bars)
+
+    assert api_client.get("/api/journal/daily-loss").json()["level"] == "ok"

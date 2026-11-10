@@ -97,7 +97,7 @@ def _read_fills(conn: sqlite3.Connection, entry_id: int) -> list[Fill]:
     return [Fill(row["side"], datetime.fromisoformat(row["time"]), row["price"], row["shares"]) for row in rows]
 
 
-def _to_entry(conn: sqlite3.Connection, row: sqlite3.Row) -> JournalEntry:
+def _to_entry(conn: sqlite3.Connection, row: sqlite3.Row, fills: list[Fill] | None = None) -> JournalEntry:
     return JournalEntry(
         id=row["id"],
         kind=row["kind"],
@@ -115,7 +115,7 @@ def _to_entry(conn: sqlite3.Connection, row: sqlite3.Row) -> JournalEntry:
         mistakes=json.loads(row["mistakes"]),
         note=row["note"],
         pass_price=row["pass_price"],
-        fills=_read_fills(conn, row["id"]),
+        fills=_read_fills(conn, row["id"]) if fills is None else fills,
     )
 
 
@@ -181,19 +181,38 @@ def get_entry(conn: sqlite3.Connection, entry_id: int) -> JournalEntry | None:
     return None if row is None else _to_entry(conn, row)
 
 
-def list_entries(conn: sqlite3.Connection, kind: EntryKind | None = None) -> list[JournalEntry]:
+def _fills_by_entry(conn: sqlite3.Connection, entry_ids: list[int]) -> dict[int, list[Fill]]:
+    """Every listed entry's fills in one query, instead of one query per entry."""
+    fills: dict[int, list[Fill]] = {entry_id: [] for entry_id in entry_ids}
+    if not entry_ids:
+        return fills
+    placeholders = ",".join("?" for _ in entry_ids)
+    # Only "?" placeholders are joined in; the ids themselves are bound parameters.
     rows = conn.execute(
-        "SELECT * FROM journal_entries WHERE (? IS NULL OR kind = ?)", (kind, kind)
+        f"SELECT * FROM journal_fills WHERE entry_id IN ({placeholders}) ORDER BY time, id", entry_ids
+    )
+    for row in rows:
+        fills[row["entry_id"]].append(Fill(row["side"], datetime.fromisoformat(row["time"]), row["price"], row["shares"]))
+    return fills
+
+
+def list_entries(
+    conn: sqlite3.Connection, kind: EntryKind | None = None, ticker: str | None = None
+) -> list[JournalEntry]:
+    rows = conn.execute(
+        "SELECT * FROM journal_entries WHERE (? IS NULL OR kind = ?) AND (? IS NULL OR ticker = ?)",
+        (kind, kind, ticker, ticker),
     ).fetchall()
-    entries = [_to_entry(conn, row) for row in rows]
+    fills = _fills_by_entry(conn, [row["id"] for row in rows])
+    entries = [_to_entry(conn, row, fills[row["id"]]) for row in rows]
     # Sorted in Python: stored times carry different UTC offsets, so string order isn't time order.
     return sorted(entries, key=lambda entry: (entry.decided_at, entry.id), reverse=True)
 
 
 def find_open_trade(conn: sqlite3.Connection, ticker: str, now: datetime) -> JournalEntry | None:
     """The stock's most recent trade that still holds shares."""
-    for entry in list_entries(conn, kind="trade"):
-        if entry.ticker != ticker or not entry.fills:
+    for entry in list_entries(conn, kind="trade", ticker=ticker):
+        if not entry.fills:
             continue
         figures = compute_trade_figures(entry.direction, entry.fills, entry.plan_stop, entry.plan_target, entry.fees, now)
         if figures.status == "open":

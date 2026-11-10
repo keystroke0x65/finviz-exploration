@@ -182,9 +182,9 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
   useEffect(() => {
     if (!ticker) return;
     let isCurrent = true;
-    fetchEntries("trade", "all")
+    fetchEntries("trade", "all", ticker)
       .then((entries) => {
-        if (isCurrent) setLoggedFills(entries.filter((entry) => entry.ticker === ticker).flatMap((entry) => entry.fills));
+        if (isCurrent) setLoggedFills(entries.flatMap((entry) => entry.fills));
       })
       // Best effort: the chart is still useful without the markers.
       .catch(() => undefined);

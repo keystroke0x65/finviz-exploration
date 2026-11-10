@@ -229,9 +229,10 @@ export function fetchReasons(): Promise<ReasonCatalog> {
   return requestJson<ReasonCatalog>(`${BASE}/reasons`);
 }
 
-export function fetchEntries(kind: EntryKind | null, period: JournalPeriod): Promise<JournalEntry[]> {
+export function fetchEntries(kind: EntryKind | null, period: JournalPeriod, ticker?: string): Promise<JournalEntry[]> {
   const kindQuery = kind ? `&kind=${kind}` : "";
-  return requestJson<JournalEntry[]>(`${BASE}/entries?period=${period}${kindQuery}`);
+  const tickerQuery = ticker ? `&ticker=${encodeURIComponent(ticker)}` : "";
+  return requestJson<JournalEntry[]>(`${BASE}/entries?period=${period}${kindQuery}${tickerQuery}`);
 }
 
 export function fetchEntry(id: number): Promise<JournalEntry> {
