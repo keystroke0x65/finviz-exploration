@@ -9,7 +9,7 @@ export type EntryKind = "trade" | "pass";
 export type FillSide = "buy" | "sell";
 export type PlanFlag = "exited_before_target" | "held_past_stop" | "followed_plan";
 export type PassOutcome = "target" | "stop" | "never_filled" | "undecided" | "not_scored";
-export type BarDayStatus = "partial" | "complete" | "missing";
+export type BarDayStatus = "partial" | "complete" | "missing" | "incomplete";
 
 export interface Fill {
   side: FillSide;

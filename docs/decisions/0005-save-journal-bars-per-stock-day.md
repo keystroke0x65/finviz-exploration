@@ -12,7 +12,9 @@ or built.
 ## Decision
 A `journal_bar_days` table stores the 4:00 AM-8:00 PM ET 1-minute bars once per
 (ticker, trading day) as JSON, with a status: `partial` (saved before 8 PM), `complete`, or
-`missing` (Finviz no longer has the day). Every journal entry on that stock-day shares the
+`missing` (Finviz no longer had the day when first asked) or `incomplete` (part of the day was
+saved, then Finviz dropped it). Saved bars are merged with each new fetch and never replaced by
+fewer bars. Every journal entry on that stock-day shares the
 row. Bars are saved when an entry is logged; the existing background loop completes
 partial days and retries failed fetches. 5-minute bars are built from the 1-minute ones
 when shown.

@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS journal_fills (
 CREATE TABLE IF NOT EXISTS journal_bar_days (
     ticker TEXT NOT NULL,
     day TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('partial', 'complete', 'missing')),
+    status TEXT NOT NULL CHECK (status IN ('partial', 'complete', 'missing', 'incomplete')),
     saved_at TEXT NOT NULL,
     bars TEXT NOT NULL DEFAULT '[]',
     PRIMARY KEY (ticker, day)

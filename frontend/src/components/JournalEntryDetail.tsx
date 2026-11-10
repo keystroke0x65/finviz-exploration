@@ -45,6 +45,7 @@ function describeDay(day: string): string {
 
 function dayNotice({ day, status }: EntryBars["days"][number]): string | null {
   if (status === "missing") return `Bars for ${describeDay(day)} are no longer available from Finviz.`;
+  if (status === "incomplete") return `Bars for ${describeDay(day)} are only partly saved; Finviz no longer has the rest.`;
   if (status === "partial") return `Bars for ${describeDay(day)} are saved up to now; the rest is saved after 8 PM ET.`;
   if (status == null) return `Bars for ${describeDay(day)} aren't saved yet; the app retries every 15 minutes.`;
   return null;

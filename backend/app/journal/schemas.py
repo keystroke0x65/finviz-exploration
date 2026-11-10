@@ -213,7 +213,7 @@ class JournalBarOut(BaseModel):
 
 class BarDayOut(BaseModel):
     day: date
-    status: Literal["partial", "complete", "missing"] | None
+    status: Literal["partial", "complete", "missing", "incomplete"] | None
 
 
 class EntryBarsOut(BaseModel):

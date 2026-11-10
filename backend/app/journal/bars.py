@@ -21,7 +21,10 @@ from app.market_time import EASTERN
 
 logger = logging.getLogger(__name__)
 
-BarDayStatus = Literal["partial", "complete", "missing"]
+# partial: saved before 8 PM, more to come. complete: the whole day. missing: Finviz no longer
+# had the day when first asked. incomplete: part of the day was saved, then Finviz dropped it.
+BarDayStatus = Literal["partial", "complete", "missing", "incomplete"]
+FINAL_STATUSES = ("complete", "missing", "incomplete")
 
 DAY_START = time(4, 0)
 DAY_END = time(20, 0)
@@ -84,21 +87,37 @@ def _write_day(conn: sqlite3.Connection, ticker: str, day: date, status: BarDayS
     )
 
 
-def _status_for(day: date, day_bars: list[Bar], oldest_day: date, now: datetime) -> BarDayStatus | None:
+def _status_for(day: date, fetched: list[Bar], saved: list[Bar], oldest_day: date, now: datetime) -> BarDayStatus | None:
     """None: nothing to save yet (today or later, no bars so far)."""
-    if day_bars:
+    if fetched:
         is_over = now >= datetime.combine(day, DAY_END, tzinfo=EASTERN)
         return "complete" if is_over else "partial"
     # Before Finviz's history starts, or a past day with no trading (holiday).
-    if day < oldest_day or day < _eastern_day(now):
-        return "missing"
-    return None
+    is_gone = day < oldest_day or day < _eastern_day(now)
+    if not is_gone:
+        return None
+    # Keep what was saved: an empty fetch must never wipe a chart.
+    return "incomplete" if saved else "missing"
+
+
+def _merge(saved: list[Bar], fetched: list[Bar]) -> list[Bar]:
+    """Saved bars plus fetched ones; a fetched bar replaces the saved bar at the same minute."""
+    by_time = {bar.time: bar for bar in saved}
+    by_time.update({bar.time: bar for bar in fetched})
+    return [by_time[moment] for moment in sorted(by_time)]
+
+
+def _saved_bars(conn: sqlite3.Connection, ticker: str, day: date) -> list[Bar]:
+    row = conn.execute(
+        "SELECT bars FROM journal_bar_days WHERE ticker = ? AND day = ?", (ticker, day.isoformat())
+    ).fetchone()
+    return [] if row is None else _decode_bars(row["bars"])
 
 
 def save_bar_days(conn: sqlite3.Connection, ticker: str, days: list[date], now: datetime, fetch_bars_fn: FetchBars) -> None:
     """Save every listed day not already complete or missing. Finviz errors propagate."""
     statuses = _read_statuses(conn, ticker, days)
-    to_save = [day for day, status in statuses.items() if status not in ("complete", "missing")]
+    to_save = [day for day, status in statuses.items() if status not in FINAL_STATUSES]
     if not to_save:
         return
     fetched = fetch_bars_fn(ticker, "1m")
@@ -108,20 +127,18 @@ def save_bar_days(conn: sqlite3.Connection, ticker: str, days: list[date], now: 
     oldest_day = min(_eastern_day(bar.time) for bar in fetched)
     with conn:
         for day in to_save:
-            status = _status_for(day, by_day.get(day, []), oldest_day, now)
+            saved = _saved_bars(conn, ticker, day)
+            fetched_day = by_day.get(day, [])
+            status = _status_for(day, fetched_day, saved, oldest_day, now)
             if status is not None:
-                _write_day(conn, ticker, day, status, by_day.get(day, []), now)
+                _write_day(conn, ticker, day, status, _merge(saved, fetched_day), now)
 
 
 def read_bars(conn: sqlite3.Connection, ticker: str, days: list[date]) -> tuple[list[Bar], dict[date, BarDayStatus | None]]:
     statuses = _read_statuses(conn, ticker, days)
     bars: list[Bar] = []
     for day in days:
-        row = conn.execute(
-            "SELECT bars FROM journal_bar_days WHERE ticker = ? AND day = ?", (ticker, day.isoformat())
-        ).fetchone()
-        if row is not None:
-            bars.extend(_decode_bars(row["bars"]))
+        bars.extend(_saved_bars(conn, ticker, day))
     return sorted(bars, key=lambda bar: bar.time), statuses
 
 
@@ -140,7 +157,7 @@ def _pending_days_by_ticker(conn: sqlite3.Connection, now: datetime) -> dict[str
     for entry in list_entries(conn):
         days = days_needed(entry, now)
         statuses = _read_statuses(conn, entry.ticker, days)
-        pending[entry.ticker].update(day for day, status in statuses.items() if status not in ("complete", "missing"))
+        pending[entry.ticker].update(day for day, status in statuses.items() if status not in FINAL_STATUSES)
     return {ticker: sorted(days) for ticker, days in pending.items() if days}
 
 

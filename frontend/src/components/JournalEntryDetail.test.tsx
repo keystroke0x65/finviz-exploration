@@ -65,6 +65,14 @@ describe("JournalEntryDetail", () => {
     expect(await screen.findByText("Bars for Oct 3 are no longer available from Finviz.")).toBeInTheDocument();
   });
 
+  it("says when only part of a day was saved before Finviz dropped it", async () => {
+    api.fetchEntryBars.mockResolvedValue({ bars: [BAR], days: [{ day: "2026-10-03", status: "incomplete" }] });
+
+    renderDetail();
+
+    expect(await screen.findByText("Bars for Oct 3 are only partly saved; Finviz no longer has the rest.")).toBeInTheDocument();
+  });
+
   it("shows what happened after the exit and the plan check", async () => {
     renderDetail();
 

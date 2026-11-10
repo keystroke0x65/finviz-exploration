@@ -166,8 +166,9 @@ stored in the same SQLite file (`journal_entries`, `journal_fills`, `journal_bar
 - The 1-minute bars (4:00 AM-8:00 PM ET) of every day a trade was open are saved when you
   log it, because Finviz drops 1-minute bars after about two weeks. A day saved before
   8 PM is "partial"; the background loop (every 15 minutes, evenings and weekends too)
-  completes it later and retries if Finviz was down. Days Finviz no longer has are marked
-  "missing" and the entry still saves.
+  completes it later and retries if Finviz was down; saved bars are merged with each new fetch,
+  never replaced. Days Finviz no longer has are marked "missing" (or "incomplete" when part of
+  the day was saved first) and the entry still saves.
 - Maths: average-cost P&L, fees booked when the trade closes, R = P&L ÷ (first entry −
   plan stop) × largest position. Realised P&L counts on the day of each sell, so the P&L
   chart, period totals and daily loss warning agree; trade counts and win rate count a

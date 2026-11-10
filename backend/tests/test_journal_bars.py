@@ -149,3 +149,35 @@ def test_aggregate_bars_builds_five_minute_bars():
         Bar(at(MONDAY, 9, 30), 2.0, 2.3, 1.9, 2.2, 300),
         Bar(at(MONDAY, 9, 35), 2.2, 2.25, 2.1, 2.15, 50),
     ]
+
+
+def test_saved_partial_bars_survive_once_finviz_drops_the_day(db_conn):
+    save_bar_days(db_conn, "HOST", [MONDAY], at(MONDAY, 11), FakeFinviz([bar(MONDAY, 9, 30), bar(MONDAY, 10, 0)]))
+
+    later = at(date(2026, 11, 30), 10)
+    save_bar_days(db_conn, "HOST", [MONDAY], later, FakeFinviz([bar(date(2026, 11, 27), 9, 30)]))
+
+    bars, statuses = read_bars(db_conn, "HOST", [MONDAY])
+    assert len(bars) == 2
+    assert statuses == {MONDAY: "incomplete"}
+
+
+def test_a_shorter_fetch_never_replaces_saved_bars(db_conn):
+    save_bar_days(db_conn, "HOST", [MONDAY], at(MONDAY, 11), FakeFinviz([bar(MONDAY, 9, 30), bar(MONDAY, 10, 0)]))
+
+    save_bar_days(db_conn, "HOST", [MONDAY], at(MONDAY, 20, 30), FakeFinviz([bar(MONDAY, 10, 0, 2.5), bar(MONDAY, 19, 0)]))
+
+    bars, statuses = read_bars(db_conn, "HOST", [MONDAY])
+    assert [saved.time for saved in bars] == [at(MONDAY, 9, 30), at(MONDAY, 10), at(MONDAY, 19)]
+    assert bars[1].close == 2.5
+    assert statuses == {MONDAY: "complete"}
+
+
+def test_incomplete_days_are_not_fetched_again(db_conn):
+    save_bar_days(db_conn, "HOST", [MONDAY], at(MONDAY, 11), FakeFinviz([bar(MONDAY, 9, 30)]))
+    save_bar_days(db_conn, "HOST", [MONDAY], at(date(2026, 11, 30), 10), FakeFinviz([bar(date(2026, 11, 27), 9, 30)]))
+    finviz = FakeFinviz([bar(date(2026, 11, 27), 9, 30)])
+
+    save_bar_days(db_conn, "HOST", [MONDAY], at(date(2026, 12, 1), 10), finviz)
+
+    assert finviz.calls == 0
