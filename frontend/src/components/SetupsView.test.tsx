@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { DailyLoss } from "../api/journal";
 import type { ScanStatus, Setup, TrackRecordSummary, Warning } from "../api/setups";
 import { SetupsView } from "./SetupsView";
 
@@ -13,7 +14,9 @@ const api = {
   runScan: vi.fn(),
   saveSettings: vi.fn(),
   fetchScanStatus: vi.fn(() => Promise.resolve(CLEAN_SCAN)),
+  fetchDailyLoss: vi.fn((): Promise<DailyLoss> => Promise.resolve({ realised_pnl_today: 0, max_daily_loss: null, level: "ok" })),
 };
+vi.mock("../api/journal", () => ({ fetchDailyLoss: () => api.fetchDailyLoss() }));
 vi.mock("../api/setups", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/setups")>()),
   fetchSetups: () => api.fetchSetups(),
@@ -48,6 +51,15 @@ describe("SetupsView", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+  });
+
+  it("warns when the max daily loss is reached", async () => {
+    respond([setup()]);
+    api.fetchDailyLoss.mockResolvedValueOnce({ realised_pnl_today: -212, max_daily_loss: 200, level: "reached" });
+
+    render(<SetupsView onOpenStock={vi.fn()} />);
+
+    expect(await screen.findByText("Max daily loss reached (−$212 of −$200)")).toBeInTheDocument();
   });
 
   it("shows each setup's Sykes sliding scale grade next to its score", async () => {

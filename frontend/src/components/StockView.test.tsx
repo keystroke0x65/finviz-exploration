@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Setup } from "../api/setups";
 import { StockView } from "./StockView";
@@ -10,8 +10,31 @@ const api = vi.hoisted(() => ({
   runScan: vi.fn(),
   fetchQuote: vi.fn(),
   refreshQuote: vi.fn(),
-  chartProps: [] as { levels: { price: number; kind: string }[]; shadeSessions?: boolean }[],
+  chartProps: [] as ChartProps[],
+  fetchDaySetups: vi.fn(),
+  fetchOpenTrade: vi.fn(),
+  fetchEntries: vi.fn(),
+  fetchJournalSettings: vi.fn(),
+  tradePanelProps: [] as { existing: unknown; clickedBar: unknown; defaultSetupId: number | null }[],
 }));
+vi.mock("../api/journal", () => ({
+  fetchDaySetups: (...args: unknown[]) => api.fetchDaySetups(...args),
+  fetchOpenTrade: (ticker: string) => api.fetchOpenTrade(ticker),
+  fetchEntries: (...args: unknown[]) => api.fetchEntries(...args),
+}));
+vi.mock("../api/settings", () => ({ fetchJournalSettings: () => api.fetchJournalSettings() }));
+vi.mock("./DailyLossBanner", () => ({ DailyLossBanner: () => null }));
+vi.mock("./TradePanel", () => ({
+  TradePanel: (props: { existing: unknown; clickedBar: unknown; defaultSetupId: number | null; onClose: () => void }) => {
+    api.tradePanelProps.push(props);
+    return (
+      <section aria-label="trade panel">
+        <button type="button" onClick={props.onClose}>Close trade panel</button>
+      </section>
+    );
+  },
+}));
+vi.mock("./PassPanel", () => ({ PassPanel: () => <section aria-label="pass panel" /> }));
 vi.mock("../api/bars", () => ({ fetchBars: (...args: unknown[]) => api.fetchBars(...args) }));
 vi.mock("../api/setups", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/setups")>()),
@@ -23,8 +46,14 @@ vi.mock("../api/stocks", () => ({
   fetchQuote: (ticker: string) => api.fetchQuote(ticker),
   refreshQuote: (ticker: string) => api.refreshQuote(ticker),
 }));
+interface ChartProps {
+  levels: { price: number; kind: string }[];
+  shadeSessions?: boolean;
+  markers?: { side: string; shares: number }[];
+  onBarClick?: (bar: unknown) => void;
+}
 vi.mock("./CandleChart", () => ({
-  CandleChart: (props: { levels: { price: number; kind: string }[]; shadeSessions?: boolean }) => {
+  CandleChart: (props: ChartProps) => {
     api.chartProps.push(props);
     return <div data-testid="chart" />;
   },
@@ -36,6 +65,11 @@ const SETUP: Setup = {
   partial_1r: 2.19, partial_2r: 2.26, trailing_stop: null, quality: 0.7, score: 80, score_parts: {},
   key_points: [["2026-10-20T13:30:00Z", 2.0]], state: "forming", triggered_at: null, session: "regular",
   detected_at: "2026-10-20T13:35:00Z", last_seen_at: "2026-10-20T13:35:30Z", has_conflict: false,
+};
+
+const DAY_SETUP = {
+  setup_record_id: 7, pattern: "bull_flag", timeframe: "5m", direction: "long", entry: 2.12, stop: 2.05, target: 2.33,
+  reward_risk: 3, score: 80, state: "forming", verdict: null, sliding_scale: null, outcome: "open",
 };
 
 const BARS_RESPONSE = {
@@ -53,7 +87,12 @@ describe("StockView", () => {
     api.fetchQuote.mockResolvedValue({ Ticker: "HOST", Company: "Host Digital Inc" });
     api.refreshQuote.mockResolvedValue({ Ticker: "HOST", Company: "Host Digital Inc" });
     api.fetchStockVerdict.mockResolvedValue(null);
+    api.fetchDaySetups.mockResolvedValue([DAY_SETUP]);
+    api.fetchOpenTrade.mockResolvedValue(null);
+    api.fetchEntries.mockResolvedValue([]);
+    api.fetchJournalSettings.mockResolvedValue({ risk_per_trade: null, max_position: null, max_daily_loss: null });
     api.chartProps = [];
+    api.tradePanelProps = [];
   });
 
   afterEach(() => {
@@ -286,5 +325,135 @@ describe("StockView", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(screen.queryByRole("button", { name: /Bull flag/ })).not.toBeInTheDocument();
+  });
+});
+
+
+describe("StockView journal", () => {
+  beforeEach(() => {
+    api.fetchBars.mockResolvedValue(BARS_RESPONSE);
+    api.fetchStockSetups.mockResolvedValue({ setups: [SETUP], warnings: [], show_short_setups: false });
+    api.fetchQuote.mockResolvedValue({ Ticker: "HOST" });
+    api.fetchStockVerdict.mockResolvedValue(null);
+    api.fetchDaySetups.mockResolvedValue([DAY_SETUP]);
+    api.fetchOpenTrade.mockResolvedValue(null);
+    api.fetchEntries.mockResolvedValue([]);
+    api.fetchJournalSettings.mockResolvedValue({ risk_per_trade: null, max_position: null, max_daily_loss: null });
+    api.chartProps = [];
+    api.tradePanelProps = [];
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("opens the trade panel with L, the pass panel with P, and closes with Escape", async () => {
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+    await screen.findByTestId("chart");
+
+    fireEvent.keyDown(window, { key: "l" });
+    expect(await screen.findByRole("region", { name: "trade panel" })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    await vi.waitFor(() => expect(screen.queryByRole("region", { name: "trade panel" })).not.toBeInTheDocument());
+
+    fireEvent.keyDown(window, { key: "p" });
+    expect(await screen.findByRole("region", { name: "pass panel" })).toBeInTheDocument();
+  });
+
+  it("keeps the panel open when Escape is pressed while typing", async () => {
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+    await screen.findByTestId("chart");
+    fireEvent.keyDown(window, { key: "l" });
+    await screen.findByRole("region", { name: "trade panel" });
+
+    fireEvent.keyDown(screen.getByLabelText("Stock ticker"), { key: "Escape" });
+
+    expect(screen.getByRole("region", { name: "trade panel" })).toBeInTheDocument();
+  });
+
+  it("starts a new trade without replaying the last candle click", async () => {
+    api.fetchOpenTrade.mockResolvedValue({ id: 4, ticker: "HOST", fills: [], decided_at: "2026-10-19T14:00:00Z" });
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+    await screen.findByTestId("chart");
+    fireEvent.click(screen.getByRole("button", { name: "Log trade" }));
+    await screen.findByRole("region", { name: "trade panel" });
+    act(() => api.chartProps[api.chartProps.length - 1].onBarClick?.(BARS_RESPONSE.bars[0]));
+
+    fireEvent.click(screen.getByRole("button", { name: "Start a new trade instead" }));
+
+    await vi.waitFor(() => expect(api.tradePanelProps[api.tradePanelProps.length - 1].existing).toBeNull());
+    expect(api.tradePanelProps[api.tradePanelProps.length - 1].clickedBar).toBeNull();
+    // The open trade's setups were for its own day; a new trade gets today's.
+    expect(api.fetchDaySetups).toHaveBeenLastCalledWith("HOST", expect.not.stringMatching("2026-10-19"), expect.any(String));
+  });
+
+  it("doesn't take fills from the daily chart", async () => {
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+    await screen.findByTestId("chart");
+    fireEvent.click(screen.getByRole("button", { name: "daily" }));
+
+    await vi.waitFor(() => expect(api.fetchBars).toHaveBeenCalledWith("HOST", "daily"));
+    await vi.waitFor(() => expect(api.chartProps[api.chartProps.length - 1].onBarClick).toBeUndefined());
+  });
+
+  it("ignores shortcuts while typing", async () => {
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+    await screen.findByTestId("chart");
+
+    fireEvent.keyDown(screen.getByLabelText("Stock ticker"), { key: "l" });
+
+    expect(screen.queryByRole("region", { name: "trade panel" })).not.toBeInTheDocument();
+  });
+
+  it("hands clicked candles to the open trade panel", async () => {
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+    await screen.findByTestId("chart");
+
+    fireEvent.click(screen.getByRole("button", { name: "Log trade" }));
+    await screen.findByRole("region", { name: "trade panel" });
+    const bar = BARS_RESPONSE.bars[0];
+    act(() => api.chartProps[api.chartProps.length - 1].onBarClick?.(bar));
+
+    await vi.waitFor(() =>
+      expect(api.tradePanelProps[api.tradePanelProps.length - 1].clickedBar).toEqual({ bar, id: 1 }),
+    );
+    expect(api.tradePanelProps[0].defaultSetupId).toBe(7);
+  });
+
+  it("continues the stock's open trade, or starts a new one", async () => {
+    const openTrade = { id: 4, ticker: "HOST", fills: [] };
+    api.fetchOpenTrade.mockResolvedValue(openTrade);
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+    await screen.findByTestId("chart");
+
+    fireEvent.click(screen.getByRole("button", { name: "Log trade" }));
+    await screen.findByRole("region", { name: "trade panel" });
+    expect(api.tradePanelProps[api.tradePanelProps.length - 1].existing).toEqual(openTrade);
+
+    fireEvent.click(screen.getByRole("button", { name: "Start a new trade instead" }));
+
+    await vi.waitFor(() => expect(api.tradePanelProps[api.tradePanelProps.length - 1].existing).toBeNull());
+  });
+
+  it("marks this stock's logged fills on the chart", async () => {
+    api.fetchEntries.mockResolvedValue([
+      { ticker: "HOST", fills: [{ side: "buy", time: "2026-10-20T09:30:00-04:00", price: 2, shares: 100 }] },
+    ]);
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+
+    await vi.waitFor(() => expect(api.fetchEntries).toHaveBeenCalledWith("trade", "all", "HOST"));
+    await vi.waitFor(() =>
+      expect(api.chartProps[api.chartProps.length - 1].markers).toEqual([
+        { side: "buy", time: "2026-10-20T09:30:00-04:00", price: 2, shares: 100 },
+      ]),
+    );
+  });
+
+  it("suggests a position size on each setup when a risk amount is set", async () => {
+    api.fetchJournalSettings.mockResolvedValue({ risk_per_trade: 50, max_position: null, max_daily_loss: null });
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+
+    expect(await screen.findByText("Size 714 sh ($1,513.68) to risk $50.00")).toBeInTheDocument();
   });
 });

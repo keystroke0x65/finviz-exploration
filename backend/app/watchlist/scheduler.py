@@ -4,7 +4,9 @@ from datetime import datetime, timedelta, timezone
 
 from app.config import Settings
 from app.db import connect
-from app.finviz_client import run_screen
+from app.bars.loader import FetchBars
+from app.finviz_client import get_bars, run_screen
+from app.journal.bars import complete_pending_days
 from app.scanning.lock import try_scan_lock
 from app.scanning.run_status import CompletedScan, CrashedScan, save_scan_attempt
 from app.scanning.scanner import ScanDeps, ScanResult, finviz_scan_deps, run_scan
@@ -105,6 +107,24 @@ def run_scheduled_expiry(db_path: str, now: datetime, retention_days: int) -> li
     return expired
 
 
+def run_scheduled_bar_saving(db_path: str, now: datetime, fetch_bars_fn: FetchBars) -> int:
+    """Save journal bars still missing or partial (runs at every tick, inside the window or not).
+
+    Days finish after 8 PM ET and Finviz drops 1-minute bars after ~2 weeks, so
+    this has to keep running in the evenings and on weekends.
+    """
+    try:
+        conn = connect(db_path)
+        try:
+            return complete_pending_days(conn, now, fetch_bars_fn)
+        finally:
+            conn.close()
+    except Exception:
+        # Same recovery point as the feeder: log it, the next tick retries.
+        logger.exception("journal bar saving failed")
+        return 0
+
+
 def seconds_until_first_tick(last_run_at: datetime | None, now: datetime, interval: timedelta) -> float:
     # uvicorn --reload restarts the lifespan on every code change; without this
     # each reload would run a feeder tick and a full scan straight away.
@@ -143,6 +163,7 @@ async def feeder_loop(settings: Settings) -> None:
             )
         except Exception:
             logger.exception("watchlist expiry failed")
+        await asyncio.to_thread(run_scheduled_bar_saving, settings.db_path, datetime.now(timezone.utc), get_bars)
         # Each tick feeds the watchlist first so the scan sees new names.
         feeder_result = await asyncio.to_thread(
             run_scheduled_feeder_tick,

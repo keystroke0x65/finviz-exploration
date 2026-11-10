@@ -76,6 +76,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS setup_records_open_key
     ON setup_records (ticker, pattern, direction, timeframe, entry)
     WHERE outcome = 'open';
 
+-- How an open setup looked on each scan where its score, state, verdict or Sykes
+-- grade changed; setup_records only keeps the latest values.
+CREATE TABLE IF NOT EXISTS setup_history (
+    id INTEGER PRIMARY KEY,
+    setup_record_id INTEGER NOT NULL REFERENCES setup_records (id) ON DELETE CASCADE,
+    seen_at TEXT NOT NULL,
+    score REAL NOT NULL,
+    state TEXT NOT NULL,
+    verdict TEXT,
+    sliding_scale TEXT
+);
+
+CREATE INDEX IF NOT EXISTS setup_history_by_record ON setup_history (setup_record_id, seen_at);
+
 CREATE TABLE IF NOT EXISTS ticker_scans (
     ticker TEXT PRIMARY KEY,
     scanned_at TEXT NOT NULL
@@ -94,6 +108,48 @@ CREATE TABLE IF NOT EXISTS ticker_verdicts (
     parts TEXT NOT NULL,
     reasons TEXT NOT NULL,
     computed_at TEXT NOT NULL
+);
+
+-- The user's own decisions: trades taken (with fills) and setups passed on.
+-- setup and stock hold JSON copies of how things looked at decided_at.
+CREATE TABLE IF NOT EXISTS journal_entries (
+    id INTEGER PRIMARY KEY,
+    kind TEXT NOT NULL CHECK (kind IN ('trade', 'pass')),
+    ticker TEXT NOT NULL,
+    direction TEXT NOT NULL CHECK (direction IN ('long', 'short')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    decided_at TEXT NOT NULL,
+    setup_record_id INTEGER REFERENCES setup_records (id) ON DELETE SET NULL,
+    setup TEXT,
+    stock TEXT NOT NULL,
+    plan_stop REAL,
+    plan_target REAL,
+    fees REAL NOT NULL DEFAULT 0,
+    reasons TEXT NOT NULL DEFAULT '[]',
+    mistakes TEXT NOT NULL DEFAULT '[]',
+    note TEXT NOT NULL DEFAULT '',
+    pass_price REAL
+);
+
+CREATE TABLE IF NOT EXISTS journal_fills (
+    id INTEGER PRIMARY KEY,
+    entry_id INTEGER NOT NULL REFERENCES journal_entries (id) ON DELETE CASCADE,
+    side TEXT NOT NULL CHECK (side IN ('buy', 'sell')),
+    time TEXT NOT NULL,
+    price REAL NOT NULL,
+    shares INTEGER NOT NULL
+);
+
+-- 1-minute bars (4:00 AM-8:00 PM ET) kept for journal charts after Finviz drops
+-- them (~2 weeks). One row per stock-day, shared by every entry on that day.
+CREATE TABLE IF NOT EXISTS journal_bar_days (
+    ticker TEXT NOT NULL,
+    day TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('partial', 'complete', 'missing', 'incomplete')),
+    saved_at TEXT NOT NULL,
+    bars TEXT NOT NULL DEFAULT '[]',
+    PRIMARY KEY (ticker, day)
 );
 
 CREATE TABLE IF NOT EXISTS app_meta (

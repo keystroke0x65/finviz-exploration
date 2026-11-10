@@ -20,6 +20,11 @@ FRONTEND_PORT=5174 (in .env). Backups in data/.
 - Deferred minors listed in progress.md (prog-0015).
 
 ## Recent changes
+- 2026-11-09: Trade journal built on branch feat/trade-journal (worktree .worktrees/trade-journal):
+  Log trade / Pass panels on the Stock tab (L/P/Esc, click candles for fills), Journal tab,
+  setup_history, journal_* tables, ADR 0005. Spec + plan: docs/superpowers/{specs,plans}/
+  2026-11-09-trade-journal*. Final review then merge (user asked to "do it"). UI redesign
+  (2026-10-31 brainstorm: Setups-first triage, chart-first Stock page) is parked.
 - 2026-10-28 (uncommitted on main): Stock tab setup list shows entry/stop/target/R/risk;
   Setups tab "Sykes" column = our A-F sliding scale grade with hover card
   (spec docs/superpowers/specs/2026-10-28-sykes-sliding-scale-design.md).

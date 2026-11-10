@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
@@ -266,3 +266,42 @@ def test_unreadable_last_run_does_not_stop_the_feeder(tmp_path):
     conn.close()
 
     assert _last_feeder_run_at(db_path) is None
+
+
+def _db_with_open_trade(tmp_path) -> str:
+    from app.journal.positions import Fill
+    from app.journal.store import EMPTY_FACTS, NewEntry, create_entry
+
+    db_path = str(tmp_path / "journal.db")
+    conn = connect(db_path)
+    bought = SATURDAY_10AM_ET - timedelta(days=4)
+    create_entry(conn, NewEntry("trade", "HOST", "long", bought, None, EMPTY_FACTS, None, None, 0.0, [], [], "", None,
+                                [Fill("buy", bought, 2.0, 100)]), bought)
+    conn.close()
+    return db_path
+
+
+def test_bar_saving_runs_outside_the_feeder_window(tmp_path):
+    from app.finviz_client import Bar
+    from app.watchlist.scheduler import run_scheduled_bar_saving
+
+    calls = []
+
+    def fetch_bars(ticker, interval):
+        calls.append((ticker, interval))
+        return [Bar(datetime(2026, 10, 20, 14, 0, tzinfo=timezone.utc), 2, 2, 2, 2, 100)]
+
+    assert run_scheduled_bar_saving(_db_with_open_trade(tmp_path), SATURDAY_10AM_ET, fetch_bars) == 1
+    assert calls == [("HOST", "1m")]
+
+
+def test_bar_saving_logs_and_survives_errors(tmp_path, caplog):
+    from app.watchlist.scheduler import run_scheduled_bar_saving
+
+    def broken(ticker, interval):
+        raise RuntimeError("boom")
+
+    with caplog.at_level(logging.ERROR):
+        assert run_scheduled_bar_saving(_db_with_open_trade(tmp_path), SATURDAY_10AM_ET, broken) == 0
+
+    assert "journal bar saving failed" in caplog.text

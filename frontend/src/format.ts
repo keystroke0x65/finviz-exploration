@@ -84,3 +84,41 @@ export function formatNewsTime(isoTimestamp: string, now: Date): string {
   const isThisYear = EASTERN_YEAR.format(published) === EASTERN_YEAR.format(now);
   return (isThisYear ? NEWS_TIME : NEWS_TIME_WITH_YEAR).format(published);
 }
+
+const MINUS_SIGN = "−";
+
+export function formatDollars(value: number | null, decimals = 2): string {
+  if (value == null) return MISSING_VALUE;
+  const amount = Math.abs(value).toLocaleString("en-US", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+  return `${value < 0 ? MINUS_SIGN : ""}$${amount}`;
+}
+
+export function formatSignedDollars(value: number | null, decimals = 2): string {
+  if (value == null) return MISSING_VALUE;
+  return `${value > 0 ? "+" : ""}${formatDollars(value, decimals)}`;
+}
+
+export function formatR(value: number | null): string {
+  if (value == null) return MISSING_VALUE;
+  const sign = value > 0 ? "+" : value < 0 ? MINUS_SIGN : "";
+  return `${sign}${Math.abs(value).toFixed(2)}R`;
+}
+
+const SECONDS_PER_MINUTE = 60;
+const SECONDS_PER_HOUR = 3600;
+const SECONDS_PER_DAY = 86400;
+
+export function formatDuration(seconds: number | null): string {
+  if (seconds == null) return MISSING_VALUE;
+  if (seconds < SECONDS_PER_MINUTE) return `${Math.round(seconds)}s`;
+  if (seconds < SECONDS_PER_HOUR) return `${Math.round(seconds / SECONDS_PER_MINUTE)}m`;
+  if (seconds < SECONDS_PER_DAY) {
+    const hours = Math.floor(seconds / SECONDS_PER_HOUR);
+    return `${hours}h ${Math.round((seconds - hours * SECONDS_PER_HOUR) / SECONDS_PER_MINUTE)}m`;
+  }
+  const days = Math.floor(seconds / SECONDS_PER_DAY);
+  return `${days}d ${Math.floor((seconds - days * SECONDS_PER_DAY) / SECONDS_PER_HOUR)}h`;
+}

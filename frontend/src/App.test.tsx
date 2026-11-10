@@ -10,6 +10,7 @@ vi.mock("./components/SetupsView", () => ({
 }));
 vi.mock("./components/StockView", () => ({ StockView: ({ ticker }: { ticker: string | null }) => <p>stock view {ticker ?? "none"}</p> }));
 vi.mock("./components/WatchlistView", () => ({ WatchlistView: () => <p>watchlist view</p> }));
+vi.mock("./components/JournalView", () => ({ JournalView: () => <p>journal view</p> }));
 
 describe("App", () => {
   afterEach(() => {
@@ -30,6 +31,16 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Stock" }));
     expect(screen.getByText("stock view none")).toBeInTheDocument();
+  });
+
+  it("has a Journal tab between Stock and Track record", () => {
+    render(<App />);
+
+    const tabs = screen.getAllByRole("tab").map((tab) => tab.textContent);
+    expect(tabs.slice(-3)).toEqual(["Stock", "Journal", "Track record"]);
+    fireEvent.click(screen.getByRole("tab", { name: "Journal" }));
+
+    expect(screen.getByText("journal view")).toBeInTheDocument();
   });
 
   it("opens the stock tab for a ticker picked elsewhere", () => {

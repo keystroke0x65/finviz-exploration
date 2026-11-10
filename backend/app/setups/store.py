@@ -1,12 +1,13 @@
 import json
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from app.patterns.ranking import ScoreBreakdown
 from app.patterns.sliding_scale import Factor, SlidingScale
 from app.patterns.trade_plan import TradePlan
 from app.patterns.types import PatternMatch, SetupState
+from app.market_time import EASTERN
 from app.setups.resolver import Outcome, Resolution
 
 # Entries are rounded before storing so float noise from different scans
@@ -64,14 +65,14 @@ def _optional_time(stored: str | None) -> datetime | None:
     return None if stored is None else datetime.fromisoformat(stored)
 
 
-def _encode_sliding_scale(scale: SlidingScale | None) -> str | None:
+def encode_sliding_scale(scale: SlidingScale | None) -> str | None:
     if scale is None:
         return None
     factors = [{"name": factor.name, "grade": factor.grade, "detail": factor.detail} for factor in scale.factors]
     return json.dumps({"letter": scale.letter, "points": scale.points, "factors": factors})
 
 
-def _decode_sliding_scale(stored: str | None) -> SlidingScale | None:
+def decode_sliding_scale(stored: str | None) -> SlidingScale | None:
     if stored is None:
         return None
     payload = json.loads(stored)
@@ -87,8 +88,18 @@ def _to_record(row: sqlite3.Row) -> SetupRecord:
     values["last_seen_at"] = datetime.fromisoformat(row["last_seen_at"])
     values["resolved_at"] = _optional_time(row["resolved_at"])
     values["triggered_at"] = _optional_time(row["triggered_at"])
-    values["sliding_scale"] = _decode_sliding_scale(row["sliding_scale"])
+    values["sliding_scale"] = decode_sliding_scale(row["sliding_scale"])
     return SetupRecord(**values)
+
+
+@dataclass(frozen=True)
+class SetupValues:
+    """The parts of a setup that change from scan to scan."""
+
+    score: float
+    state: SetupState
+    verdict: str | None
+    sliding_scale: SlidingScale | None
 
 
 def record_match(
@@ -127,7 +138,7 @@ def record_match(
             plan.target_3r, plan.available_reward_risk, plan.risk_percent, plan.blocking_level, plan.partial_1r,
             plan.partial_2r, plan.trailing_stop, match.quality, score.total, json.dumps(score.parts), key_points,
             state, state, session, float_millions, match.detected_at.isoformat(), now.isoformat(), verdict,
-            None if triggered_at is None else triggered_at.isoformat(), _encode_sliding_scale(sliding_scale),
+            None if triggered_at is None else triggered_at.isoformat(), encode_sliding_scale(sliding_scale),
         ),
     )
     conn.commit()
@@ -139,7 +150,68 @@ def record_match(
         """,
         (ticker, match.pattern, match.direction, match.timeframe, entry),
     ).fetchone()
+    _append_history(conn, row["id"], now, score.total, state, verdict, encode_sliding_scale(sliding_scale))
     return _to_record(row)
+
+
+def _append_history(
+    conn: sqlite3.Connection,
+    record_id: int,
+    now: datetime,
+    score: float,
+    state: SetupState,
+    verdict: str | None,
+    sliding_scale: str | None,
+) -> None:
+    last = conn.execute(
+        "SELECT score, state, verdict, sliding_scale FROM setup_history WHERE setup_record_id = ? "
+        "ORDER BY id DESC LIMIT 1",
+        (record_id,),
+    ).fetchone()
+    if last is not None and tuple(last) == (score, state, verdict, sliding_scale):
+        return
+    conn.execute(
+        "INSERT INTO setup_history (setup_record_id, seen_at, score, state, verdict, sliding_scale) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (record_id, now.isoformat(), score, state, verdict, sliding_scale),
+    )
+    conn.commit()
+
+
+def get_setup_record(conn: sqlite3.Connection, record_id: int) -> SetupRecord | None:
+    row = conn.execute("SELECT * FROM setup_records WHERE id = ?", (record_id,)).fetchone()
+    return None if row is None else _to_record(row)
+
+
+def setup_values_at(conn: sqlite3.Connection, record_id: int, at: datetime) -> SetupValues | None:
+    """How the setup looked at a moment: the last history row at or before it.
+
+    Before the first scan the first row is the closest thing there is; records
+    from before history existed fall back to their own (latest) values.
+    """
+    record = get_setup_record(conn, record_id)
+    if record is None:
+        return None
+    rows = conn.execute(
+        "SELECT * FROM setup_history WHERE setup_record_id = ? ORDER BY seen_at, id", (record_id,)
+    ).fetchall()
+    if not rows:
+        return SetupValues(record.score, record.state, record.verdict, record.sliding_scale)
+    # Stored times carry different offsets, so compare as datetimes, not strings.
+    seen = [row for row in rows if datetime.fromisoformat(row["seen_at"]) <= at] or rows[:1]
+    row = seen[-1]
+    return SetupValues(row["score"], row["state"], row["verdict"], decode_sliding_scale(row["sliding_scale"]))
+
+
+def list_setups_for_day(conn: sqlite3.Connection, ticker: str, day: date) -> list[SetupRecord]:
+    """Every setup the stock had on a trading day, whatever happened to it."""
+    rows = conn.execute("SELECT * FROM setup_records WHERE ticker = ? ORDER BY detected_at, id", (ticker,))
+    records = [_to_record(row) for row in rows]
+    return [
+        record
+        for record in records
+        if record.detected_at.astimezone(EASTERN).date() <= day <= record.last_seen_at.astimezone(EASTERN).date()
+    ]
 
 
 def mark_ticker_scanned(conn: sqlite3.Connection, ticker: str, now: datetime) -> None:

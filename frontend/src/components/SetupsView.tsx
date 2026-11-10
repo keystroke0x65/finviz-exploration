@@ -21,6 +21,7 @@ import { describeSetupState } from "../setupState";
 import { VerdictBadge } from "./VerdictBadge";
 import { SlidingScaleBadge } from "./SlidingScaleBadge";
 import { StockLink } from "./StockLink";
+import { DailyLossBanner } from "./DailyLossBanner";
 
 interface SetupsViewProps {
   onOpenStock: (ticker: string) => void;
@@ -84,6 +85,7 @@ export function SetupsView({ onOpenStock }: SetupsViewProps) {
 
   return (
     <section>
+      <DailyLossBanner refreshKey={0} />
       <div className="watchlist-toolbar">
         <p className="muted setups-intro">
           Patterns are detected by fixed rules from Finviz bars. They flag shapes worth checking on the

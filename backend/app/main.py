@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from app.config import get_settings
 from app.db import connect
 from app.routes.bars import router as bars_router
+from app.routes.journal import router as journal_router
 from app.routes.screens import router as screens_router
 from app.routes.settings import router as settings_router
 from app.routes.setups import router as setups_router
@@ -42,6 +43,7 @@ app.include_router(bars_router)
 app.include_router(setups_router)
 app.include_router(settings_router)
 app.include_router(track_record_router)
+app.include_router(journal_router)
 
 
 @app.get("/health")

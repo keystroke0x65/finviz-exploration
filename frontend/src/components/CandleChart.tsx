@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { MouseEvent as ReactMouseEvent, MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
 import {
   createChart,
   HistogramData,
@@ -7,6 +7,8 @@ import {
   ISeriesApi,
   LineStyle,
   MouseEventParams,
+  SeriesMarker,
+  Time,
   UTCTimestamp,
   WhitespaceData,
 } from "lightweight-charts";
@@ -22,6 +24,14 @@ export interface ChartLevel {
   kind: ChartLevelKind;
 }
 
+// A logged fill, drawn as an arrow on the bar it happened in.
+export interface ChartMarker {
+  time: string;
+  side: "buy" | "sell";
+  shares: number;
+  price: number;
+}
+
 interface CandleChartProps {
   bars: Bar[];
   levels: ChartLevel[];
@@ -33,6 +43,10 @@ interface CandleChartProps {
   shadeSessions?: boolean;
   // Daily bars are labelled by date in the hover legend, intraday bars by time.
   isDaily?: boolean;
+  markers?: ChartMarker[];
+  onBarClick?: (bar: Bar) => void;
+  // Filled with a function that returns the chart as a canvas (for "Save as image").
+  screenshotRef?: MutableRefObject<(() => HTMLCanvasElement) | null>;
 }
 
 // Mirrors the tokens in styles.css; the chart draws on canvas and can't read CSS variables.
@@ -99,6 +113,42 @@ function toSortedUniquePoints(points: [string, number][]): { time: UTCTimestamp;
   return [...byTime.entries()].sort(([left], [right]) => left - right).map(([time, value]) => ({ time, value }));
 }
 
+const MAX_MARKER_SIZE = 3;
+// Further than this between press and release is a drag (scrolling the chart), not a click.
+const CLICK_SLOP_PX = 5;
+
+// A fill's time is rarely a bar's exact start; the arrow goes on the bar that contains it.
+function barTimeFor(fillTime: UTCTimestamp, barTimes: UTCTimestamp[]): UTCTimestamp | null {
+  let found: UTCTimestamp | null = null;
+  for (const barTime of barTimes) {
+    if (barTime > fillTime) break;
+    found = barTime;
+  }
+  return found;
+}
+
+function toSeriesMarkers(markers: ChartMarker[], bars: Bar[]): SeriesMarker<Time>[] {
+  const barTimes = bars.map((bar) => toTime(bar.time)).sort((left, right) => left - right);
+  const largest = Math.max(...markers.map((marker) => marker.shares), 1);
+  return markers
+    .flatMap((marker) => {
+      const time = barTimeFor(toTime(marker.time), barTimes);
+      if (time == null) return [];
+      const isBuy = marker.side === "buy";
+      return [
+        {
+          time,
+          position: isBuy ? ("belowBar" as const) : ("aboveBar" as const),
+          shape: isBuy ? ("arrowUp" as const) : ("arrowDown" as const),
+          color: isBuy ? CHART_COLORS.up : CHART_COLORS.down,
+          text: `${isBuy ? "B" : "S"} ${marker.shares} @ ${marker.price.toFixed(2)}`,
+          size: Math.max(1, Math.round((MAX_MARKER_SIZE * marker.shares) / largest)),
+        },
+      ];
+    })
+    .sort((left, right) => left.time - right.time);
+}
+
 function BarLegend({ bar, isDaily }: { bar: Bar; isDaily: boolean }) {
   const text = describeBar(bar, isDaily);
   const valueClass = text.direction === "up" ? "gain" : "loss";
@@ -128,6 +178,9 @@ export function CandleChart({
   visibleBars,
   shadeSessions = false,
   isDaily = false,
+  markers,
+  onBarClick,
+  screenshotRef,
 }: CandleChartProps) {
   // Chart time of the bar under the mouse; null when the mouse is off the chart.
   const [hoveredTime, setHoveredTime] = useState<number | null>(null);
@@ -139,6 +192,9 @@ export function CandleChart({
   const candlesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const sessionsRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  // Read on click, so it must be current without waiting for a re-render.
+  const hoveredTimeRef = useRef<number | null>(null);
+  const pressedAtRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -180,11 +236,19 @@ export function CandleChart({
     // The crosshair snaps to a bar's time anywhere on the chart, so this works
     // over candles, volume or empty space alike.
     const handleCrosshairMove = (param: MouseEventParams) => {
-      setHoveredTime(typeof param.time === "number" ? param.time : null);
+      const time = typeof param.time === "number" ? param.time : null;
+      hoveredTimeRef.current = time;
+      setHoveredTime(time);
     };
     chart.subscribeCrosshairMove(handleCrosshairMove);
+    if (screenshotRef) {
+      screenshotRef.current = () => chart.takeScreenshot();
+    }
     return () => {
       chart.unsubscribeCrosshairMove(handleCrosshairMove);
+      if (screenshotRef) {
+        screenshotRef.current = null;
+      }
       chart.remove();
       chartRef.current = null;
       candlesRef.current = null;
@@ -202,6 +266,7 @@ export function CandleChart({
     candles.setData(
       bars.map((bar) => ({ time: toTime(bar.time), open: bar.open, high: bar.high, low: bar.low, close: bar.close })),
     );
+    candles.setMarkers(markers && markers.length > 0 ? toSeriesMarkers(markers, bars) : []);
     volumeRef.current?.setData(toVolumePoints(bars));
     sessionsRef.current?.setData(shadeSessions ? toSessionShading(bars) : []);
 
@@ -247,11 +312,30 @@ export function CandleChart({
       priceLines.forEach((line) => candles.removePriceLine(line));
       extraSeries.forEach((series) => chart.removeSeries(series));
     };
-  }, [bars, levels, outline, vwap, visibleBars, shadeSessions]);
+  }, [bars, levels, outline, vwap, visibleBars, shadeSessions, markers]);
+
+  // A plain DOM click, not the library's subscribeClick: lightweight-charts 4.2 drops a second
+  // click within its double-click window when it lands 5px or more from the first (it fires
+  // neither click nor dblclick), which would lose a quick exit click right after an entry click.
+  function handleMouseDown(event: ReactMouseEvent) {
+    pressedAtRef.current = { x: event.clientX, y: event.clientY };
+  }
+
+  function handleClick(event: ReactMouseEvent) {
+    const pressedAt = pressedAtRef.current;
+    if (pressedAt && Math.abs(event.clientX - pressedAt.x) + Math.abs(event.clientY - pressedAt.y) >= CLICK_SLOP_PX) return;
+    const clicked = hoveredTimeRef.current == null ? undefined : barsByTime.get(hoveredTimeRef.current);
+    if (clicked) onBarClick?.(clicked);
+  }
 
   return (
     <div className="candle-chart-frame">
-      <div ref={containerRef} className="candle-chart" />
+      <div
+        ref={containerRef}
+        className="candle-chart"
+        onMouseDown={onBarClick ? handleMouseDown : undefined}
+        onClick={onBarClick ? handleClick : undefined}
+      />
       {legendBar && <BarLegend bar={legendBar} isDaily={isDaily} />}
     </div>
   );

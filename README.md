@@ -121,6 +121,73 @@ Once a pattern has 30 or more trades on a timeframe, from at least 5 different t
 its average R moves each new setup's score by up to 15 points either way, and the score
 details say so. Until then the history is shown (muted) but doesn't affect scores.
 
+### Journal
+
+The journal records your own decisions: trades you took with your real account (any number
+of buy and sell fills, long or short) and setups you passed on, with the reason. It is
+stored in the same SQLite file (`journal_entries`, `journal_fills`, `journal_bar_days`).
+
+- **Journal tab** (between Stock and Track record): pick Today, This week (default), This
+  month or All time. Tiles show net P&L, trades (and how many are still open), win rate,
+  average gain and loss, largest win and loss, average planned R:R next to the average R
+  made, average duration, average Sykes grade and score of what you traded, how much price
+  kept going after your exits, and passes. Below: a cumulative P&L chart (one bar per
+  closing fill), the list of trades and passes (filter Trades / Passes / Both; click the
+  time to open one), and breakdowns by pattern, mistake, time of day (by entry), duration,
+  country and industry (count and P&L each), passes by reason with what each passed setup
+  would have done, and "You vs. the system" (your results per pattern next to the Track
+  record's; muted where the system's history is too short). An open entry shows its saved
+  chart (1m/5m) with every fill and the plan's stop and target, notes about days whose bars
+  are missing or not yet complete, the plan check (exited before target, held past stop,
+  followed the plan), and "Kept going +1.40R after you sold" / "Dropped 0.50R after you
+  sold". Edit (passes keep their time), Delete (asks first) and "Save as image" (PNG) are on
+  each entry. "Export entries (CSV)" / "Export fills (CSV)" download the period, and "Risk
+  settings" sets risk per trade, max position and max daily loss (empty = off).
+- **Logging, from the Stock tab:** "Log trade" (key `L`) and "Pass" (key `P`) above the
+  chart; `Esc` closes the panel (keys are ignored while typing). In the trade panel, click a
+  candle to add a fill at its time and close (the first click is the buy, later ones sells,
+  for a long), or type date, time (Eastern), price and shares; a price outside the clicked
+  candle's range gets a warning. Figures (average entry/exit, shares held, money in, P&L,
+  R) update as you type. The setup list offers every setup the stock had that day, even
+  ones that already stopped out; its stop and target fill in the plan. If the stock has an
+  open trade, "Log trade" adds to it ("Start a new trade instead" starts another). Passing
+  takes reason chips (more than one allowed; "Other" needs a note). Your logged fills show
+  as arrows on the Stock chart (1m/5m). With a risk per trade set, each setup shows a
+  position size ("Size 625 sh ($1,150.00) to risk $50.00", capped by the max position).
+  With a max daily loss set, Setups and Stock show an amber note at 80% of it and a red
+  banner once it's reached; nothing is ever blocked.
+- Each entry keeps a copy of the setup (pattern, plan, score, Sykes grade, verdict, state)
+  and the stock (company, country, sector, industry, float, market cap, price, change,
+  volume so far) **as they were when you traded or passed**, even if you log it hours
+  later: every scan now writes a row to `setup_history` when a setup's score, state,
+  verdict or grade changes. "Volume vs. average" is the day's volume up to that moment
+  divided by the average daily volume, not scaled for time of day (Finviz's relative
+  volume is a live figure and can't be looked up for an earlier moment).
+- The 1-minute bars (4:00 AM-8:00 PM ET) of every day a trade was open are saved when you
+  log it, because Finviz drops 1-minute bars after about two weeks. A day saved before
+  8 PM is "partial"; the background loop (every 15 minutes, evenings and weekends too)
+  completes it later and retries if Finviz was down; saved bars are merged with each new fetch,
+  never replaced. Days Finviz no longer has are marked "missing" (or "incomplete" when part of
+  the day was saved first) and the entry still saves.
+- Maths: average-cost P&L, fees booked when the trade closes, R = P&L ÷ (first entry −
+  plan stop) × largest position. Realised P&L counts on the day of each sell, so the P&L
+  chart, period totals and daily loss warning agree; trade counts and win rate count a
+  trade in the period it closed (breakeven trades count as neither win nor loss).
+- Passes are judged from the moment you passed, using the linked setup's stop and target:
+  from the price then if it was already through the entry (missed it, too late), otherwise
+  only if price later reaches the entry, until 8 PM that day. If price was already past the
+  target or behind the stop, the pass says so ("Already past the target when you passed").
+  Every pass, with or without a setup, also shows what price did next: the best and worst
+  move from the pass price until 8 PM, in % (and in R when the setup has a stop); "Passes by
+  reason" averages them per reason, and the CSV export includes them.
+- API (`/api/journal`): `GET /reasons`; `GET|POST /entries`; `GET|PUT|DELETE
+  /entries/{id}`; `GET /entries/{id}/bars?interval=1m|5m`; `POST /preview` (figures for
+  fills being typed); `GET /setups/{ticker}?day=&at=` (the day's setups as they looked at
+  a moment); `GET /open-trade/{ticker}`; `GET /summary?period=today|week|month|all`;
+  `GET /daily-loss`; `GET /export/entries.csv` and `/export/fills.csv` (cells that would
+  run as spreadsheet formulas are prefixed with `'`). Settings: `GET|PUT
+  /api/settings/journal` (risk per trade, max position, max daily loss, in dollars).
+
 ### The verdict
 
 Every scanned stock also gets one overall call: **Leans long**, **Leans short** or **No
