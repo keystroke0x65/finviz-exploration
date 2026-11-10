@@ -92,6 +92,22 @@ def validate_fills(direction: Direction, fills: list[Fill]) -> str | None:
     return None
 
 
+def validate_plan(direction: Direction, fills: list[Fill], plan_stop: float | None, plan_target: float | None) -> str | None:
+    """Why the plan can't be measured against these fills: a stop or target on the wrong side
+    of the first fill would turn R into a believable but meaningless number."""
+    if not fills:
+        return None
+    first = _sorted(fills)[0].price
+    is_long = direction == "long"
+    if plan_stop is not None and (plan_stop >= first if is_long else plan_stop <= first):
+        side = "below" if is_long else "above"
+        return f"The plan stop ({plan_stop:.2f}) must be {side} the first fill ({first:.2f}) for a {direction} trade."
+    if plan_target is not None and (plan_target <= first if is_long else plan_target >= first):
+        side = "above" if is_long else "below"
+        return f"The plan target ({plan_target:.2f}) must be {side} the first fill ({first:.2f}) for a {direction} trade."
+    return None
+
+
 def _reward_risk(first_price: float, plan_stop: float | None, plan_target: float | None) -> float | None:
     if plan_stop is None or plan_target is None or first_price == plan_stop:
         return None

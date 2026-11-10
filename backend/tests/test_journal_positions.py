@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from app.journal.positions import Fill, compute_trade_figures, validate_fills
+from app.journal.positions import Fill, compute_trade_figures, validate_fills, validate_plan
 from app.market_time import EASTERN
 
 START = datetime(2026, 11, 9, 9, 45, tzinfo=EASTERN)
@@ -127,3 +127,24 @@ def test_validate_rejects_more_than_50_fills():
     fills = [buy(0, 2.0, 100)] + [buy(minute, 2.0, 1) for minute in range(1, 51)]
 
     assert validate_fills("long", fills) == "A trade can have at most 50 fills."
+
+
+def test_validate_plan_accepts_a_sensible_plan():
+    assert validate_plan("long", [buy(0, 2.0, 100)], 1.9, 2.3) is None
+    assert validate_plan("short", [sell(0, 2.0, 100)], 2.1, 1.7) is None
+    assert validate_plan("long", [buy(0, 2.0, 100)], None, None) is None
+
+
+def test_validate_plan_rejects_a_stop_on_the_wrong_side():
+    assert validate_plan("long", [buy(0, 2.0, 100)], 2.2, None) == (
+        "The plan stop (2.20) must be below the first fill (2.00) for a long trade."
+    )
+    assert validate_plan("short", [sell(0, 2.0, 100)], 1.9, None) == (
+        "The plan stop (1.90) must be above the first fill (2.00) for a short trade."
+    )
+
+
+def test_validate_plan_rejects_a_target_on_the_wrong_side():
+    assert validate_plan("long", [buy(0, 2.0, 100)], None, 1.8) == (
+        "The plan target (1.80) must be above the first fill (2.00) for a long trade."
+    )

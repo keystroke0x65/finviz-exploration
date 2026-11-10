@@ -128,6 +128,7 @@ def test_create_pass_records_price_at_that_moment(api_client):
         (trade_body(fills=[{"side": "buy", "time": "2099-01-02T09:45:00-05:00", "price": 2.0, "shares": 100}]),
          "in the future"),
         (trade_body(mistakes=["chased", "followed_plan"]), "Followed the plan"),
+        (trade_body(plan_stop=2.1), "must be below the first fill"),
         (trade_body(mistakes=["nope"]), "Unknown mistake"),
         (trade_body(setup_record_id=999), "Setup not found"),
         (pass_body(reasons=["nope"]), "Unknown reason"),
@@ -154,6 +155,8 @@ def test_preview_returns_figures_or_the_fill_problem(api_client):
     assert good["figures"]["net_pnl"] == pytest.approx(50.0)
     assert good["error"] is None
     assert bad == {"figures": None, "error": "The first fill must be a buy for a long trade."}
+    wrong_stop = api_client.post("/api/journal/preview", json=trade_body(plan_stop=2.1)).json()
+    assert wrong_stop["error"] == "The plan stop (2.10) must be below the first fill (2.00) for a long trade."
 
 
 def test_list_get_update_delete(api_client):

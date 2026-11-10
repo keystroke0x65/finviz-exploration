@@ -11,7 +11,7 @@ from app.errors import FinvizAuthError, FinvizRateLimitError, FinvizUnavailableE
 from app.finviz_client import get_bars, get_quote
 from app.journal.bars import aggregate_bars, days_needed, read_bars
 from app.journal.export import entries_csv, fills_csv
-from app.journal.positions import Fill, compute_trade_figures, validate_fills
+from app.journal.positions import Fill, compute_trade_figures, validate_fills, validate_plan
 from app.journal.reasons import MISTAKES, PASS_REASON_GROUPS
 from app.journal.schemas import (
     DailyLossOut,
@@ -71,7 +71,7 @@ def _to_draft(body: TradeIn | PassIn, now: datetime) -> EntryDraft:
         return EntryDraft("pass", body.ticker, body.direction, body.setup_record_id, None, None, 0.0, body.reasons, [],
                           body.note, [], body.decided_at)
     fills = [Fill(fill.side, fill.time, fill.price, fill.shares) for fill in body.fills]
-    problem = validate_fills(body.direction, fills)
+    problem = validate_fills(body.direction, fills) or validate_plan(body.direction, fills, body.plan_stop, body.plan_target)
     if problem is None and any(fill.time > now for fill in fills):
         problem = "A fill can't be in the future."
     if problem is not None:
@@ -156,7 +156,7 @@ def remove_entry(entry_id: int, conn: DbConnection) -> Response:
 def post_preview(body: TradeIn) -> PreviewOut:
     """Figures for fills being typed; a fill problem comes back as text, not a 422."""
     fills = [Fill(fill.side, fill.time, fill.price, fill.shares) for fill in body.fills]
-    problem = validate_fills(body.direction, fills)
+    problem = validate_fills(body.direction, fills) or validate_plan(body.direction, fills, body.plan_stop, body.plan_target)
     if problem is not None:
         return PreviewOut(figures=None, error=problem)
     figures = compute_trade_figures(body.direction, fills, body.plan_stop, body.plan_target, body.fees, _now())
