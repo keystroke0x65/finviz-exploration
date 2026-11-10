@@ -251,3 +251,16 @@ def test_journal_settings_round_trip_and_validation(api_client):
     assert saved.json() == {"risk_per_trade": 50.0, "max_position": 2000.0, "max_daily_loss": 200.0}
     assert api_client.put("/api/settings/journal", json={"risk_per_trade": -5, "max_position": None,
                                                          "max_daily_loss": None}).status_code == 422
+
+
+def test_editing_while_finviz_is_down_keeps_the_saved_stock_facts(api_client, finviz):
+    created = api_client.post("/api/journal/entries", json=trade_body()).json()
+    get_bars, get_quote = finviz
+    get_bars.side_effect = FinvizUnavailableError("bars HOST", "timeout")
+    get_quote.side_effect = FinvizUnavailableError("quote HOST", "timeout")
+
+    updated = api_client.put(f"/api/journal/entries/{created['id']}", json=trade_body(note="edited")).json()
+
+    assert updated["note"] == "edited"
+    assert updated["stock"]["industry"] == "Software"
+    assert updated["stock"]["change_percent"] == pytest.approx(created["stock"]["change_percent"])

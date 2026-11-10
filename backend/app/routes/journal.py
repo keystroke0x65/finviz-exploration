@@ -92,9 +92,9 @@ def _to_out(conn: sqlite3.Connection, entry: JournalEntry, now: datetime, bar_wa
     return JournalEntryOut(**payload)
 
 
-def _prepare(conn: sqlite3.Connection, body: TradeIn | PassIn, now: datetime):
+def _prepare(conn: sqlite3.Connection, body: TradeIn | PassIn, now: datetime, stored: JournalEntry | None = None):
     try:
-        return prepare_entry(conn, _to_draft(body, now), now, get_bars, _load_quote)
+        return prepare_entry(conn, _to_draft(body, now), now, get_bars, _load_quote, stored)
     except SetupNotFoundError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -135,10 +135,11 @@ def get_one_entry(entry_id: int, conn: DbConnection) -> JournalEntryOut:
 
 @router.put("/entries/{entry_id}", response_model=JournalEntryOut)
 def put_entry(entry_id: int, body: Annotated[EntryIn, Body()], conn: DbConnection) -> JournalEntryOut:
-    if get_entry(conn, entry_id) is None:
+    stored = get_entry(conn, entry_id)
+    if stored is None:
         raise HTTPException(status_code=404, detail="Journal entry not found.")
     now = _now()
-    entry, bar_warning = _prepare(conn, body, now)
+    entry, bar_warning = _prepare(conn, body, now, stored)
     updated = update_entry(conn, entry_id, entry, now)
     if updated is None:
         raise HTTPException(status_code=404, detail="Journal entry not found.")

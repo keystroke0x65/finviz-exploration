@@ -6,7 +6,7 @@ can be tested without Finviz.
 
 import logging
 import sqlite3
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from datetime import date, datetime
 from typing import Callable
 
@@ -18,7 +18,7 @@ from app.journal.pass_scoring import score_pass
 from app.journal.positions import Direction, Fill, compute_trade_figures
 from app.journal.review import after_exit, plan_flags
 from app.journal.snapshot import previous_close, setup_snapshot, stock_facts_at
-from app.journal.store import EMPTY_FACTS, EntryKind, JournalEntry, NewEntry, list_entries
+from app.journal.store import EMPTY_FACTS, EntryKind, JournalEntry, NewEntry, StockFacts, list_entries
 from app.journal.summary import ReviewedTrade, ScoredPass
 from app.market_time import EASTERN
 from app.scanning.snapshots import read_snapshots
@@ -81,12 +81,26 @@ def _previous_close(conn: sqlite3.Connection, ticker: str, day: date, now: datet
     return previous_close(daily, day)
 
 
+def _keep_known(fresh: StockFacts, stored: StockFacts | None) -> StockFacts:
+    """On an edit, a fact the new lookup couldn't get (Finviz down) keeps its saved value."""
+    if stored is None:
+        return fresh
+    return StockFacts(**{
+        name: value if value is not None else getattr(stored, name) for name, value in asdict(fresh).items()
+    })
+
+
 def prepare_entry(
-    conn: sqlite3.Connection, draft: EntryDraft, now: datetime, fetch_bars_fn: FetchBars, load_quote: LoadQuote
+    conn: sqlite3.Connection,
+    draft: EntryDraft,
+    now: datetime,
+    fetch_bars_fn: FetchBars,
+    load_quote: LoadQuote,
+    stored: NewEntry | None = None,
 ) -> tuple[NewEntry, str | None]:
     """The entry to store, with setup and stock as they were at decided_at, plus any bar warning.
 
-    Raises SetupNotFoundError for an unknown setup id.
+    `stored` is the saved entry when editing. Raises SetupNotFoundError for an unknown setup id.
     """
     decided_at = _decided_at(draft, now)
     entry = _base_entry(conn, draft, decided_at)
@@ -100,8 +114,10 @@ def prepare_entry(
         # The trade's own first fill is the price that mattered, not the bar's close.
         price = min(entry.fills, key=lambda fill: fill.time).price
         change = (price / close_before - 1) * 100 if close_before else None
-        return replace(entry, stock=replace(facts, price=price, change_percent=change)), bar_warning
-    return replace(entry, stock=facts, pass_price=facts.price), bar_warning
+        trade_facts = replace(facts, price=price, change_percent=change)
+        return replace(entry, stock=_keep_known(trade_facts, stored and stored.stock)), bar_warning
+    pass_facts = _keep_known(facts, stored and stored.stock)
+    return replace(entry, stock=pass_facts, pass_price=pass_facts.price), bar_warning
 
 
 def _entry_bars(conn: sqlite3.Connection, entry: JournalEntry, now: datetime) -> list[Bar]:
