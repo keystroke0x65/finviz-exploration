@@ -121,6 +121,39 @@ Once a pattern has 30 or more trades on a timeframe, from at least 5 different t
 its average R moves each new setup's score by up to 15 points either way, and the score
 details say so. Until then the history is shown (muted) but doesn't affect scores.
 
+### Journal
+
+The journal records your own decisions: trades you took with your real account (any number
+of buy and sell fills, long or short) and setups you passed on, with the reason. It is
+stored in the same SQLite file (`journal_entries`, `journal_fills`, `journal_bar_days`).
+
+- Each entry keeps a copy of the setup (pattern, plan, score, Sykes grade, verdict, state)
+  and the stock (company, country, sector, industry, float, market cap, price, change,
+  volume so far) **as they were when you traded or passed**, even if you log it hours
+  later: every scan now writes a row to `setup_history` when a setup's score, state,
+  verdict or grade changes. "Volume vs. average" is the day's volume up to that moment
+  divided by the average daily volume, not scaled for time of day (Finviz's relative
+  volume is a live figure and can't be looked up for an earlier moment).
+- The 1-minute bars (4:00 AM-8:00 PM ET) of every day a trade was open are saved when you
+  log it, because Finviz drops 1-minute bars after about two weeks. A day saved before
+  8 PM is "partial"; the background loop (every 15 minutes, evenings and weekends too)
+  completes it later and retries if Finviz was down. Days Finviz no longer has are marked
+  "missing" and the entry still saves.
+- Maths: average-cost P&L, fees booked when the trade closes, R = P&L ÷ (first entry −
+  plan stop) × largest position. Realised P&L counts on the day of each sell, so the P&L
+  chart, period totals and daily loss warning agree; trade counts and win rate count a
+  trade in the period it closed (breakeven trades count as neither win nor loss).
+- Passes are judged from the moment you passed, using the linked setup's stop and target:
+  from the price then if it was already through the entry (missed it, too late), otherwise
+  only if price later reaches the entry, until 8 PM that day.
+- API (`/api/journal`): `GET /reasons`; `GET|POST /entries`; `GET|PUT|DELETE
+  /entries/{id}`; `GET /entries/{id}/bars?interval=1m|5m`; `POST /preview` (figures for
+  fills being typed); `GET /setups/{ticker}?day=&at=` (the day's setups as they looked at
+  a moment); `GET /open-trade/{ticker}`; `GET /summary?period=today|week|month|all`;
+  `GET /daily-loss`; `GET /export/entries.csv` and `/export/fills.csv` (cells that would
+  run as spreadsheet formulas are prefixed with `'`). Settings: `GET|PUT
+  /api/settings/journal` (risk per trade, max position, max daily loss, in dollars).
+
 ### The verdict
 
 Every scanned stock also gets one overall call: **Leans long**, **Leans short** or **No

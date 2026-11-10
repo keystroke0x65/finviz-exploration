@@ -16,7 +16,7 @@ from app.bars.loader import FetchBars
 from app.errors import FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError
 from app.finviz_client import Bar
 from app.journal.positions import compute_trade_figures
-from app.journal.store import JournalEntry, list_entries
+from app.journal.store import NewEntry, list_entries
 from app.market_time import EASTERN
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ def _weekdays(start: date, end: date) -> list[date]:
     return [day for day in days if day.weekday() < SATURDAY]
 
 
-def days_needed(entry: JournalEntry, now: datetime) -> list[date]:
+def days_needed(entry: NewEntry, now: datetime) -> list[date]:
     if entry.kind == "pass" or not entry.fills:
         return [_eastern_day(entry.decided_at)]
     figures = compute_trade_figures(entry.direction, entry.fills, entry.plan_stop, entry.plan_target, entry.fees, now)
@@ -125,12 +125,12 @@ def read_bars(conn: sqlite3.Connection, ticker: str, days: list[date]) -> tuple[
     return sorted(bars, key=lambda bar: bar.time), statuses
 
 
-def save_bars_for_entry(conn: sqlite3.Connection, entry: JournalEntry, now: datetime, fetch_bars_fn: FetchBars) -> str | None:
+def save_bars_for_entry(conn: sqlite3.Connection, entry: NewEntry, now: datetime, fetch_bars_fn: FetchBars) -> str | None:
     """Save the entry's bars; on a Finviz failure return a warning instead (the background job retries)."""
     try:
         save_bar_days(conn, entry.ticker, days_needed(entry, now), now, fetch_bars_fn)
     except (FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError) as exc:
-        logger.warning("could not save journal bars for entry %d (%s): %s", entry.id, entry.ticker, exc)
+        logger.warning("could not save journal bars for %s: %s", entry.ticker, exc)
         return BARS_RETRY_WARNING
     return None
 
