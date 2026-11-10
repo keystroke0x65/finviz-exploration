@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Bar } from "../api/bars";
 import {
+  AfterPass,
   DaySetup,
   deleteEntry,
   EntryBars,
@@ -13,7 +14,7 @@ import {
 import { patternName } from "../api/setups";
 import type { JournalSettings } from "../api/settings";
 import { easternParts } from "../easternTime";
-import { formatDollars, formatDuration, formatPrice, formatR, formatSignedDollars } from "../format";
+import { formatDollars, formatDuration, formatPrice, formatR, formatSignedDollars, formatSignedPercent } from "../format";
 import { CandleChart, ChartLevel } from "./CandleChart";
 import { PassPanel } from "./PassPanel";
 import { ClickedBar, TradePanel } from "./TradePanel";
@@ -56,7 +57,9 @@ function describePassOutcome(outcome: PassOutcome, r: number | null): string {
   if (outcome === "stop") return `Would have stopped out (${formatR(r)})`;
   if (outcome === "never_filled") return "Would never have reached its entry";
   if (outcome === "undecided") return "Hadn't hit its stop or target by 8 PM";
-  return "Not scored (no setup linked, or no trade left to take)";
+  if (outcome === "past_target") return "Already past the target when you passed";
+  if (outcome === "behind_stop") return "Already behind the stop when you passed";
+  return "No setup linked, so no stop or target to score against";
 }
 
 function afterExitLines(entry: JournalEntry): string[] {
@@ -70,6 +73,15 @@ function afterExitLines(entry: JournalEntry): string[] {
   if (after.best_r > 0) lines.push(`Kept going ${formatR(after.best_r)} after you sold`);
   if (after.worst_r < 0) lines.push(`Dropped ${Math.abs(after.worst_r).toFixed(2)}R after you sold`);
   return lines;
+}
+
+function afterPassLine(after: AfterPass): string {
+  const withR = (percent: number, r: number | null) =>
+    r == null ? formatSignedPercent(percent) : `${formatSignedPercent(percent)}, ${formatR(r)}`;
+  return (
+    `After you passed: high ${formatPrice(after.best_price)} (${withR(after.best_percent, after.best_r)}), ` +
+    `low ${formatPrice(after.worst_price)} (${withR(after.worst_percent, after.worst_r)})`
+  );
 }
 
 function chartLevels(entry: JournalEntry): ChartLevel[] {
@@ -119,6 +131,7 @@ function PassFacts({ entry, labels }: { entry: JournalEntry; labels: Record<stri
       <ul className="journal-flags">
         <li>Passed at {formatPrice(entry.pass_price)}</li>
         {entry.pass_score && <li>{describePassOutcome(entry.pass_score.outcome, entry.pass_score.r)}</li>}
+        {entry.after_pass && <li>{afterPassLine(entry.after_pass)}</li>}
       </ul>
     </>
   );

@@ -8,7 +8,14 @@ export type JournalPeriod = "today" | "week" | "month" | "all";
 export type EntryKind = "trade" | "pass";
 export type FillSide = "buy" | "sell";
 export type PlanFlag = "exited_before_target" | "held_past_stop" | "followed_plan";
-export type PassOutcome = "target" | "stop" | "never_filled" | "undecided" | "not_scored";
+export type PassOutcome =
+  | "target"
+  | "stop"
+  | "never_filled"
+  | "undecided"
+  | "past_target"
+  | "behind_stop"
+  | "not_scored";
 export type BarDayStatus = "partial" | "complete" | "missing" | "incomplete";
 
 export interface Fill {
@@ -98,6 +105,16 @@ export interface AfterExit {
   worst_price: number | null;
 }
 
+// What price did after a pass, measured from the pass price (R only with a setup stop).
+export interface AfterPass {
+  best_price: number;
+  worst_price: number;
+  best_percent: number;
+  worst_percent: number;
+  best_r: number | null;
+  worst_r: number | null;
+}
+
 export interface JournalEntry {
   id: number;
   kind: EntryKind;
@@ -120,6 +137,7 @@ export interface JournalEntry {
   after_exit: AfterExit | null;
   plan_flags: PlanFlag[];
   pass_score: { outcome: PassOutcome; r: number | null } | null;
+  after_pass: AfterPass | null;
   bar_warning: string | null;
 }
 
@@ -172,7 +190,10 @@ export interface PassReasonRow {
   stop: number;
   never_filled: number;
   undecided: number;
+  already_past: number;
   average_r: number | null;
+  average_best_percent: number | null;
+  average_worst_percent: number | null;
 }
 
 export interface VersusRow {

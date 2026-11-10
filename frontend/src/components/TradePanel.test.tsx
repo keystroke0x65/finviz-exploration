@@ -151,7 +151,7 @@ describe("TradePanel", () => {
       decided_at: BAR.time, setup: { ...SETUP, sliding_scale: null }, stock: NO_FACTS, plan_stop: 1.76,
       plan_target: 2.08, fees: 0, reasons: [], mistakes: [], note: "", pass_price: null,
       fills: [{ side: "buy", time: BAR.time, price: 1.84, shares: 500 }], figures: null, after_exit: null,
-      plan_flags: [], pass_score: null, bar_warning: null,
+      plan_flags: [], pass_score: null, after_pass: null, bar_warning: null,
     };
     const { rerender, props } = renderPanel({ existing });
     rerender(<TradePanel {...props} clickedBar={{ bar: LATER_BAR, id: 1 }} />);

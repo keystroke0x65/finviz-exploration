@@ -82,14 +82,16 @@ def _to_draft(body: TradeIn | PassIn, now: datetime) -> EntryDraft:
 
 
 def _to_out(conn: sqlite3.Connection, entry: JournalEntry, now: datetime, bar_warning: str | None = None) -> JournalEntryOut:
-    payload = {**asdict(entry), "figures": None, "after_exit": None, "plan_flags": [], "pass_score": None,
+    payload = {**asdict(entry), "figures": None, "after_exit": None, "plan_flags": [], "pass_score": None, "after_pass": None,
                "bar_warning": bar_warning}
     if entry.kind == "trade" and entry.fills:
         reviewed = review_trade(conn, entry, now)
         payload.update(figures=asdict(reviewed.figures), after_exit=reviewed.after and asdict(reviewed.after),
                        plan_flags=reviewed.flags)
     if entry.kind == "pass":
-        payload["pass_score"] = asdict(score_saved_pass(conn, entry, now).score)
+        scored = score_saved_pass(conn, entry, now)
+        payload["pass_score"] = asdict(scored.score)
+        payload["after_pass"] = scored.after and asdict(scored.after)
     return JournalEntryOut(**payload)
 
 

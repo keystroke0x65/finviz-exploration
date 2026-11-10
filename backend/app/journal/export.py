@@ -14,7 +14,7 @@ ENTRY_COLUMNS = [
     "id", "kind", "ticker", "direction", "decided_at", "pattern", "timeframe", "score", "sykes_grade",
     "sykes_points", "status", "average_entry", "average_exit", "max_shares", "money_in", "fees", "net_pnl",
     "r_multiple", "planned_reward_risk", "duration_minutes", "plan_stop", "plan_target", "mistakes", "reasons",
-    "pass_price", "pass_outcome", "country", "industry", "note",
+    "pass_price", "pass_outcome", "after_pass_best_percent", "after_pass_worst_percent", "country", "industry", "note",
 ]
 FILL_COLUMNS = ["entry_id", "ticker", "side", "time", "price", "shares"]
 
@@ -65,6 +65,8 @@ def entries_csv(trades: list[ReviewedTrade], passes: list[ScoredPass]) -> str:
     for scored in passes:
         rows.append((scored.entry.decided_at, {
             **_common(scored.entry), "pass_price": scored.entry.pass_price, "pass_outcome": scored.score.outcome,
+            "after_pass_best_percent": scored.after and round(scored.after.best_percent, 2),
+            "after_pass_worst_percent": scored.after and round(scored.after.worst_percent, 2),
         }))
     # Sorted as datetimes: stored times carry different UTC offsets, so their text doesn't sort by time.
     newest_first = sorted(rows, key=lambda item: item[0], reverse=True)

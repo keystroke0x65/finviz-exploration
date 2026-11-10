@@ -152,8 +152,17 @@ class AfterExitOut(BaseModel):
 
 
 class PassScoreOut(BaseModel):
-    outcome: Literal["target", "stop", "never_filled", "undecided", "not_scored"]
+    outcome: Literal["target", "stop", "never_filled", "undecided", "past_target", "behind_stop", "not_scored"]
     r: float | None
+
+
+class AfterPassOut(BaseModel):
+    best_price: float
+    worst_price: float
+    best_percent: float
+    worst_percent: float
+    best_r: float | None
+    worst_r: float | None
 
 
 class JournalEntryOut(BaseModel):
@@ -178,6 +187,7 @@ class JournalEntryOut(BaseModel):
     after_exit: AfterExitOut | None
     plan_flags: list[Literal["exited_before_target", "held_past_stop", "followed_plan"]]
     pass_score: PassScoreOut | None
+    after_pass: AfterPassOut | None
     # Set only on the response to a save whose chart bars couldn't be fetched.
     bar_warning: str | None = None
 
@@ -256,7 +266,10 @@ class PassReasonRowOut(BaseModel):
     stop: int
     never_filled: int
     undecided: int
+    already_past: int
     average_r: float | None
+    average_best_percent: float | None
+    average_worst_percent: float | None
 
 
 class VersusRowOut(BaseModel):

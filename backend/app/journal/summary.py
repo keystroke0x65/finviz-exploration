@@ -12,7 +12,7 @@ from datetime import datetime, time, timedelta
 from statistics import mean
 from typing import Callable, Literal
 
-from app.journal.pass_scoring import PassScore
+from app.journal.pass_scoring import AfterPass, PassScore
 from app.journal.positions import TradeFigures
 from app.journal.review import AfterExit, PlanFlag
 from app.journal.store import JournalEntry
@@ -51,6 +51,7 @@ class ReviewedTrade:
 class ScoredPass:
     entry: JournalEntry
     score: PassScore
+    after: AfterPass | None = None
 
 
 @dataclass(frozen=True)
@@ -75,8 +76,13 @@ class PassReasonRow:
     stop: int
     never_filled: int
     undecided: int
+    # Price was already past the target or behind the stop when the user passed.
+    already_past: int
     # Over passes that would have hit their target or stop.
     average_r: float | None
+    # Best and worst move after passing, from the pass price, over passes with bars.
+    average_best_percent: float | None
+    average_worst_percent: float | None
 
 
 @dataclass(frozen=True)
@@ -193,12 +199,14 @@ def _letter_for(points: float | None) -> str | None:
 
 
 def _pass_reason_rows(passes: list[ScoredPass]) -> list[PassReasonRow]:
-    by_reason: dict[str, list[PassScore]] = defaultdict(list)
+    by_reason: dict[str, list[ScoredPass]] = defaultdict(list)
     for scored in passes:
         for reason in scored.entry.reasons:
-            by_reason[reason].append(scored.score)
+            by_reason[reason].append(scored)
     rows = []
-    for reason, scores in by_reason.items():
+    for reason, group in by_reason.items():
+        scores = [scored.score for scored in group]
+        afters = [scored.after for scored in group if scored.after is not None]
         outcomes = [score.outcome for score in scores]
         rows.append(PassReasonRow(
             reason=reason,
@@ -207,7 +215,10 @@ def _pass_reason_rows(passes: list[ScoredPass]) -> list[PassReasonRow]:
             stop=outcomes.count("stop"),
             never_filled=outcomes.count("never_filled"),
             undecided=outcomes.count("undecided"),
+            already_past=outcomes.count("past_target") + outcomes.count("behind_stop"),
             average_r=_average([score.r for score in scores if score.r is not None]),
+            average_best_percent=_average([after.best_percent for after in afters]),
+            average_worst_percent=_average([after.worst_percent for after in afters]),
         ))
     return sorted(rows, key=lambda row: (-row.count, row.reason))
 

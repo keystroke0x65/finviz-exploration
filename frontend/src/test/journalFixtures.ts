@@ -28,7 +28,7 @@ export function tradeEntry(overrides: Partial<JournalEntry> = {}): JournalEntry 
       { side: "sell", time: "2026-11-09T10:05:00-05:00", price: 2.05, shares: 500 },
     ],
     figures: CLOSED_FIGURES, after_exit: { best_r: 1.4, worst_r: -0.5, best_price: 2.16, worst_price: 2.01 },
-    plan_flags: ["exited_before_target"], pass_score: null, bar_warning: null, ...overrides,
+    plan_flags: ["exited_before_target"], pass_score: null, after_pass: null, bar_warning: null, ...overrides,
   };
 }
 

@@ -14,7 +14,7 @@ from app.bars.loader import FetchBars, load_bars
 from app.errors import FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError
 from app.finviz_client import Bar
 from app.journal.bars import days_needed, read_bars, save_bars_for_entry
-from app.journal.pass_scoring import score_pass
+from app.journal.pass_scoring import after_pass, score_pass
 from app.journal.positions import Direction, Fill, compute_trade_figures
 from app.journal.review import after_exit, plan_flags
 from app.journal.snapshot import previous_close, setup_snapshot, stock_facts_at
@@ -146,7 +146,11 @@ def score_saved_pass(conn: sqlite3.Connection, entry: JournalEntry, now: datetim
     # A pass saved while Finviz was down has no price; once the bars arrive, take it from them.
     # Without it the pass would be judged from the setup's ideal entry, overstating a "missed it".
     pass_price = entry.pass_price if entry.pass_price is not None else _price_at(bars, entry.decided_at)
-    return ScoredPass(entry, score_pass(entry.setup, entry.decided_at, pass_price, bars))
+    return ScoredPass(
+        entry,
+        score_pass(entry.setup, entry.decided_at, pass_price, bars),
+        after_pass(entry.setup, entry.direction, entry.decided_at, pass_price, bars),
+    )
 
 
 def _figures_only(entry: JournalEntry, now: datetime) -> ReviewedTrade:

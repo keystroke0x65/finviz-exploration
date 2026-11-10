@@ -39,7 +39,10 @@ const SUMMARY: JournalSummary = {
   by_country: [{ label: "USA", count: 1, pnl: 105 }], by_industry: [{ label: "Software", count: 1, pnl: 105 }],
   by_pattern: [{ label: "bull_flag", count: 1, pnl: 105 }], by_mistake: [{ label: "chased", count: 1, pnl: 105 }],
   by_time_of_day: [{ label: "9:30–10", count: 1, pnl: 105 }], by_duration: [{ label: "5–30 min", count: 1, pnl: 105 }],
-  pass_reasons: [{ reason: "low_sykes", count: 1, target: 0, stop: 1, never_filled: 0, undecided: 0, average_r: -1 }],
+  pass_reasons: [{
+    reason: "low_sykes", count: 1, target: 0, stop: 1, never_filled: 0, undecided: 0, already_past: 0, average_r: -1,
+    average_best_percent: 5.5, average_worst_percent: -3.25,
+  }],
   versus_system: [{ pattern: "bull_flag", timeframe: "5m", trades: 1, win_rate: 1, average_r: 2.63,
     system: { trades: 40, win_rate: 0.22, average_r: -0.2 }, system_has_enough_history: true }],
 };
@@ -122,6 +125,9 @@ describe("JournalView", () => {
     expect(mistakes).toHaveTextContent("Chased");
     expect(screen.getByRole("table", { name: "By pattern" })).toHaveTextContent("Bull flag");
     expect(screen.getByRole("table", { name: "You vs. the system" })).toHaveTextContent("−0.20R");
+    const passes = screen.getByRole("table", { name: "Passes by reason" });
+    expect(passes).toHaveTextContent("+5.50%");
+    expect(passes).toHaveTextContent("-3.25%");
   });
 
   it("links the CSV exports for the period", async () => {

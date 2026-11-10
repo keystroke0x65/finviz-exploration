@@ -88,6 +88,16 @@ describe("JournalEntryDetail", () => {
     expect(screen.getByText("Would have stopped out (−1.00R)")).toBeInTheDocument();
   });
 
+  it("shows what a pass already past its target would have seen", async () => {
+    renderDetail(passEntry({
+      pass_score: { outcome: "past_target", r: null },
+      after_pass: { best_price: 2.12, worst_price: 1.8, best_percent: 11.58, worst_percent: -5.26, best_r: 2.75, worst_r: -1.25 },
+    }));
+
+    expect(await screen.findByText("Already past the target when you passed")).toBeInTheDocument();
+    expect(screen.getByText("After you passed: high 2.12 (+11.58%, +2.75R), low 1.80 (-5.26%, −1.25R)")).toBeInTheDocument();
+  });
+
   it("deletes only after confirming", async () => {
     api.deleteEntry.mockResolvedValue(undefined);
     const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);

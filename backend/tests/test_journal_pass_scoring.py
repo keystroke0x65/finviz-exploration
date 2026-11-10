@@ -3,7 +3,7 @@ from datetime import date, datetime
 import pytest
 
 from app.finviz_client import Bar
-from app.journal.pass_scoring import score_pass
+from app.journal.pass_scoring import after_pass, score_pass
 from app.journal.store import SetupSnapshot
 from app.market_time import EASTERN
 
@@ -65,8 +65,12 @@ def test_pass_without_setup_is_not_scored():
     assert score_pass(None, at(10, 0), 2.0, []).outcome == "not_scored"
 
 
-def test_pass_price_already_past_target_is_not_scored():
-    assert score_pass(SETUP, at(10, 0), 2.4, []).outcome == "not_scored"
+def test_pass_price_already_past_target_says_so():
+    assert score_pass(SETUP, at(10, 0), 2.4, []).outcome == "past_target"
+
+
+def test_pass_price_already_behind_the_stop_says_so():
+    assert score_pass(SETUP, at(10, 0), 1.85, []).outcome == "behind_stop"
 
 
 def test_short_setup_scores_downward_moves():
@@ -74,3 +78,32 @@ def test_short_setup_scores_downward_moves():
                           state="forming", verdict=None, sliding_scale=None)
 
     assert score_pass(short, at(10, 0), 2.05, [bar(at(10, 1), 1.65, 2.0)]).outcome == "target"
+
+
+def test_after_pass_measures_the_best_and_worst_move_from_the_pass_price():
+    bars = [bar(at(9, 59), 1.0, 9.0), bar(at(10, 5), 2.1, 2.45), bar(at(11, 0), 2.05, 2.3), bar(at(20, 0), 1.0, 9.0)]
+
+    result = after_pass(SETUP, "long", at(10, 0), 2.2, bars)
+
+    assert (result.best_price, result.worst_price) == (2.45, 2.05)
+    assert result.best_percent == pytest.approx(11.36, abs=0.01)
+    assert result.worst_percent == pytest.approx(-6.82, abs=0.01)
+    assert (result.best_r, result.worst_r) == (pytest.approx(2.5), pytest.approx(-1.5))
+
+
+def test_after_pass_without_a_setup_gives_moves_but_no_r():
+    result = after_pass(None, "long", at(10, 0), 2.0, [bar(at(10, 5), 1.9, 2.2)])
+
+    assert (result.best_percent, result.best_r) == (pytest.approx(10.0), None)
+
+
+def test_after_pass_for_a_short_counts_drops_as_the_best_move():
+    result = after_pass(None, "short", at(10, 0), 2.0, [bar(at(10, 5), 1.8, 2.1)])
+
+    assert (result.best_price, result.worst_price) == (1.8, 2.1)
+    assert (result.best_percent, result.worst_percent) == (pytest.approx(10.0), pytest.approx(-5.0))
+
+
+def test_after_pass_without_a_price_or_later_bars_is_empty():
+    assert after_pass(SETUP, "long", at(10, 0), None, [bar(at(10, 5), 1.9, 2.2)]) is None
+    assert after_pass(SETUP, "long", at(10, 0), 2.0, []) is None

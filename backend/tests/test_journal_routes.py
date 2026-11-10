@@ -117,6 +117,10 @@ def test_create_pass_records_price_at_that_moment(api_client):
     assert body["reasons"] == ["low_sykes"]
     assert body["pass_price"] == pytest.approx(2.2)
     assert body["pass_score"]["outcome"] == "not_scored"
+    # No setup linked, but what price did next is still tracked: high 2.40 after the 9:50 pass.
+    assert body["after_pass"]["best_price"] == pytest.approx(2.4)
+    assert body["after_pass"]["best_percent"] == pytest.approx(9.09, abs=0.01)
+    assert body["after_pass"]["best_r"] is None
 
 
 @pytest.mark.parametrize(
@@ -278,7 +282,7 @@ def test_a_pass_saved_while_finviz_was_down_is_scored_from_its_moment_once_bars_
     complete_pending_days(db_conn, at(21, 0), fake_bars)
 
     # 2.20 at the 9:50 pass was already past the 2.15 target: no trade was left to take.
-    assert api_client.get(f"/api/journal/entries/{created['id']}").json()["pass_score"]["outcome"] == "not_scored"
+    assert api_client.get(f"/api/journal/entries/{created['id']}").json()["pass_score"]["outcome"] == "past_target"
 
 
 def test_entries_can_be_filtered_by_ticker(api_client):

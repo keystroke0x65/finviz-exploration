@@ -14,7 +14,15 @@ import {
 import { patternName } from "../api/setups";
 import { fetchJournalSettings, JournalSettings } from "../api/settings";
 import { easternParts } from "../easternTime";
-import { formatDollars, formatDuration, formatPrice, formatR, formatSignedDollars, MISSING_VALUE } from "../format";
+import {
+  formatDollars,
+  formatDuration,
+  formatPrice,
+  formatR,
+  formatSignedDollars,
+  formatSignedPercent,
+  MISSING_VALUE,
+} from "../format";
 import { DailyLossBanner } from "./DailyLossBanner";
 import { JournalEntryDetail } from "./JournalEntryDetail";
 import { JournalSettingsPanel } from "./JournalSettingsPanel";
@@ -119,15 +127,21 @@ function PassReasonsTable({ summary, labels }: { summary: JournalSummary; labels
     <table className="data-table journal-breakdown" aria-label="Passes by reason">
       <caption>Passes by reason (what the setup would have done)</caption>
       <thead>
-        <tr><th></th><th>Passes</th><th>Target</th><th>Stop</th><th>No fill</th><th>Undecided</th><th>Avg R</th></tr>
+        <tr>
+          <th></th><th>Passes</th><th>Target</th><th>Stop</th><th>No fill</th><th>Undecided</th><th>Already past</th>
+          <th>Avg R</th><th title="From the pass price, until 8 PM that day">Avg best after</th><th>Avg worst after</th>
+        </tr>
       </thead>
       <tbody>
-        {summary.pass_reasons.length === 0 && <tr><td colSpan={7} className="muted">No passes</td></tr>}
+        {summary.pass_reasons.length === 0 && <tr><td colSpan={10} className="muted">No passes</td></tr>}
         {summary.pass_reasons.map((row) => (
           <tr key={row.reason}>
             <td>{labels[row.reason] ?? row.reason}</td>
             <td>{row.count}</td><td>{row.target}</td><td>{row.stop}</td><td>{row.never_filled}</td><td>{row.undecided}</td>
+            <td>{row.already_past}</td>
             <td className={pnlClass(row.average_r)}>{formatR(row.average_r)}</td>
+            <td className="gain">{formatSignedPercent(row.average_best_percent)}</td>
+            <td className="loss">{formatSignedPercent(row.average_worst_percent)}</td>
           </tr>
         ))}
       </tbody>

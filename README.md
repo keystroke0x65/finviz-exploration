@@ -175,7 +175,11 @@ stored in the same SQLite file (`journal_entries`, `journal_fills`, `journal_bar
   trade in the period it closed (breakeven trades count as neither win nor loss).
 - Passes are judged from the moment you passed, using the linked setup's stop and target:
   from the price then if it was already through the entry (missed it, too late), otherwise
-  only if price later reaches the entry, until 8 PM that day.
+  only if price later reaches the entry, until 8 PM that day. If price was already past the
+  target or behind the stop, the pass says so ("Already past the target when you passed").
+  Every pass, with or without a setup, also shows what price did next: the best and worst
+  move from the pass price until 8 PM, in % (and in R when the setup has a stop); "Passes by
+  reason" averages them per reason, and the CSV export includes them.
 - API (`/api/journal`): `GET /reasons`; `GET|POST /entries`; `GET|PUT|DELETE
   /entries/{id}`; `GET /entries/{id}/bars?interval=1m|5m`; `POST /preview` (figures for
   fills being typed); `GET /setups/{ticker}?day=&at=` (the day's setups as they looked at

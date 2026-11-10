@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 import pytest
 
-from app.journal.pass_scoring import PassScore
+from app.journal.pass_scoring import AfterPass, PassScore
 from app.journal.positions import Fill, compute_trade_figures
 from app.journal.review import AfterExit
 from app.journal.store import EMPTY_FACTS, JournalEntry, SetupSnapshot, StockFacts
@@ -172,3 +172,17 @@ def test_daily_realised_pnl_counts_only_todays_closing_fills():
                       Fill("sell", at(TUESDAY, 10), 1.8, 100)], fees=5.0)
 
     assert daily_realised_pnl([yesterday, split], NOW) == pytest.approx(-25.0)
+
+
+def test_pass_reasons_show_how_far_price_moved_after_passing():
+    def scored(outcome, best, worst):
+        pass_entry = entry([], kind="pass", reasons=["too_late"], decided_at=at(TUESDAY, 10))
+        return ScoredPass(pass_entry, PassScore(outcome, None), AfterPass(0, 0, best, worst, None, None))
+
+    passes = [scored("past_target", 12.0, -4.0), scored("behind_stop", 4.0, -10.0), scored("not_scored", 0.0, 0.0)]
+
+    row = summarise([], passes, None, no_system).pass_reasons[0]
+
+    assert row.already_past == 2
+    assert row.average_best_percent == pytest.approx(16 / 3)
+    assert row.average_worst_percent == pytest.approx(-14 / 3)
