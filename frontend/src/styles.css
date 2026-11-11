@@ -1582,3 +1582,19 @@ input[type="checkbox"] {
     gap: 0.15rem;
   }
 }
+
+/* About 5 articles tall (set from the rows by NewsList); the rest scroll inside. */
+.news-scroll {
+  position: relative;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--line);
+}
+
+.news-scroll .news-rows {
+  margin: 0;
+}
+
+.news-scroll > button {
+  margin: 0.75rem 0;
+}

@@ -54,8 +54,9 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
   News: each news item is marked on the candle where it came out (1m, 5m and daily; news from
   before the first bar of a day goes on that day's first bar). Hover a marked candle to see each
   item's source, title and time. Under the chart, the stock's news is listed newest first,
-  starting with the last 2 weeks; "Show more" adds the 2 weeks before (skipping stretches with
-  no news). Titles open the article in a new tab. News comes from Finviz's news export (about
+  starting with the last 2 weeks, in a box about 5 articles tall (the rest scroll inside it, so
+  the page doesn't grow); "Show more" at the bottom of the box adds the 2 weeks before
+  (skipping stretches with no news). Titles open the article in a new tab. News comes from Finviz's news export (about
   the last 100 items per stock, `GET /api/stocks/{ticker}/news`), cached for 10 minutes;
   "Scan this stock" refreshes it. The Log trade and Pass panels open between the chart and
   the news, so the chart stays in view while logging.
