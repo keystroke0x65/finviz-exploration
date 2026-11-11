@@ -14,7 +14,7 @@ import {
   Warning,
 } from "../api/setups";
 import { fetchJournalSettings, JournalSettings } from "../api/settings";
-import { fetchQuote, Quote, refreshQuote } from "../api/stocks";
+import { fetchNews, fetchQuote, NewsItem, Quote, refreshQuote } from "../api/stocks";
 import { easternParts, easternToday } from "../easternTime";
 import { finvizQuoteUrl, formatDollars, formatPrice, MISSING_VALUE } from "../format";
 import { useJournalShortcuts } from "../journalShortcuts";
@@ -22,6 +22,7 @@ import { suggestShares } from "../positionSize";
 import { describeSetupState } from "../setupState";
 import { CandleChart, ChartLevel } from "./CandleChart";
 import { DailyLossBanner } from "./DailyLossBanner";
+import { NewsList } from "./NewsList";
 import { PassPanel } from "./PassPanel";
 import { ClickedBar, TradePanel } from "./TradePanel";
 import { QuoteTable } from "./QuoteTable";
@@ -171,6 +172,26 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
   // Bumped after a save so the fill markers and daily loss banner reload.
   const [journalVersion, setJournalVersion] = useState(0);
   const [journalNotice, setJournalNotice] = useState<string | null>(null);
+  const [news, setNews] = useState<NewsItem[] | null>(null);
+  const [newsError, setNewsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!ticker) return;
+    setNews(null);
+    setNewsError(null);
+    let isCurrent = true;
+    fetchNews(ticker)
+      .then((loaded) => {
+        if (isCurrent) setNews(loaded);
+      })
+      // Its own error: the chart and setups are still useful without news.
+      .catch((loadError: unknown) => {
+        if (isCurrent) setNewsError(errorMessage(loadError));
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [ticker]);
 
   useEffect(() => {
     fetchJournalSettings()
@@ -265,15 +286,18 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
     setError(null);
     try {
       await runScan(scannedTicker);
-      const [freshSetups, freshVerdict, freshQuote] = await Promise.all([
+      const [freshSetups, freshVerdict, freshQuote, freshNews] = await Promise.all([
         fetchStockSetups(scannedTicker),
         fetchStockVerdict(scannedTicker),
         refreshQuote(scannedTicker),
+        // News failing must not fail the scan's other results.
+        fetchNews(scannedTicker, true).catch(() => null),
       ]);
       if (shownTicker.current === scannedTicker) {
         setSetups(freshSetups);
         setVerdict(freshVerdict);
         setQuote(freshQuote);
+        if (freshNews) setNews(freshNews);
         setBarsReloadCount((count) => count + 1);
       }
     } catch (scanError) {
@@ -408,6 +432,7 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
                     shadeSessions={hasSessions}
                     isDaily={timeframe === "daily"}
                     markers={hasSessions ? loggedFills : undefined}
+                    news={news ?? undefined}
                     // A daily candle has no time of day to fill at.
                     onBarClick={hasSessions ? handleBarClick : undefined}
                   />
@@ -467,6 +492,8 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
                 onClose={closePanel}
               />
             )}
+            {/* After the panels, so opening one pushes the news down and the chart stays put. */}
+            <NewsList key={ticker} items={news} error={newsError} />
           </div>
 
           <aside className="stock-side">

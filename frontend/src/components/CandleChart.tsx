@@ -13,6 +13,8 @@ import {
   WhitespaceData,
 } from "lightweight-charts";
 import type { Bar } from "../api/bars";
+import type { NewsItem } from "../api/stocks";
+import { newsByBarTime } from "../chartNews";
 import { describeBar } from "../barLegend";
 import { barSession, BarSession, toChartTime } from "../chartTime";
 
@@ -44,6 +46,8 @@ interface CandleChartProps {
   // Daily bars are labelled by date in the hover legend, intraday bars by time.
   isDaily?: boolean;
   markers?: ChartMarker[];
+  // The stock's news; each item is marked on the bar it came out in.
+  news?: NewsItem[];
   onBarClick?: (bar: Bar) => void;
   // Filled with a function that returns the chart as a canvas (for "Save as image").
   screenshotRef?: MutableRefObject<(() => HTMLCanvasElement) | null>;
@@ -63,6 +67,7 @@ export const CHART_COLORS = {
   session: "#7b6aa6",
   vwap: "#c9a8ff",
   outline: "#f0b44c",
+  news: "#5aa9ff",
   volumeUp: "rgba(70, 192, 138, 0.45)",
   volumeDown: "rgba(229, 107, 93, 0.45)",
   preMarket: "rgba(64, 190, 200, 0.2)",
@@ -149,6 +154,40 @@ function toSeriesMarkers(markers: ChartMarker[], bars: Bar[]): SeriesMarker<Time
     .sort((left, right) => left.time - right.time);
 }
 
+function toNewsMarkers(newsByBar: Map<number, NewsItem[]>): SeriesMarker<Time>[] {
+  return [...newsByBar.entries()].map(([time, items]) => ({
+    time: time as UTCTimestamp,
+    position: "aboveBar" as const,
+    shape: "circle" as const,
+    color: CHART_COLORS.news,
+    // A count only when several items share a bar; one item is just the dot.
+    text: items.length > 1 ? String(items.length) : "",
+  }));
+}
+
+const NEWS_CARD_TIME = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+function NewsCard({ items }: { items: NewsItem[] }) {
+  return (
+    <div className="news-hover-card" role="tooltip">
+      {items.map((item) => (
+        <p key={`${item.time}-${item.url}`}>
+          <span className="muted">
+            {item.source} · {NEWS_CARD_TIME.format(new Date(item.time))}
+          </span>
+          <span className="news-hover-title">{item.title}</span>
+        </p>
+      ))}
+    </div>
+  );
+}
+
 function BarLegend({ bar, isDaily }: { bar: Bar; isDaily: boolean }) {
   const text = describeBar(bar, isDaily);
   const valueClass = text.direction === "up" ? "gain" : "loss";
@@ -179,6 +218,7 @@ export function CandleChart({
   shadeSessions = false,
   isDaily = false,
   markers,
+  news,
   onBarClick,
   screenshotRef,
 }: CandleChartProps) {
@@ -187,6 +227,8 @@ export function CandleChart({
   const barsByTime = useMemo(() => new Map(bars.map((bar) => [toTime(bar.time) as number, bar])), [bars]);
   // Off the chart, or on a time with no bar (e.g. right of the last one), show the latest bar.
   const legendBar = (hoveredTime != null ? barsByTime.get(hoveredTime) : undefined) ?? bars[bars.length - 1];
+  const newsByBar = useMemo(() => newsByBarTime(news ?? [], bars), [news, bars]);
+  const hoveredNews = hoveredTime != null ? newsByBar.get(hoveredTime) : undefined;
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -266,7 +308,9 @@ export function CandleChart({
     candles.setData(
       bars.map((bar) => ({ time: toTime(bar.time), open: bar.open, high: bar.high, low: bar.low, close: bar.close })),
     );
-    candles.setMarkers(markers && markers.length > 0 ? toSeriesMarkers(markers, bars) : []);
+    const fillMarkers = markers && markers.length > 0 ? toSeriesMarkers(markers, bars) : [];
+    // lightweight-charts needs every marker in one list, in time order.
+    candles.setMarkers([...fillMarkers, ...toNewsMarkers(newsByBar)].sort((left, right) => Number(left.time) - Number(right.time)));
     volumeRef.current?.setData(toVolumePoints(bars));
     sessionsRef.current?.setData(shadeSessions ? toSessionShading(bars) : []);
 
@@ -312,7 +356,7 @@ export function CandleChart({
       priceLines.forEach((line) => candles.removePriceLine(line));
       extraSeries.forEach((series) => chart.removeSeries(series));
     };
-  }, [bars, levels, outline, vwap, visibleBars, shadeSessions, markers]);
+  }, [bars, levels, outline, vwap, visibleBars, shadeSessions, markers, newsByBar]);
 
   // A plain DOM click, not the library's subscribeClick: lightweight-charts 4.2 drops a second
   // click within its double-click window when it lands 5px or more from the first (it fires
@@ -337,6 +381,7 @@ export function CandleChart({
         onClick={onBarClick ? handleClick : undefined}
       />
       {legendBar && <BarLegend bar={legendBar} isDaily={isDaily} />}
+      {hoveredNews && <NewsCard items={hoveredNews} />}
     </div>
   );
 }

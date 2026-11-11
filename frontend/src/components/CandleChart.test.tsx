@@ -284,3 +284,40 @@ describe("CandleChart fills", () => {
     expect(screenshotRef.current?.()).toBe("canvas");
   });
 });
+
+describe("CandleChart news", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  const NEWS = [
+    { time: "2026-10-20T09:31:20-04:00", source: "GlobeNewswire", title: "Host wins contract", url: "https://example.com/a" },
+    { time: "2026-10-20T09:31:45-04:00", source: "Benzinga", title: "Host shares jump", url: "https://example.com/b" },
+  ];
+
+  it("marks the bar each news item came out in", () => {
+    render(<CandleChart bars={BARS} levels={[]} outline={null} vwap={null} news={NEWS} />);
+
+    const markers = chart.candleSeries.setMarkers.mock.calls[chart.candleSeries.setMarkers.mock.calls.length - 1][0];
+    const secondBarTime = chart.candleSeries.setData.mock.calls[0][0][1].time;
+    expect(markers).toEqual([
+      expect.objectContaining({ time: secondBarTime, shape: "circle", position: "aboveBar", color: CHART_COLORS.news, text: "2" }),
+    ]);
+  });
+
+  it("shows the news of the bar under the mouse", () => {
+    render(<CandleChart bars={BARS} levels={[]} outline={null} vwap={null} news={NEWS} />);
+    const [firstTime, secondTime] = chart.candleSeries.setData.mock.calls[0][0].map((point: { time: number }) => point.time);
+
+    act(() => chart.moveCrosshair(secondTime));
+    const card = screen.getByRole("tooltip");
+    expect(card).toHaveTextContent("GlobeNewswire");
+    expect(card).toHaveTextContent("Host wins contract");
+    expect(card).toHaveTextContent("Benzinga");
+    expect(card).toHaveTextContent("9:31 AM");
+
+    act(() => chart.moveCrosshair(firstTime));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+});

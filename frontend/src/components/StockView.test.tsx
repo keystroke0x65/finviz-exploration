@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   refreshQuote: vi.fn(),
   chartProps: [] as ChartProps[],
   fetchDaySetups: vi.fn(),
+  fetchNews: vi.fn(),
   fetchOpenTrade: vi.fn(),
   fetchEntries: vi.fn(),
   fetchJournalSettings: vi.fn(),
@@ -45,11 +46,13 @@ vi.mock("../api/setups", async (importOriginal) => ({
 vi.mock("../api/stocks", () => ({
   fetchQuote: (ticker: string) => api.fetchQuote(ticker),
   refreshQuote: (ticker: string) => api.refreshQuote(ticker),
+  fetchNews: (ticker: string, refresh?: boolean) => api.fetchNews(ticker, refresh),
 }));
 interface ChartProps {
   levels: { price: number; kind: string }[];
   shadeSessions?: boolean;
   markers?: { side: string; shares: number }[];
+  news?: { title: string }[];
   onBarClick?: (bar: unknown) => void;
 }
 vi.mock("./CandleChart", () => ({
@@ -88,6 +91,7 @@ describe("StockView", () => {
     api.refreshQuote.mockResolvedValue({ Ticker: "HOST", Company: "Host Digital Inc" });
     api.fetchStockVerdict.mockResolvedValue(null);
     api.fetchDaySetups.mockResolvedValue([DAY_SETUP]);
+    api.fetchNews.mockResolvedValue([]);
     api.fetchOpenTrade.mockResolvedValue(null);
     api.fetchEntries.mockResolvedValue([]);
     api.fetchJournalSettings.mockResolvedValue({ risk_per_trade: null, max_position: null, max_daily_loss: null });
@@ -336,6 +340,7 @@ describe("StockView journal", () => {
     api.fetchQuote.mockResolvedValue({ Ticker: "HOST" });
     api.fetchStockVerdict.mockResolvedValue(null);
     api.fetchDaySetups.mockResolvedValue([DAY_SETUP]);
+    api.fetchNews.mockResolvedValue([]);
     api.fetchOpenTrade.mockResolvedValue(null);
     api.fetchEntries.mockResolvedValue([]);
     api.fetchJournalSettings.mockResolvedValue({ risk_per_trade: null, max_position: null, max_daily_loss: null });
@@ -455,5 +460,60 @@ describe("StockView journal", () => {
     render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
 
     expect(await screen.findByText("Size 714 sh ($1,513.68) to risk $50.00")).toBeInTheDocument();
+  });
+});
+
+
+describe("StockView news", () => {
+  // Recent, so it falls in the list's first 2 weeks.
+  const NEWS = [{ time: new Date(Date.now() - 3_600_000).toISOString(), source: "GlobeNewswire", title: "Host wins contract", url: "https://example.com/a" }];
+
+  beforeEach(() => {
+    api.fetchBars.mockResolvedValue(BARS_RESPONSE);
+    api.fetchStockSetups.mockResolvedValue({ setups: [SETUP], warnings: [], show_short_setups: false });
+    api.fetchQuote.mockResolvedValue({ Ticker: "HOST" });
+    api.refreshQuote.mockResolvedValue({ Ticker: "HOST" });
+    api.fetchStockVerdict.mockResolvedValue(null);
+    api.fetchDaySetups.mockResolvedValue([DAY_SETUP]);
+    api.fetchOpenTrade.mockResolvedValue(null);
+    api.fetchEntries.mockResolvedValue([]);
+    api.fetchJournalSettings.mockResolvedValue({ risk_per_trade: null, max_position: null, max_daily_loss: null });
+    api.fetchNews.mockResolvedValue(NEWS);
+    api.chartProps = [];
+    api.tradePanelProps = [];
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("lists the stock's news under the chart and marks it on the chart", async () => {
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+
+    expect(await screen.findByRole("link", { name: "Host wins contract" })).toBeInTheDocument();
+    expect(api.fetchNews).toHaveBeenCalledWith("HOST", undefined);
+    await vi.waitFor(() => expect(api.chartProps[api.chartProps.length - 1].news).toEqual(NEWS));
+  });
+
+  it("opens the trade panel between the chart and the news, and only when asked", async () => {
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+    const news = await screen.findByRole("region", { name: "News" });
+    expect(screen.queryByRole("region", { name: "trade panel" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Log trade" }));
+
+    const panel = await screen.findByRole("region", { name: "trade panel" });
+    expect(panel.compareDocumentPosition(news) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId("chart").compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("refreshes the news when the stock is scanned", async () => {
+    api.runScan.mockResolvedValue({ scanned: ["HOST"], failed: [], setups_found: 0, scanned_at: "x" });
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Scan this stock" }));
+
+    await vi.waitFor(() => expect(api.fetchNews).toHaveBeenCalledWith("HOST", true));
   });
 });
