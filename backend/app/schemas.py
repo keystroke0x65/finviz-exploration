@@ -377,3 +377,14 @@ class TrackRecordOut(BaseModel):
     rows: list[PatternStatsOut]
     min_trades: int
     min_trading_days: int
+
+
+class NewsItemOut(BaseModel):
+    time: datetime
+    source: str
+    title: str
+    url: str
+
+
+class NewsOut(BaseModel):
+    items: list[NewsItemOut]

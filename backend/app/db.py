@@ -90,6 +90,12 @@ CREATE TABLE IF NOT EXISTS setup_history (
 
 CREATE INDEX IF NOT EXISTS setup_history_by_record ON setup_history (setup_record_id, seen_at);
 
+CREATE TABLE IF NOT EXISTS news_cache (
+    ticker TEXT PRIMARY KEY,
+    fetched_at TEXT NOT NULL,
+    items TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS ticker_scans (
     ticker TEXT PRIMARY KEY,
     scanned_at TEXT NOT NULL

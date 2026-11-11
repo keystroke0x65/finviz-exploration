@@ -51,6 +51,14 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
   "capped" when a nearby level limits it), reward:risk and risk %, plus its score and
   Sykes grade (hover the grade for its factors); click it to draw its entry, stop and
   target on the chart. Tickers anywhere in the app open this tab; the small "Finviz" link opens Finviz.
+  News: each news item is marked on the candle where it came out (1m, 5m and daily; news from
+  before the first bar of a day goes on that day's first bar). Hover a marked candle to see each
+  item's source, title and time. Under the chart, the stock's news is listed newest first,
+  starting with the last 2 weeks; "Show more" adds the 2 weeks before (skipping stretches with
+  no news). Titles open the article in a new tab. News comes from Finviz's news export (about
+  the last 100 items per stock, `GET /api/stocks/{ticker}/news`), cached for 10 minutes;
+  "Scan this stock" refreshes it. The Log trade and Pass panels open between the chart and
+  the news, so the chart stays in view while logging.
 - **Screens** tab: saved Finviz screens. Paste a Finviz screener URL (build it on
   finviz.com, copy the address bar) or use the form for country, price, float, market cap,
   volume and relative volume. Running a screen shows price, change, after-hours change,

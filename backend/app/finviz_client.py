@@ -44,6 +44,12 @@ COUNT_COLUMN_IDS = "1"
 # Price bars (date/time, OHLC, volume). Verified 2026-10-20: daily ~10 years,
 # 1-minute ~2 weeks, 5-minute ~3 weeks, intraday 04:00-20:00 ET.
 FINVIZ_BARS_URL = "https://elite.finviz.com/quote_export.ashx"
+# Stock news export (v=3): Title, Source, Date, Url, Category, Ticker, newest first, about the
+# last 100 items per stock. Verified 2026-11-11; Date is "YYYY-MM-DD HH:MM:SS" in New York time.
+FINVIZ_NEWS_URL = "https://elite.finviz.com/news_export.ashx"
+NEWS_VIEW = "3"
+NEWS_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+WEB_URL_PREFIXES = ("https://", "http://")
 
 Interval = Literal["1m", "5m", "daily"]
 BAR_PERIOD_CODES: dict[str, str] = {"1m": "i1", "5m": "i5", "daily": "d"}
@@ -327,3 +333,33 @@ def find_unrecognised_codes(filters: list[str], signal: str | None) -> list[str]
     if signal and _count_screen_rows([], signal) >= market_size:
         unrecognised.append(signal)
     return unrecognised
+
+
+@dataclass(frozen=True)
+class NewsItem:
+    time: datetime  # Eastern time
+    source: str
+    title: str
+    url: str
+
+
+def _to_news_item(record: dict) -> NewsItem | None:
+    """None for a row that can't be shown safely: no title, a bad date, or a non-web link."""
+    title, source, url = record.get("Title"), record.get("Source"), record.get("Url")
+    if not title or not url or not str(url).startswith(WEB_URL_PREFIXES):
+        return None
+    try:
+        moment = datetime.strptime(str(record.get("Date")), NEWS_TIME_FORMAT).replace(tzinfo=EASTERN)
+    except ValueError:
+        return None
+    return NewsItem(moment, str(source or ""), str(title), str(url))
+
+
+def get_news(ticker: str) -> list[NewsItem]:
+    """The stock's recent news from Finviz, newest first."""
+    operation = f"news {ticker}"
+    df = _read_csv_as_strings(
+        _fetch_export_csv(FINVIZ_NEWS_URL, {"v": NEWS_VIEW, "t": ticker}, operation), operation, required_column="Title"
+    )
+    items = [_to_news_item(_clean_missing(record)) for record in df.to_dict("records")]
+    return sorted((item for item in items if item is not None), key=lambda item: item.time, reverse=True)
