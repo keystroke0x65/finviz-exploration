@@ -52,4 +52,28 @@ describe("NewsList", () => {
     rerender(<NewsList items={null} error="Finviz is rate limiting requests" now={NOW} />);
     expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load news: Finviz is rate limiting requests");
   });
+
+  it("keeps the news in a scrolling box with Show more inside it", () => {
+    render(<NewsList items={ITEMS} error={null} now={NOW} />);
+
+    const box = screen.getByRole("region", { name: "News articles" });
+    expect(box).toHaveClass("news-scroll");
+    expect(box).toContainElement(screen.getByRole("link", { name: "Fresh deal" }));
+    expect(box).toContainElement(screen.getByRole("button", { name: "Show more" }));
+  });
+
+  it("sizes the box to its first 5 articles", () => {
+    const many = Array.from({ length: 8 }, (_, index) => itemDaysAgo(index * 0.1, `Story ${index}`));
+    render(<NewsList items={many} error={null} now={NOW} />);
+    const box = screen.getByRole("region", { name: "News articles" });
+    const rows = box.querySelectorAll(".news-row");
+    rows.forEach((row, index) => {
+      Object.defineProperty(row, "offsetTop", { value: index * 40, configurable: true });
+      Object.defineProperty(row, "offsetHeight", { value: 40, configurable: true });
+    });
+
+    fireEvent(window, new Event("resize"));
+
+    expect(box.style.maxHeight).toBe("200px");
+  });
 });
