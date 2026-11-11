@@ -1,12 +1,16 @@
+import sqlite3
+from dataclasses import asdict
+from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path
 
 from app.cache import get_cached_quote, set_cached_quote
 from app.errors import FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError, TickerNotFoundError
-from app.finviz_client import get_quote
-from app.routes.dependencies import finviz_error_to_http
-from app.schemas import QuoteResponse
+from app.finviz_client import get_news, get_quote
+from app.news_cache import read_cached_news, write_cached_news
+from app.routes.dependencies import finviz_error_to_http, get_db_connection
+from app.schemas import NewsOut, QuoteResponse
 
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
 
@@ -44,3 +48,21 @@ def refresh_stock(ticker: TickerPath) -> QuoteResponse:
 @router.get("/{ticker}", response_model=QuoteResponse)
 def get_stock(ticker: TickerPath) -> QuoteResponse:
     return _fetch_quote(ticker, use_cache=True)
+
+
+@router.get("/{ticker}/news", response_model=NewsOut)
+def get_stock_news(
+    ticker: TickerPath, conn: Annotated[sqlite3.Connection, Depends(get_db_connection)], refresh: bool = False
+) -> NewsOut:
+    """The stock's recent news, newest first; cached briefly, `refresh` asks Finviz again."""
+    ticker = ticker.upper()
+    now = datetime.now(timezone.utc)
+    cached = None if refresh else read_cached_news(conn, ticker, now)
+    if cached is not None:
+        return NewsOut(items=[asdict(item) for item in cached])
+    try:
+        items = get_news(ticker)
+    except (FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError) as exc:
+        raise finviz_error_to_http(exc) from exc
+    write_cached_news(conn, ticker, items, now)
+    return NewsOut(items=[asdict(item) for item in items])

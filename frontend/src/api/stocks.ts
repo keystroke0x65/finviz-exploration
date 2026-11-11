@@ -15,3 +15,16 @@ export function fetchQuote(ticker: string): Promise<Quote> {
 export function refreshQuote(ticker: string): Promise<Quote> {
   return requestJson<Quote>(`/api/stocks/${ticker}/refresh`);
 }
+
+export interface NewsItem {
+  time: string;
+  source: string;
+  title: string;
+  url: string;
+}
+
+export async function fetchNews(ticker: string, refresh = false): Promise<NewsItem[]> {
+  const query = refresh ? "?refresh=true" : "";
+  const body = await requestJson<{ items: NewsItem[] }>(`/api/stocks/${encodeURIComponent(ticker)}/news${query}`);
+  return body.items;
+}
