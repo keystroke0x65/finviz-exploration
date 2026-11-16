@@ -64,21 +64,25 @@ def run_scheduled_scan(db_path: str, now: datetime, deps: ScanDeps) -> ScanResul
             return None
         scan_progress.start("automatic", now)
         try:
-            conn = connect(db_path)
             try:
-                result = run_scan(conn, now, deps, progress=scan_progress)
-            finally:
-                conn.close()
-        except Exception as error:
-            # Same recovery point as the feeder: log and let the next tick retry,
-            # and record it so the Setups view says its list is stale.
-            logger.exception("scan failed")
-            _record_scan_attempt(db_path, CrashedScan(finished_at=now, error_type=type(error).__name__))
-            return None
+                conn = connect(db_path)
+                try:
+                    result = run_scan(conn, now, deps, progress=scan_progress)
+                finally:
+                    conn.close()
+            except Exception as error:
+                # Same recovery point as the feeder: log and let the next tick retry,
+                # and record it so the Setups view says its list is stale.
+                logger.exception("scan failed")
+                _record_scan_attempt(db_path, CrashedScan(finished_at=now, error_type=type(error).__name__))
+                return None
+            _record_scan_attempt(
+                db_path, CompletedScan(finished_at=now, scanned=len(result.scanned), failed=result.failed)
+            )
         finally:
-            # Whatever happened, the progress bar must not stay on a scan that has stopped.
+            # Whatever happened, the bar must not stay on a stopped scan; and it clears only after
+            # the attempt is saved, since the page reloads "Last scan" the moment the bar goes.
             scan_progress.finish()
-        _record_scan_attempt(db_path, CompletedScan(finished_at=now, scanned=len(result.scanned), failed=result.failed))
 
     logger.info("scan: %d tickers scanned, %d setups", len(result.scanned), result.setups_found)
     if result.failed:

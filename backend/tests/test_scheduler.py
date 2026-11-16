@@ -343,3 +343,31 @@ def test_scheduled_scan_clears_progress_when_the_database_cannot_open(tmp_path, 
 
     assert scheduler.run_scheduled_scan(db_path, TUESDAY_10AM_ET, deps) is None
     assert scan_progress.snapshot() is None
+
+
+def test_scheduled_scan_is_saved_before_its_progress_clears(tmp_path, monkeypatch):
+    from app.db import connect as open_db
+    from app.scanning.progress import ProgressTracker
+    from app.scanning.run_status import read_scan_status
+    from app.scanning.scanner import ScanDeps, ScanResult
+    from app.watchlist import scheduler
+
+    db_path = _seeded_db_path(tmp_path)
+    saved_when_cleared = []
+
+    class RecordingTracker(ProgressTracker):
+        def finish(self) -> None:
+            conn = open_db(db_path)
+            try:
+                saved_when_cleared.append(read_scan_status(conn).latest is not None)
+            finally:
+                conn.close()
+            super().finish()
+
+    monkeypatch.setattr(scheduler, "scan_progress", RecordingTracker())
+    monkeypatch.setattr(scheduler, "run_scan", lambda conn, now, deps, progress=None: ScanResult([], [], 0, now))
+    deps = ScanDeps(fetch_bars=lambda *args: [], fetch_snapshots=lambda tickers: [])
+
+    scheduler.run_scheduled_scan(db_path, TUESDAY_10AM_ET, deps)
+
+    assert saved_when_cleared == [True]

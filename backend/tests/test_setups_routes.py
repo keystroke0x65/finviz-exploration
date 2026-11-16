@@ -317,3 +317,42 @@ def test_one_stock_scan_does_not_show_progress(api_client):
         api_client.post("/api/scans", json={"ticker": "HOST"})
 
     assert seen == [False]
+
+
+def test_watchlist_scan_is_saved_before_its_progress_clears(api_client, db_conn, monkeypatch):
+    from app.scanning.progress import ProgressTracker
+    from app.scanning.run_status import read_scan_status
+
+    saved_when_cleared = []
+
+    class RecordingTracker(ProgressTracker):
+        def finish(self) -> None:
+            saved_when_cleared.append(read_scan_status(db_conn).latest is not None)
+            super().finish()
+
+    monkeypatch.setattr("app.routes.setups.scan_progress", RecordingTracker())
+    with patch("app.routes.setups.run_scan", return_value=ScanResult(["HOST"], [], 0, NOW)):
+        api_client.post("/api/scans", json={})
+
+    # Otherwise the page could reload on the cleared bar and still show the previous scan.
+    assert saved_when_cleared == [True]
+
+
+def test_a_rejected_scan_leaves_the_running_scans_progress_alone(api_client):
+    from app.scanning.lock import scan_lock
+    from app.scanning.progress import scan_progress
+
+    scan_lock.acquire()
+    try:
+        scan_progress.start("automatic", NOW)
+        scan_progress.set_total(40)
+        scan_progress.set_phase("scanning")
+        scan_progress.begin_ticker("HOST", 5)
+
+        assert api_client.post("/api/scans", json={}).status_code == 409
+        body = api_client.get("/api/scans/progress").json()
+    finally:
+        scan_progress.finish()
+        scan_lock.release()
+
+    assert (body["running"], body["kind"], body["done"]) == (True, "automatic", 5)
