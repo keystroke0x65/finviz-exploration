@@ -17,6 +17,8 @@ function describeProgress(progress: RunningScan): string {
 export function ScanProgressBar({ progress }: { progress: RunningScan }) {
   const label = progress.kind === "manual" ? "Scanning watchlist" : "Automatic scan";
   const percent = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
+  // Before the stocks are counted there's no count to announce: an indeterminate bar.
+  const hasCount = progress.phase !== "preparing" && progress.total > 0;
   return (
     <div className="scan-progress">
       <span className="scan-progress-label">{label}</span>
@@ -24,9 +26,9 @@ export function ScanProgressBar({ progress }: { progress: RunningScan }) {
         className="scan-progress-track"
         role="progressbar"
         aria-label={label}
-        aria-valuemin={0}
-        aria-valuemax={progress.total}
-        aria-valuenow={progress.done}
+        aria-valuemin={hasCount ? 0 : undefined}
+        aria-valuemax={hasCount ? progress.total : undefined}
+        aria-valuenow={hasCount ? progress.done : undefined}
       >
         <div className="scan-progress-fill" style={{ width: `${percent}%` }} />
       </div>

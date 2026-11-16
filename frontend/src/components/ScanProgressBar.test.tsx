@@ -33,4 +33,12 @@ describe("ScanProgressBar", () => {
     rerender(<ScanProgressBar progress={{ ...SCANNING, phase: "finishing", done: 40, ticker: null }} />);
     expect(screen.getByText("Finishing… · started 9:41 AM")).toBeInTheDocument();
   });
+
+  it("has no count to announce while preparing", () => {
+    render(<ScanProgressBar progress={{ ...SCANNING, phase: "preparing", done: 0, total: 0, ticker: null }} />);
+
+    const bar = screen.getByRole("progressbar");
+    expect(bar).not.toHaveAttribute("aria-valuenow");
+    expect(bar).not.toHaveAttribute("aria-valuemax");
+  });
 });

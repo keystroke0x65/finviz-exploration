@@ -107,7 +107,7 @@ export function SetupsView({ onOpenStock }: SetupsViewProps) {
             />
             Show short setups
           </label>
-          <button type="button" className="button-primary" onClick={handleScan} disabled={isScanning}>
+          <button type="button" className="button-primary" onClick={handleScan} disabled={isScanning || scanProgress != null}>
             {isScanning ? "Scanning…" : "Scan watchlist"}
           </button>
         </div>

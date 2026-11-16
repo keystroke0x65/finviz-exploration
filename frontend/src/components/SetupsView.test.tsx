@@ -341,7 +341,9 @@ describe("SetupsView scan progress", () => {
     await act(() => vi.advanceTimersByTimeAsync(2000));
 
     await vi.waitFor(() => expect(screen.queryByRole("progressbar")).not.toBeInTheDocument());
-    expect(api.fetchSetups.mock.calls.length).toBeGreaterThan(setupLoadsBefore);
+    await act(() => vi.advanceTimersByTimeAsync(4000));
+    // Exactly one reload for the one scan that ended, however many idle checks follow.
+    expect(api.fetchSetups.mock.calls.length).toBe(setupLoadsBefore + 1);
   });
 
   it("keeps checking every 2 seconds and stops when the tab closes", async () => {
@@ -359,13 +361,36 @@ describe("SetupsView scan progress", () => {
   });
 
   it("hides the bar when checking fails, without an error", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     respond([setup()]);
-    api.fetchScanProgress.mockRejectedValue(new Error("Request failed (502)"));
+    api.fetchScanProgress.mockResolvedValueOnce(RUNNING).mockRejectedValue(new Error("Request failed (502)"));
+
+    render(<SetupsView onOpenStock={vi.fn()} />);
+    await screen.findByRole("progressbar");
+    await act(() => vi.advanceTimersByTimeAsync(2000));
+
+    await vi.waitFor(() => expect(screen.queryByRole("progressbar")).not.toBeInTheDocument());
+    expect(screen.queryByText(/Request failed/)).not.toBeInTheDocument();
+  });
+
+  it("can't start a manual scan while one is running", async () => {
+    respond([setup()]);
+    api.fetchScanProgress.mockResolvedValue(RUNNING);
 
     render(<SetupsView onOpenStock={vi.fn()} />);
 
-    await vi.waitFor(() => expect(api.fetchScanProgress).toHaveBeenCalled());
-    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Request failed/)).not.toBeInTheDocument();
+    await screen.findByRole("progressbar");
+    expect(screen.getByRole("button", { name: "Scan watchlist" })).toBeDisabled();
+  });
+
+  it("doesn't start another check while the last one is still waiting", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    respond([setup()]);
+    api.fetchScanProgress.mockReturnValue(new Promise(() => undefined));
+
+    render(<SetupsView onOpenStock={vi.fn()} />);
+    await act(() => vi.advanceTimersByTimeAsync(6000));
+
+    expect(api.fetchScanProgress).toHaveBeenCalledTimes(1);
   });
 });

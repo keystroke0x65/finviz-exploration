@@ -15,7 +15,12 @@ export function useScanProgress(onFinished: () => void): RunningScan | null {
 
   useEffect(() => {
     let isMounted = true;
+    // A slow answer must not overlap the next check: out-of-order answers would flash
+    // the bar back and report the same scan as finished twice.
+    let isChecking = false;
     async function check() {
+      if (isChecking) return;
+      isChecking = true;
       try {
         const latest = await fetchScanProgress();
         if (!isMounted) return;
@@ -26,6 +31,8 @@ export function useScanProgress(onFinished: () => void): RunningScan | null {
       } catch {
         // Best effort (e.g. the backend restarting): hide the bar until a check succeeds.
         if (isMounted) setProgress(null);
+      } finally {
+        isChecking = false;
       }
     }
     check();
