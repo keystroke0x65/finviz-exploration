@@ -47,6 +47,7 @@ describe("ScreensView", () => {
 
     expect(await screen.findByText(/^No stocks match this screen right now\./)).toBeInTheDocument();
     expect(api.runScreen).toHaveBeenCalledWith(1);
+    expect(document.title).toBe("Screens · Top gainers — low float · Finviz");
   });
 
   it("shows the backend error when a run fails", async () => {

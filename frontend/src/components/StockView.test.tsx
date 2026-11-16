@@ -104,6 +104,14 @@ describe("StockView", () => {
     vi.clearAllMocks();
   });
 
+  it("titles the browser tab with the ticker, price and change", async () => {
+    api.fetchQuote.mockResolvedValue({ Ticker: "HOST", Price: "2.15", Change: "12.30%" });
+
+    render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
+
+    await vi.waitFor(() => expect(document.title).toBe("HOST 2.15 +12.30% · Finviz"));
+  });
+
   it("asks for a ticker when none is chosen", () => {
     render(<StockView ticker={null} onTickerChange={vi.fn()} />);
 

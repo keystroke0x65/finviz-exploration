@@ -55,6 +55,14 @@ describe("SetupsView", () => {
     vi.clearAllMocks();
   });
 
+  it("titles the browser tab with the setup count", async () => {
+    respond([setup(), setup({ id: 2, ticker: "WORX" })]);
+
+    render(<SetupsView onOpenStock={vi.fn()} />);
+
+    await vi.waitFor(() => expect(document.title).toBe("Setups · 2 · Finviz"));
+  });
+
   it("warns when the max daily loss is reached", async () => {
     respond([setup()]);
     api.fetchDailyLoss.mockResolvedValueOnce({ realised_pnl_today: -212, max_daily_loss: 200, level: "reached" });

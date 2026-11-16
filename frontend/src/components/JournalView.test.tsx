@@ -77,6 +77,7 @@ describe("JournalView", () => {
     expect(api.fetchEntries).toHaveBeenCalledWith(null, "week");
     expect(screen.getByTestId("pnl-chart")).toBeInTheDocument();
     expect(screen.getByText("B · 10.0/14")).toBeInTheDocument();
+    expect(document.title).toBe("Journal · +$105.00 this week · Finviz");
   });
 
   it("reloads for another period", async () => {

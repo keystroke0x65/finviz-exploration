@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { journalTitle, useDocumentTitle } from "../pageTitle";
 import {
   Bucket,
   EntryKind,
@@ -221,6 +222,7 @@ export function JournalView({ onOpenStock }: JournalViewProps) {
   const [period, setPeriod] = useState<JournalPeriod>("week");
   const [kind, setKind] = useState<EntryKind | null>(null);
   const [summary, setSummary] = useState<JournalSummary | null>(null);
+  useDocumentTitle(journalTitle(summary ? summary.net_pnl : null, period));
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [catalog, setCatalog] = useState<ReasonCatalog | null>(null);
   const [settings, setSettings] = useState<JournalSettings | null>(null);

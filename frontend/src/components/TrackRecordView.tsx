@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { trackRecordTitle, useDocumentTitle } from "../pageTitle";
 import {
   MIN_TRADES_FOR_TRACK_RECORD,
   MIN_TRADING_DAYS_FOR_TRACK_RECORD,
@@ -46,6 +47,7 @@ function dateSpan(firstDay: string | null, lastDay: string | null): string | und
 }
 
 export function TrackRecordView() {
+  useDocumentTitle(trackRecordTitle());
   const [filters, setFilters] = useState<TrackRecordFilters>({ timeframe: null, float_bucket: null, session: null });
   const [response, setResponse] = useState<TrackRecordResponse | null>(null);
   const [error, setError] = useState<string | null>(null);

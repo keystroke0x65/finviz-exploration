@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { screensTitle, useDocumentTitle } from "../pageTitle";
 import {
   createScreen,
   deleteScreen,
@@ -121,6 +122,7 @@ export function ScreensView({ onOpenStock }: ScreensViewProps) {
   }
 
   const selectedScreenId = runState.status === "idle" ? null : runState.screen.id;
+  useDocumentTitle(screensTitle(runState.status === "idle" ? null : runState.screen.name));
 
   return (
     <div className="screens-layout">
