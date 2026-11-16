@@ -454,6 +454,7 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
                   key={panel.existing?.id ?? "new"}
                   ticker={ticker}
                   preferredSetupId={selectedSetupId}
+                  preferredDirection={selectedSetup ? selectedSetup.direction : null}
                   existing={panel.existing}
                   settings={journalSettings}
                   clickedBar={clickedBar}

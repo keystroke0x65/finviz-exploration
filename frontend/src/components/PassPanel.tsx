@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createEntry, fetchReasons, JournalEntry, PassDraft, ReasonCatalog, updateEntry } from "../api/journal";
 import { ReasonChips, toggled } from "./ReasonChips";
-import { SetupPicker } from "./SetupPicker";
+import { describeSavedSetup, SetupPicker } from "./SetupPicker";
 import { useDaySetups } from "../useDaySetups";
 
 const OTHER_REASON = "other";
@@ -28,7 +28,9 @@ export function PassPanel({ ticker, preferredSetupId, existing = null, onSaved, 
   // Once the user (or a saved pass) has a setup, new matches must not swap it.
   const isSetupChosen = useRef(existing != null);
   // A pass is matched at its own moment (now, or when a saved pass was made), in any direction.
-  const daySetups = useDaySetups(ticker, existing ? { time: existing.decided_at, price: existing.pass_price } : null, null);
+  const { setups: daySetups, error: setupsError } = useDaySetups(
+    ticker, existing ? { time: existing.decided_at, price: existing.pass_price } : null, null,
+  );
   const allSetups = [...(daySetups?.matches ?? []), ...(daySetups?.others ?? [])];
 
   useEffect(() => {
@@ -77,7 +79,11 @@ export function PassPanel({ ticker, preferredSetupId, existing = null, onSaved, 
         ticker={ticker}
         setups={daySetups}
         selectedId={setupId}
-        matchLabel="Setups live now"
+        matchLabel={existing ? "Setups live when you passed" : "Setups live now"}
+        selectedFallback={
+          existing?.setup && existing.setup.setup_record_id === setupId ? describeSavedSetup(existing.setup) : null
+        }
+        error={setupsError}
         onChange={(id) => {
           isSetupChosen.current = true;
           setSetupId(id);

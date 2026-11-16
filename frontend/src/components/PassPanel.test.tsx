@@ -89,6 +89,7 @@ describe("PassPanel", () => {
     render(<PassPanel ticker="HOST" preferredSetupId={null} existing={existing} onSaved={vi.fn()} onClose={vi.fn()} />);
 
     expect(await screen.findByRole("button", { name: "Low Sykes grade" })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("group", { name: "Setups live when you passed" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Save pass" }));
 
     await vi.waitFor(() => expect(api.updateEntry).toHaveBeenCalled());

@@ -274,6 +274,7 @@ export function JournalEntryDetail({ entry, labels, settings, onChanged, onDelet
         <TradePanel
           ticker={entry.ticker}
           preferredSetupId={entry.setup?.setup_record_id ?? null}
+          preferredDirection={entry.direction}
           existing={entry}
           settings={settings}
           clickedBar={clickedBar}

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Bar } from "../api/bars";
 import {
   createEntry,
+  DaySetup,
   fetchReasons,
   Fill,
   FillSide,
@@ -18,7 +19,7 @@ import { easternIso, easternParts, easternToday } from "../easternTime";
 import { formatDollars, formatNumber, formatPrice, formatSignedDollars } from "../format";
 import { suggestShares } from "../positionSize";
 import { ReasonChips, toggled } from "./ReasonChips";
-import { SetupPicker } from "./SetupPicker";
+import { describeSavedSetup, describeSetup, SetupPicker } from "./SetupPicker";
 import { TradeMoment, useDaySetups } from "../useDaySetups";
 
 const PREVIEW_DELAY_MS = 300;
@@ -43,8 +44,9 @@ interface FillRow {
 
 interface TradePanelProps {
   ticker: string;
-  // The setup picked on the Stock page, chosen first if it fits the trade.
+  // The setup picked on the Stock page, chosen first if it fits the trade, and its direction.
   preferredSetupId: number | null;
+  preferredDirection: Direction | null;
   existing: JournalEntry | null;
   settings: JournalSettings | null;
   clickedBar: ClickedBar | null;
@@ -211,17 +213,27 @@ function describeMatches(moment: TradeMoment | null, direction: Direction): stri
   return `Best matches for your ${FILL_TIME.format(new Date(moment.time))} ${openingSide(direction)} at ${formatPrice(moment.price)}`;
 }
 
+function describeFallback(setupId: number | null, chosen: DaySetup | null, existing: JournalEntry | null): string | null {
+  if (setupId == null) return null;
+  if (chosen?.setup_record_id === setupId) return describeSetup(chosen);
+  if (existing?.setup?.setup_record_id === setupId) return describeSavedSetup(existing.setup);
+  return null;
+}
+
 export function TradePanel({
   ticker,
   preferredSetupId,
+  preferredDirection,
   existing,
   settings,
   clickedBar,
   onSaved,
   onClose,
 }: TradePanelProps) {
-  const [direction, setDirection] = useState<Direction>(existing?.direction ?? "long");
+  const [direction, setDirection] = useState<Direction>(existing?.direction ?? preferredDirection ?? "long");
   const [setupId, setSetupId] = useState<number | null>(existing ? existing.setup?.setup_record_id ?? null : null);
+  // The last setup picked from the lists, kept so it can still be shown if a later list leaves it out.
+  const [chosenSetup, setChosenSetup] = useState<DaySetup | null>(null);
   // Once the user (or a saved entry) has a setup, new matches must not swap it.
   const isSetupChosen = useRef(existing != null);
   const isPlanEdited = useRef(existing != null);
@@ -261,7 +273,7 @@ export function TradePanel({
   }, [clickedBar?.id]);
 
   const moment = useMemo(() => firstFillMoment(rows), [rows]);
-  const daySetups = useDaySetups(ticker, moment, direction);
+  const { setups: daySetups, error: setupsError } = useDaySetups(ticker, moment, direction);
   const allSetups = useMemo(() => [...(daySetups?.matches ?? []), ...(daySetups?.others ?? [])], [daySetups]);
 
   useEffect(() => {
@@ -269,7 +281,10 @@ export function TradePanel({
     const best =
       daySetups.matches.find((setup) => setup.setup_record_id === preferredSetupId) ?? daySetups.matches[0] ?? null;
     setSetupId(best?.setup_record_id ?? null);
-    if (best && !isPlanEdited.current) setPlan({ stop: String(best.stop), target: String(best.target) });
+    setChosenSetup(best);
+    if (isPlanEdited.current) return;
+    // The plan follows the auto-picked setup, and goes with it when none fits any more.
+    setPlan(best ? { stop: String(best.stop), target: String(best.target) } : { stop: "", target: "" });
   }, [daySetups, preferredSetupId]);
 
   const draft = useMemo(
@@ -303,7 +318,8 @@ export function TradePanel({
   function handleSetupChange(id: number | null) {
     isSetupChosen.current = true;
     setSetupId(id);
-    const chosen = allSetups.find((setup) => setup.setup_record_id === id);
+    const chosen = allSetups.find((setup) => setup.setup_record_id === id) ?? null;
+    setChosenSetup(chosen);
     if (!chosen) return;
     setDirection(chosen.direction === "short" ? "short" : "long");
     setPlan({ stop: String(chosen.stop), target: String(chosen.target) });
@@ -358,6 +374,8 @@ export function TradePanel({
           setups={daySetups}
           selectedId={setupId}
           matchLabel={describeMatches(moment, direction)}
+          selectedFallback={describeFallback(setupId, chosenSetup, existing)}
+          error={setupsError}
           onChange={handleSetupChange}
         />
         <label className="journal-field">

@@ -48,6 +48,6 @@ describe("useDaySetups", () => {
     await act(() => vi.advanceTimersByTimeAsync(400));
 
     expect(api.fetchDaySetups).toHaveBeenCalledWith("HOST", "2026-11-16", "2026-11-16T15:00:00.400Z", undefined, undefined);
-    expect(result.current).toEqual(EMPTY);
+    expect(result.current).toEqual({ setups: EMPTY, error: null });
   });
 });

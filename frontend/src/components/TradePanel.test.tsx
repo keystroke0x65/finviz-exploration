@@ -41,7 +41,7 @@ const NO_SETTINGS = { risk_per_trade: null, max_position: null, max_daily_loss: 
 
 function renderPanel(props: Partial<Parameters<typeof TradePanel>[0]> = {}) {
   const defaults = {
-    ticker: "HOST", preferredSetupId: null, existing: null, settings: NO_SETTINGS, clickedBar: null,
+    ticker: "HOST", preferredSetupId: null, preferredDirection: null, existing: null, settings: NO_SETTINGS, clickedBar: null,
     onSaved: vi.fn(), onClose: vi.fn(),
   };
   const merged = { ...defaults, ...props };
@@ -196,5 +196,49 @@ describe("TradePanel", () => {
       { side: "buy", time: "2026-11-09T09:45:00-05:00", price: 1.84, shares: 500 },
       { side: "sell", time: "2026-11-09T10:05:00-05:00", price: 2.05, shares: 500 },
     ]);
+  });
+
+  it("starts a short trade when the setup picked on the Stock page is a short", async () => {
+    renderPanel({ preferredSetupId: 9, preferredDirection: "short" });
+
+    expect(screen.getByRole("combobox", { name: "Direction" })).toHaveValue("short");
+    await vi.waitFor(() => expect(api.fetchDaySetups).toHaveBeenCalled());
+    expect(api.fetchDaySetups.mock.calls[0][3]).toBe("short");
+  });
+
+  it("clears an auto-filled plan when no setup fits the fill any more", async () => {
+    const { rerender, props } = renderPanel();
+    await vi.waitFor(() => expect(screen.getByLabelText("Plan stop")).toHaveValue(1.76));
+    api.fetchDaySetups.mockResolvedValue({ matches: [], others: [] });
+
+    rerender(<TradePanel {...props} clickedBar={{ bar: BAR, id: 1 }} />);
+
+    await vi.waitFor(() => expect(screen.getByRole("combobox", { name: "Setup" })).toHaveValue(""));
+    expect(screen.getByLabelText("Plan stop")).toHaveValue(null);
+    expect(screen.getByLabelText("Plan target")).toHaveValue(null);
+  });
+
+  it("still shows a saved setup the matching list leaves out", async () => {
+    api.fetchDaySetups.mockResolvedValue({ matches: [SETUP], others: [] });
+    const existing: JournalEntry = {
+      id: 3, kind: "trade", ticker: "HOST", direction: "long", created_at: BAR.time, updated_at: BAR.time,
+      decided_at: BAR.time, setup: { ...SETUP, setup_record_id: 42, sliding_scale: null }, stock: NO_FACTS, plan_stop: 1.76,
+      plan_target: 2.08, fees: 0, reasons: [], mistakes: [], note: "", pass_price: null,
+      fills: [{ side: "buy", time: BAR.time, price: 1.84, shares: 500 }], figures: null, after_exit: null,
+      plan_flags: [], pass_score: null, after_pass: null, bar_warning: null,
+    };
+    renderPanel({ existing });
+
+    expect(await screen.findByRole("option", { name: "Bull flag 5m · entry 1.84 · saved setup · score 80" }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Setup" })).toHaveValue("42");
+  });
+
+  it("says when the setups couldn't be loaded", async () => {
+    api.fetchDaySetups.mockRejectedValue(new Error("Request failed (502)"));
+
+    renderPanel();
+
+    expect(await screen.findByText("Couldn't load setups: Request failed (502)")).toBeInTheDocument();
   });
 });

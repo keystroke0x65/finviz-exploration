@@ -16,8 +16,14 @@ export interface TradeMoment {
  * The stock's setups for the picker, matched to the trade's first fill (its day, time,
  * direction and price), or the setups live right now when there's no fill yet.
  */
-export function useDaySetups(ticker: string, moment: TradeMoment | null, direction: Direction | null): DaySetups | null {
-  const [setups, setSetups] = useState<DaySetups | null>(null);
+export interface DaySetupsState {
+  // null while loading.
+  setups: DaySetups | null;
+  error: string | null;
+}
+
+export function useDaySetups(ticker: string, moment: TradeMoment | null, direction: Direction | null): DaySetupsState {
+  const [state, setState] = useState<DaySetupsState>({ setups: null, error: null });
   const time = moment?.time ?? null;
   const price = moment?.price ?? null;
 
@@ -27,11 +33,13 @@ export function useDaySetups(ticker: string, moment: TradeMoment | null, directi
       const at = time ?? new Date().toISOString();
       fetchDaySetups(ticker, easternParts(at).date, at, direction ?? undefined, price ?? undefined)
         .then((loaded) => {
-          if (isCurrent) setSetups(loaded);
+          if (isCurrent) setState({ setups: loaded, error: null });
         })
-        // Best effort: the picker then offers only "No setup", and the entry still saves.
-        .catch(() => {
-          if (isCurrent) setSetups({ matches: [], others: [] });
+        // The picker says so; the entry can still be saved with "No setup".
+        .catch((loadError: unknown) => {
+          if (!isCurrent) return;
+          const message = loadError instanceof Error ? loadError.message : String(loadError);
+          setState({ setups: { matches: [], others: [] }, error: message });
         });
     }, SETTLE_MS);
     return () => {
@@ -40,5 +48,5 @@ export function useDaySetups(ticker: string, moment: TradeMoment | null, directi
     };
   }, [ticker, time, price, direction]);
 
-  return setups;
+  return state;
 }

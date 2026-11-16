@@ -22,6 +22,8 @@ describe("SetupPicker", () => {
         setups={{ matches: [daySetup(1)], others: [daySetup(2, { pattern: "abcd", entry: 0.9, triggered_at: null, state: "forming" })] }}
         selectedId={1}
         matchLabel="Best matches for your 9:45 AM buy at 0.76"
+        selectedFallback={null}
+        error={null}
         onChange={vi.fn()}
       />,
     );
@@ -36,7 +38,7 @@ describe("SetupPicker", () => {
 
   it("reports the chosen setup, or none", () => {
     const onChange = vi.fn();
-    render(<SetupPicker ticker="RAIN" setups={{ matches: [daySetup(1)], others: [] }} selectedId={1} matchLabel="x" onChange={onChange} />);
+    render(<SetupPicker ticker="RAIN" setups={{ matches: [daySetup(1)], others: [] }} selectedId={1} matchLabel="x" selectedFallback={null} error={null} onChange={onChange} />);
 
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "" } });
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "1" } });
@@ -45,7 +47,7 @@ describe("SetupPicker", () => {
   });
 
   it("says when the setups are still loading", () => {
-    render(<SetupPicker ticker="RAIN" setups={null} selectedId={null} matchLabel="x" onChange={vi.fn()} />);
+    render(<SetupPicker ticker="RAIN" setups={null} selectedId={null} matchLabel="x" selectedFallback={null} error={null} onChange={vi.fn()} />);
 
     expect(screen.getByRole("option", { name: "Loading setups…" })).toBeInTheDocument();
   });
