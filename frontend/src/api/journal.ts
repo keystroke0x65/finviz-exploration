@@ -163,6 +163,9 @@ export interface EntryBars {
 
 export interface DaySetup {
   setup_record_id: number;
+  detected_at: string;
+  // When price last reached the entry; null while forming.
+  triggered_at: string | null;
   pattern: string;
   timeframe: string;
   direction: string;
@@ -280,9 +283,23 @@ export function fetchEntryBars(id: number, interval: "1m" | "5m"): Promise<Entry
   return requestJson<EntryBars>(`${BASE}/entries/${id}/bars?interval=${interval}`);
 }
 
-export function fetchDaySetups(ticker: string, day: string, at: string): Promise<DaySetup[]> {
-  const query = new URLSearchParams({ day, at }).toString();
-  return requestJson<DaySetup[]>(`${BASE}/setups/${encodeURIComponent(ticker)}?${query}`);
+// The stock's setups for the picker: those that fit the trade (best first), then the day's others.
+export interface DaySetups {
+  matches: DaySetup[];
+  others: DaySetup[];
+}
+
+export function fetchDaySetups(
+  ticker: string,
+  day: string,
+  at: string,
+  direction?: Direction,
+  price?: number,
+): Promise<DaySetups> {
+  const params = new URLSearchParams({ day, at });
+  if (direction) params.set("direction", direction);
+  if (price != null) params.set("price", String(price));
+  return requestJson<DaySetups>(`${BASE}/setups/${encodeURIComponent(ticker)}?${params.toString()}`);
 }
 
 export function fetchOpenTrade(ticker: string): Promise<JournalEntry | null> {

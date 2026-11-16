@@ -167,8 +167,14 @@ stored in the same SQLite file (`journal_entries`, `journal_fills`, `journal_bar
   candle to add a fill at its time and close (the first click is the buy, later ones sells,
   for a long), or type date, time (Eastern), price and shares; a price outside the clicked
   candle's range gets a warning. Figures (average entry/exit, shares held, money in, P&L,
-  R) update as you type. The setup list offers every setup the stock had that day, even
-  ones that already stopped out; its stop and target fill in the plan. If the stock has an
+  R) update as you type. The setup list puts first the setups that fit your trade: same
+  direction, already found before your first fill and not stopped out or at target by then,
+  each shown once (re-detections merged), closest entry to your fill price first, then the
+  nearest trigger time. Each shows its entry and trigger time so you can tell them apart. The
+  best match is picked for you (the setup selected on the Stock page wins if it fits) and its
+  stop and target fill in the plan; the list follows your first fill as you add or change it.
+  The day's other setups are under "Other … setups today". Passing matches at the moment you
+  pass, in either direction. If the stock has an
   open trade, "Log trade" adds to it ("Start a new trade instead" starts another). Passing
   takes reason chips (more than one allowed; "Other" needs a note). Your logged fills show
   as arrows on the Stock chart (1m/5m). With a risk per trade set, each setup shows a
@@ -201,8 +207,9 @@ stored in the same SQLite file (`journal_entries`, `journal_fills`, `journal_bar
   reason" averages them per reason, and the CSV export includes them.
 - API (`/api/journal`): `GET /reasons`; `GET|POST /entries`; `GET|PUT|DELETE
   /entries/{id}`; `GET /entries/{id}/bars?interval=1m|5m`; `POST /preview` (figures for
-  fills being typed); `GET /setups/{ticker}?day=&at=` (the day's setups as they looked at
-  a moment); `GET /open-trade/{ticker}`; `GET /summary?period=today|week|month|all`;
+  fills being typed); `GET /setups/{ticker}?day=&at=&direction=&price=` (the day's setups as they
+  looked at a moment, split into `matches`, those live then in the trade's direction, closest
+  entry to `price` first, and `others`); `GET /open-trade/{ticker}`; `GET /summary?period=today|week|month|all`;
   `GET /daily-loss`; `GET /export/entries.csv` and `/export/fills.csv` (cells that would
   run as spreadsheet formulas are prefixed with `'`). Settings: `GET|PUT
   /api/settings/journal` (risk per trade, max position, max daily loss, in dollars).

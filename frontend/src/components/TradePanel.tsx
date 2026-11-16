@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Bar } from "../api/bars";
 import {
   createEntry,
@@ -19,7 +19,8 @@ import { easternIso, easternParts, easternToday } from "../easternTime";
 import { formatDollars, formatNumber, formatPrice, formatSignedDollars } from "../format";
 import { suggestShares } from "../positionSize";
 import { ReasonChips, toggled } from "./ReasonChips";
-import { SetupPicker } from "./SetupPicker";
+import { describeSavedSetup, describeSetup, SetupPicker } from "./SetupPicker";
+import { TradeMoment, useDaySetups } from "../useDaySetups";
 
 const PREVIEW_DELAY_MS = 300;
 const FOLLOWED_PLAN = "followed_plan";
@@ -43,8 +44,9 @@ interface FillRow {
 
 interface TradePanelProps {
   ticker: string;
-  setups: DaySetup[];
-  defaultSetupId: number | null;
+  // The setup picked on the Stock page, chosen first if it fits the trade, and its direction.
+  preferredSetupId: number | null;
+  preferredDirection: Direction | null;
   existing: JournalEntry | null;
   settings: JournalSettings | null;
   clickedBar: ClickedBar | null;
@@ -195,25 +197,49 @@ function FillRowFields({
   );
 }
 
+const FILL_TIME = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" });
+
+// The earliest fully typed fill: the moment and price the setups are matched against.
+function firstFillMoment(rows: FillRow[]): TradeMoment | null {
+  const complete = rows
+    .map((row) => ({ price: parsePositive(row.price), time: row.date && row.time ? easternIso(row.date, row.time) : null }))
+    .filter((fill): fill is TradeMoment => fill.price != null && fill.time != null)
+    .sort((left, right) => Date.parse(left.time) - Date.parse(right.time));
+  return complete[0] ?? null;
+}
+
+function describeMatches(moment: TradeMoment | null, direction: Direction): string {
+  if (!moment) return "Setups live now";
+  return `Best matches for your ${FILL_TIME.format(new Date(moment.time))} ${openingSide(direction)} at ${formatPrice(moment.price)}`;
+}
+
+function describeFallback(setupId: number | null, chosen: DaySetup | null, existing: JournalEntry | null): string | null {
+  if (setupId == null) return null;
+  if (chosen?.setup_record_id === setupId) return describeSetup(chosen);
+  if (existing?.setup?.setup_record_id === setupId) return describeSavedSetup(existing.setup);
+  return null;
+}
+
 export function TradePanel({
   ticker,
-  setups,
-  defaultSetupId,
+  preferredSetupId,
+  preferredDirection,
   existing,
   settings,
   clickedBar,
   onSaved,
   onClose,
 }: TradePanelProps) {
-  const initialSetupId = existing ? existing.setup?.setup_record_id ?? null : defaultSetupId;
-  const initialSetup = setups.find((setup) => setup.setup_record_id === initialSetupId) ?? null;
-  const [direction, setDirection] = useState<Direction>(
-    existing?.direction ?? (initialSetup?.direction === "short" ? "short" : "long"),
-  );
-  const [setupId, setSetupId] = useState<number | null>(initialSetupId);
+  const [direction, setDirection] = useState<Direction>(existing?.direction ?? preferredDirection ?? "long");
+  const [setupId, setSetupId] = useState<number | null>(existing ? existing.setup?.setup_record_id ?? null : null);
+  // The last setup picked from the lists, kept so it can still be shown if a later list leaves it out.
+  const [chosenSetup, setChosenSetup] = useState<DaySetup | null>(null);
+  // Once the user (or a saved entry) has a setup, new matches must not swap it.
+  const isSetupChosen = useRef(existing != null);
+  const isPlanEdited = useRef(existing != null);
   const [plan, setPlan] = useState({
-    stop: String(existing ? existing.plan_stop ?? "" : initialSetup?.stop ?? ""),
-    target: String(existing ? existing.plan_target ?? "" : initialSetup?.target ?? ""),
+    stop: String(existing?.plan_stop ?? ""),
+    target: String(existing?.plan_target ?? ""),
   });
   const [rows, setRows] = useState<FillRow[]>(() => (existing ? rowsFromEntry(existing) : []));
   const [mistakes, setMistakes] = useState<string[]>(existing?.mistakes ?? []);
@@ -246,6 +272,21 @@ export function TradePanel({
     // Only a new click adds a row; direction changes must not replay the last click.
   }, [clickedBar?.id]);
 
+  const moment = useMemo(() => firstFillMoment(rows), [rows]);
+  const { setups: daySetups, error: setupsError } = useDaySetups(ticker, moment, direction);
+  const allSetups = useMemo(() => [...(daySetups?.matches ?? []), ...(daySetups?.others ?? [])], [daySetups]);
+
+  useEffect(() => {
+    if (!daySetups || isSetupChosen.current) return;
+    const best =
+      daySetups.matches.find((setup) => setup.setup_record_id === preferredSetupId) ?? daySetups.matches[0] ?? null;
+    setSetupId(best?.setup_record_id ?? null);
+    setChosenSetup(best);
+    if (isPlanEdited.current) return;
+    // The plan follows the auto-picked setup, and goes with it when none fits any more.
+    setPlan(best ? { stop: String(best.stop), target: String(best.target) } : { stop: "", target: "" });
+  }, [daySetups, preferredSetupId]);
+
   const draft = useMemo(
     () => buildDraft(ticker, direction, setupId, plan, fees, mistakes, note, rows),
     [ticker, direction, setupId, plan, fees, mistakes, note, rows],
@@ -275,8 +316,10 @@ export function TradePanel({
   }, [draftKey]);
 
   function handleSetupChange(id: number | null) {
+    isSetupChosen.current = true;
     setSetupId(id);
-    const chosen = setups.find((setup) => setup.setup_record_id === id);
+    const chosen = allSetups.find((setup) => setup.setup_record_id === id) ?? null;
+    setChosenSetup(chosen);
     if (!chosen) return;
     setDirection(chosen.direction === "short" ? "short" : "long");
     setPlan({ stop: String(chosen.stop), target: String(chosen.target) });
@@ -308,7 +351,7 @@ export function TradePanel({
     }
   }
 
-  const sizingEntry = parsePositive(rows[0]?.price ?? "") ?? setups.find((setup) => setup.setup_record_id === setupId)?.entry;
+  const sizingEntry = parsePositive(rows[0]?.price ?? "") ?? allSetups.find((setup) => setup.setup_record_id === setupId)?.entry;
   const sizingStop = parsePositive(plan.stop);
   const riskPerTrade = settings?.risk_per_trade ?? null;
   const suggested =
@@ -326,7 +369,15 @@ export function TradePanel({
       </header>
       <p className="muted">Click a candle on the chart to add a fill at its time and close, or type one.</p>
       <div className="journal-row">
-        <SetupPicker setups={setups} selectedId={setupId} onChange={handleSetupChange} />
+        <SetupPicker
+          ticker={ticker}
+          setups={daySetups}
+          selectedId={setupId}
+          matchLabel={describeMatches(moment, direction)}
+          selectedFallback={describeFallback(setupId, chosenSetup, existing)}
+          error={setupsError}
+          onChange={handleSetupChange}
+        />
         <label className="journal-field">
           <span className="plan-label">Direction</span>
           <select value={direction} onChange={(event) => setDirection(event.target.value === "short" ? "short" : "long")}>
@@ -337,12 +388,18 @@ export function TradePanel({
         <label className="journal-field">
           <span className="plan-label">Plan stop</span>
           <input type="number" min="0" step="0.0001" value={plan.stop} aria-label="Plan stop"
-            onChange={(event) => setPlan({ ...plan, stop: event.target.value })} />
+            onChange={(event) => {
+              isPlanEdited.current = true;
+              setPlan({ ...plan, stop: event.target.value });
+            }} />
         </label>
         <label className="journal-field">
           <span className="plan-label">Plan target</span>
           <input type="number" min="0" step="0.0001" value={plan.target} aria-label="Plan target"
-            onChange={(event) => setPlan({ ...plan, target: event.target.value })} />
+            onChange={(event) => {
+              isPlanEdited.current = true;
+              setPlan({ ...plan, target: event.target.value });
+            }} />
         </label>
       </div>
       {suggested != null && sizingEntry != null && riskPerTrade != null && (

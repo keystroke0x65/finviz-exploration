@@ -5,12 +5,14 @@ import type { DaySetup, JournalEntry } from "../api/journal";
 import { TradePanel } from "./TradePanel";
 
 const api = vi.hoisted(() => ({
+  fetchDaySetups: vi.fn(),
   fetchReasons: vi.fn(),
   createEntry: vi.fn(),
   updateEntry: vi.fn(),
   previewTrade: vi.fn(),
 }));
 vi.mock("../api/journal", () => ({
+  fetchDaySetups: (...args: unknown[]) => api.fetchDaySetups(...args),
   fetchReasons: () => api.fetchReasons(),
   createEntry: (draft: unknown) => api.createEntry(draft),
   updateEntry: (id: number, draft: unknown) => api.updateEntry(id, draft),
@@ -18,8 +20,11 @@ vi.mock("../api/journal", () => ({
 }));
 
 const SETUP: DaySetup = {
-  setup_record_id: 7, pattern: "bull_flag", timeframe: "5m", direction: "long", entry: 1.84, stop: 1.76, target: 2.08,
+  setup_record_id: 7, detected_at: "2026-11-09T09:30:00-05:00", triggered_at: "2026-11-09T09:44:00-05:00", pattern: "bull_flag", timeframe: "5m", direction: "long", entry: 1.84, stop: 1.76, target: 2.08,
   reward_risk: 3, score: 80, state: "forming", verdict: null, sliding_scale: null, outcome: "open",
+};
+const OTHER_SETUP: DaySetup = {
+  ...SETUP, setup_record_id: 9, pattern: "bear_flag", direction: "short", entry: 1.7, stop: 1.8, target: 1.4,
 };
 const BAR: Bar = { time: "2026-11-09T09:45:00-05:00", open: 1.8, high: 1.86, low: 1.79, close: 1.84, volume: 1000 };
 const LATER_BAR: Bar = { time: "2026-11-09T10:05:00-05:00", open: 2.0, high: 2.1, low: 1.98, close: 2.05, volume: 900 };
@@ -36,7 +41,7 @@ const NO_SETTINGS = { risk_per_trade: null, max_position: null, max_daily_loss: 
 
 function renderPanel(props: Partial<Parameters<typeof TradePanel>[0]> = {}) {
   const defaults = {
-    ticker: "HOST", setups: [SETUP], defaultSetupId: 7, existing: null, settings: NO_SETTINGS, clickedBar: null,
+    ticker: "HOST", preferredSetupId: null, preferredDirection: null, existing: null, settings: NO_SETTINGS, clickedBar: null,
     onSaved: vi.fn(), onClose: vi.fn(),
   };
   const merged = { ...defaults, ...props };
@@ -51,6 +56,7 @@ function fillRows() {
 describe("TradePanel", () => {
   beforeEach(() => {
     api.fetchReasons.mockResolvedValue({ pass_reasons: [], mistakes: [{ key: "chased", label: "Chased" }] });
+    api.fetchDaySetups.mockResolvedValue({ matches: [SETUP], others: [OTHER_SETUP] });
     api.previewTrade.mockResolvedValue({ figures: null, error: "Add at least one fill." });
     api.createEntry.mockResolvedValue({ id: 3, kind: "trade", bar_warning: null });
     api.updateEntry.mockResolvedValue({ id: 3, kind: "trade", bar_warning: null });
@@ -61,11 +67,33 @@ describe("TradePanel", () => {
     vi.clearAllMocks();
   });
 
-  it("fills the plan from the chosen setup", () => {
+  it("picks the best matching setup and fills the plan from it", async () => {
     renderPanel();
 
-    expect(screen.getByLabelText("Plan stop")).toHaveValue(1.76);
+    await vi.waitFor(() => expect(screen.getByLabelText("Plan stop")).toHaveValue(1.76));
     expect(screen.getByLabelText("Plan target")).toHaveValue(2.08);
+    expect(screen.getByRole("combobox", { name: "Setup" })).toHaveValue("7");
+  });
+
+  it("asks for the setups that fit the first fill", async () => {
+    const { rerender, props } = renderPanel();
+    rerender(<TradePanel {...props} clickedBar={{ bar: BAR, id: 1 }} />);
+
+    await vi.waitFor(() =>
+      expect(api.fetchDaySetups).toHaveBeenLastCalledWith("HOST", "2026-11-09", "2026-11-09T09:45:00-05:00", "long", 1.84),
+    );
+    expect(await screen.findByRole("group", { name: "Best matches for your 9:45 AM buy at 1.84" })).toBeInTheDocument();
+  });
+
+  it("keeps a setup the user chose when the matches change", async () => {
+    const { rerender, props } = renderPanel();
+    await vi.waitFor(() => expect(screen.getByRole("combobox", { name: "Setup" })).toHaveValue("7"));
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Setup" }), { target: { value: "9" } });
+    rerender(<TradePanel {...props} clickedBar={{ bar: BAR, id: 1 }} />);
+    await vi.waitFor(() => expect(api.fetchDaySetups.mock.calls.length).toBeGreaterThan(1));
+
+    expect(screen.getByRole("combobox", { name: "Setup" })).toHaveValue("9");
   });
 
   it("adds a buy and then a sell from clicked candles", () => {
@@ -104,12 +132,15 @@ describe("TradePanel", () => {
     fireEvent.change(within(row).getByLabelText("Shares"), { target: { value: "500" } });
 
     expect(await screen.findByText("+$105.00")).toBeInTheDocument();
-    expect(api.previewTrade).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        fills: [{ side: "buy", time: "2026-11-09T09:45:00-05:00", price: 1.84, shares: 500 }],
-        plan_stop: 1.76,
-        setup_record_id: 7,
-      }),
+    // The matching setup arrives a moment after the fill, and the preview follows it.
+    await vi.waitFor(() =>
+      expect(api.previewTrade).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          fills: [{ side: "buy", time: "2026-11-09T09:45:00-05:00", price: 1.84, shares: 500 }],
+          plan_stop: 1.76,
+          setup_record_id: 7,
+        }),
+      ),
     );
   });
 
@@ -123,10 +154,10 @@ describe("TradePanel", () => {
     expect(await screen.findByText("The first fill must be a buy for a long trade.")).toBeInTheDocument();
   });
 
-  it("suggests a position size from the risk setting", () => {
+  it("suggests a position size from the risk setting", async () => {
     renderPanel({ settings: { risk_per_trade: 50, max_position: null, max_daily_loss: null } });
 
-    expect(screen.getByText("Size 625 sh ($1,150.00) to risk $50.00")).toBeInTheDocument();
+    expect(await screen.findByText("Size 625 sh ($1,150.00) to risk $50.00")).toBeInTheDocument();
   });
 
   it("saves a new trade", async () => {
@@ -134,6 +165,7 @@ describe("TradePanel", () => {
     rerender(<TradePanel {...props} clickedBar={{ bar: BAR, id: 1 }} />);
     fireEvent.change(within(fillRows()[0]).getByLabelText("Shares"), { target: { value: "500" } });
     fireEvent.click(await screen.findByRole("button", { name: "Chased" }));
+    await vi.waitFor(() => expect(screen.getByLabelText("Plan stop")).toHaveValue(1.76));
 
     fireEvent.click(screen.getByRole("button", { name: "Save trade" }));
 
@@ -164,5 +196,49 @@ describe("TradePanel", () => {
       { side: "buy", time: "2026-11-09T09:45:00-05:00", price: 1.84, shares: 500 },
       { side: "sell", time: "2026-11-09T10:05:00-05:00", price: 2.05, shares: 500 },
     ]);
+  });
+
+  it("starts a short trade when the setup picked on the Stock page is a short", async () => {
+    renderPanel({ preferredSetupId: 9, preferredDirection: "short" });
+
+    expect(screen.getByRole("combobox", { name: "Direction" })).toHaveValue("short");
+    await vi.waitFor(() => expect(api.fetchDaySetups).toHaveBeenCalled());
+    expect(api.fetchDaySetups.mock.calls[0][3]).toBe("short");
+  });
+
+  it("clears an auto-filled plan when no setup fits the fill any more", async () => {
+    const { rerender, props } = renderPanel();
+    await vi.waitFor(() => expect(screen.getByLabelText("Plan stop")).toHaveValue(1.76));
+    api.fetchDaySetups.mockResolvedValue({ matches: [], others: [] });
+
+    rerender(<TradePanel {...props} clickedBar={{ bar: BAR, id: 1 }} />);
+
+    await vi.waitFor(() => expect(screen.getByRole("combobox", { name: "Setup" })).toHaveValue(""));
+    expect(screen.getByLabelText("Plan stop")).toHaveValue(null);
+    expect(screen.getByLabelText("Plan target")).toHaveValue(null);
+  });
+
+  it("still shows a saved setup the matching list leaves out", async () => {
+    api.fetchDaySetups.mockResolvedValue({ matches: [SETUP], others: [] });
+    const existing: JournalEntry = {
+      id: 3, kind: "trade", ticker: "HOST", direction: "long", created_at: BAR.time, updated_at: BAR.time,
+      decided_at: BAR.time, setup: { ...SETUP, setup_record_id: 42, sliding_scale: null }, stock: NO_FACTS, plan_stop: 1.76,
+      plan_target: 2.08, fees: 0, reasons: [], mistakes: [], note: "", pass_price: null,
+      fills: [{ side: "buy", time: BAR.time, price: 1.84, shares: 500 }], figures: null, after_exit: null,
+      plan_flags: [], pass_score: null, after_pass: null, bar_warning: null,
+    };
+    renderPanel({ existing });
+
+    expect(await screen.findByRole("option", { name: "Bull flag 5m · entry 1.84 · saved setup · score 80" }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Setup" })).toHaveValue("42");
+  });
+
+  it("says when the setups couldn't be loaded", async () => {
+    api.fetchDaySetups.mockRejectedValue(new Error("Request failed (502)"));
+
+    renderPanel();
+
+    expect(await screen.findByText("Couldn't load setups: Request failed (502)")).toBeInTheDocument();
   });
 });

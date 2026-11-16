@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { stockTitle, useDocumentTitle } from "../pageTitle";
 import { Bar, BarsResponse, fetchBars } from "../api/bars";
-import { DaySetup, fetchDaySetups, fetchEntries, fetchOpenTrade, Fill, JournalEntry } from "../api/journal";
+import { fetchEntries, fetchOpenTrade, Fill, JournalEntry } from "../api/journal";
 import {
   fetchStockSetups,
   fetchStockVerdict,
@@ -16,7 +16,6 @@ import {
 } from "../api/setups";
 import { fetchJournalSettings, JournalSettings } from "../api/settings";
 import { fetchNews, fetchQuote, NewsItem, Quote, refreshQuote } from "../api/stocks";
-import { easternParts, easternToday } from "../easternTime";
 import { finvizQuoteUrl, formatDollars, formatPrice, MISSING_VALUE } from "../format";
 import { useJournalShortcuts } from "../journalShortcuts";
 import { suggestShares } from "../positionSize";
@@ -83,8 +82,8 @@ function setupLevels(setup: Setup | Warning): ChartLevel[] {
 
 type JournalPanel =
   | { kind: "none" }
-  | { kind: "trade"; existing: JournalEntry | null; setups: DaySetup[] }
-  | { kind: "pass"; setups: DaySetup[] };
+  | { kind: "trade"; existing: JournalEntry | null }
+  | { kind: "pass" };
 
 const NO_PANEL: JournalPanel = { kind: "none" };
 
@@ -96,13 +95,6 @@ function PositionSize({ setup, settings }: { setup: Setup; settings: JournalSett
       Size {shares} sh ({formatDollars(shares * setup.entry)}) to risk {formatDollars(settings.risk_per_trade)}
     </span>
   );
-}
-
-// The setup the panel starts on: the one picked in the side list, else the best scored that day.
-function defaultSetupId(setups: DaySetup[], selectedSetupId: number | null): number | null {
-  if (setups.some((setup) => setup.setup_record_id === selectedSetupId)) return selectedSetupId;
-  const best = [...setups].sort((left, right) => right.score - left.score)[0];
-  return best ? best.setup_record_id : null;
 }
 
 function TradePlanFigures({ setup }: { setup: Setup }) {
@@ -316,38 +308,24 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
     setJournalNotice(null);
     try {
       const openTrade = await fetchOpenTrade(ticker);
-      const moment = openTrade?.decided_at ?? new Date().toISOString();
-      const setups = await fetchDaySetups(ticker, easternParts(moment).date, moment);
       setClickedBar(null);
-      setPanel({ kind: "trade", existing: openTrade, setups });
+      setPanel({ kind: "trade", existing: openTrade });
     } catch (openError) {
       setError(errorMessage(openError));
     }
   }, [ticker]);
 
-  const openPassPanel = useCallback(async () => {
+  const openPassPanel = useCallback(() => {
     if (!ticker) return;
     setJournalNotice(null);
-    try {
-      const setups = await fetchDaySetups(ticker, easternToday(), new Date().toISOString());
-      setPanel({ kind: "pass", setups });
-    } catch (openError) {
-      setError(errorMessage(openError));
-    }
+    setPanel({ kind: "pass" });
   }, [ticker]);
 
   const closePanel = useCallback(() => setPanel(NO_PANEL), []);
 
-  async function startNewTrade() {
-    if (!ticker) return;
+  function startNewTrade() {
     setClickedBar(null);
-    try {
-      // The open trade's setups were for its own day; a new trade starts from today's.
-      const setups = await fetchDaySetups(ticker, easternToday(), new Date().toISOString());
-      setPanel({ kind: "trade", existing: null, setups });
-    } catch (startError) {
-      setError(errorMessage(startError));
-    }
+    setPanel({ kind: "trade", existing: null });
   }
 
   useJournalShortcuts({ onLogTrade: openTradePanel, onPass: openPassPanel, onClose: closePanel }, Boolean(ticker));
@@ -475,8 +453,8 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
                 <TradePanel
                   key={panel.existing?.id ?? "new"}
                   ticker={ticker}
-                  setups={panel.setups}
-                  defaultSetupId={defaultSetupId(panel.setups, selectedSetupId)}
+                  preferredSetupId={selectedSetupId}
+                  preferredDirection={selectedSetup ? selectedSetup.direction : null}
                   existing={panel.existing}
                   settings={journalSettings}
                   clickedBar={clickedBar}
@@ -488,8 +466,7 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
             {panel.kind === "pass" && (
               <PassPanel
                 ticker={ticker}
-                setups={panel.setups}
-                defaultSetupId={defaultSetupId(panel.setups, selectedSetupId)}
+                preferredSetupId={selectedSetupId}
                 onSaved={handleJournalSaved}
                 onClose={closePanel}
               />
