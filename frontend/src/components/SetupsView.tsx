@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
+import { setupsTitle, useDocumentTitle } from "../pageTitle";
 import {
   fetchSetups,
   fetchScanStatus,
@@ -60,6 +61,7 @@ export function SetupsView({ onOpenStock }: SetupsViewProps) {
   const scanProgress = useScanProgress(() => {
     reload().catch((loadError) => setError(errorMessage(loadError)));
   });
+  useDocumentTitle(setupsTitle(response ? response.setups.length : null, scanProgress));
 
   useEffect(() => {
     reload().catch((loadError) => setError(errorMessage(loadError)));

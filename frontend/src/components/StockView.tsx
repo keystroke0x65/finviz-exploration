@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { stockTitle, useDocumentTitle } from "../pageTitle";
 import { Bar, BarsResponse, fetchBars } from "../api/bars";
 import { DaySetup, fetchDaySetups, fetchEntries, fetchOpenTrade, Fill, JournalEntry } from "../api/journal";
 import {
@@ -154,6 +155,7 @@ export function StockView({ ticker, onTickerChange }: StockViewProps) {
   const [bars, setBars] = useState<BarsResponse | null>(null);
   const [setups, setSetups] = useState<SetupsResponse | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
+  useDocumentTitle(stockTitle(ticker, quote));
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [selectedSetupId, setSelectedSetupId] = useState<number | null>(null);
   const [isScanning, setIsScanning] = useState(false);

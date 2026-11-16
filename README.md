@@ -10,6 +10,10 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
 
 ## What it does
 
+- Each browser tab's title says what it shows, so Chrome's tab strip and hover card tell
+  tabs apart: "HOST 2.15 +12.30% · Finviz" on the Stock tab (updates with each quote),
+  "Setups · 12" (or "Scanning 12/40" during a scan), "Screens · <screen>", "Watchlist · 63
+  stocks", "Journal · +$25.50 this week", "Track record". The app has its own tab icon.
 - The header shows the US market session (pre-market, regular hours, after-hours) on a
   4 AM to 8 PM Eastern strip with a marker for now. Exchange holidays aren't shown.
 - **Setups** tab (home): setups found in the latest scans, best score first. Each shows

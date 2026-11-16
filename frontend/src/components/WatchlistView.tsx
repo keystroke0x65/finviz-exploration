@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { useDocumentTitle, watchlistTitle } from "../pageTitle";
 import {
   addToWatchlist,
   FeederResult,
@@ -37,6 +38,7 @@ interface WatchlistViewProps {
 
 export function WatchlistView({ onOpenStock }: WatchlistViewProps) {
   const [entries, setEntries] = useState<WatchlistEntry[]>([]);
+  useDocumentTitle(watchlistTitle(entries.length));
   const [tickerInput, setTickerInput] = useState("");
   const [expandedTicker, setExpandedTicker] = useState<string | null>(null);
   const [feederStatus, setFeederStatus] = useState<FeederStatus | null>(null);
