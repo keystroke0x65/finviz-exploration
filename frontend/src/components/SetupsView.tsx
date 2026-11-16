@@ -22,6 +22,8 @@ import { VerdictBadge } from "./VerdictBadge";
 import { SlidingScaleBadge } from "./SlidingScaleBadge";
 import { StockLink } from "./StockLink";
 import { DailyLossBanner } from "./DailyLossBanner";
+import { ScanProgressBar } from "./ScanProgressBar";
+import { useScanProgress } from "../useScanProgress";
 
 interface SetupsViewProps {
   onOpenStock: (ticker: string) => void;
@@ -55,6 +57,9 @@ export function SetupsView({ onOpenStock }: SetupsViewProps) {
     setScanStatus(status);
   }, []);
   const scanNote = scanStatus ? describeScanStatus(scanStatus, new Date()) : null;
+  const scanProgress = useScanProgress(() => {
+    reload().catch((loadError) => setError(errorMessage(loadError)));
+  });
 
   useEffect(() => {
     reload().catch((loadError) => setError(errorMessage(loadError)));
@@ -102,12 +107,13 @@ export function SetupsView({ onOpenStock }: SetupsViewProps) {
             />
             Show short setups
           </label>
-          <button type="button" className="button-primary" onClick={handleScan} disabled={isScanning}>
-            {isScanning ? "Scanning… (up to 2 min)" : "Scan watchlist"}
+          <button type="button" className="button-primary" onClick={handleScan} disabled={isScanning || scanProgress != null}>
+            {isScanning ? "Scanning…" : "Scan watchlist"}
           </button>
         </div>
       </div>
 
+      {scanProgress && <ScanProgressBar progress={scanProgress} />}
       {scanNote?.isProblem && (
         <p role="alert" className="alert">
           {scanNote.text}

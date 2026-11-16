@@ -26,6 +26,7 @@ from app.scanning.market_gainers import (
     read_market_gainers,
     save_market_gainers,
 )
+from app.scanning.progress import ProgressTracker
 from app.scanning.snapshots import save_snapshots
 from app.scanning.verdicts import save_verdict
 from app.setups.resolver import has_deadline_passed, resolve_outcome
@@ -336,6 +337,7 @@ def run_scan(
     deps: ScanDeps,
     tickers: list[str] | None = None,
     should_refresh_intraday: bool = False,
+    progress: ProgressTracker | None = None,
 ) -> ScanResult:
     """Scan explicit tickers, or (tickers=None) the active part of the watchlist.
 
@@ -343,6 +345,8 @@ def run_scan(
     still fresh, for a scan someone asked for to see the latest move.
     """
     failed: list[tuple[str, str]] = []
+    if progress is not None:
+        progress.set_phase("preparing")
     if tickers is None:
         watchlist = [entry.ticker for entry in list_entries(conn)]
         snapshots, snapshot_error = _fetch_snapshots(deps, watchlist)
@@ -361,7 +365,12 @@ def run_scan(
     scanned: list[str] = []
     setups_found = 0
     was_stopped_by_finviz = False
+    if progress is not None:
+        progress.set_total(len(tickers))
+        progress.set_phase("scanning")
     for index, ticker in enumerate(tickers):
+        if progress is not None:
+            progress.begin_ticker(ticker, index)
         try:
             setups_found += scan_ticker(
                 conn, ticker, snapshots.get(ticker), now, deps,
@@ -393,6 +402,8 @@ def run_scan(
             failed.append((ticker, f"internal error ({type(exc).__name__}); see backend logs"))
             continue
         scanned.append(ticker)
+    if progress is not None:
+        progress.set_phase("finishing")
     if not was_stopped_by_finviz:
         _resolve_inactive_tickers(conn, set(tickers), now, deps)
     return ScanResult(scanned, failed, setups_found, now)

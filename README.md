@@ -31,6 +31,11 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
   `docs/superpowers/specs/2026-10-28-sykes-sliding-scale-design.md`. Each full scan also
   counts US stocks up 30%+ on Finviz for the market factor (one extra request). Setups
   recorded before the grade existed show "—" until they're scanned again.
+  While a watchlist scan runs (from "Scan watchlist" or the automatic one every 15 minutes),
+  a progress bar above that line shows how far it has got ("12 of 40 stocks · HOST · started
+  9:41 AM", or "Preparing…" / "Finishing…" before and after the stocks); when it ends, the
+  setups reload by themselves. The page checks `GET /api/scans/progress` every 2 seconds.
+  One-stock scans from the Stock tab don't show it.
   Above the table a grey line says when the last full scan ran ("Last scan 3:45 PM · 40
   stocks"); it turns into a red warning if that scan failed, or if no scan has finished for
   30 minutes during scan hours (4 AM-8 PM ET), since the setups shown are then out of date.

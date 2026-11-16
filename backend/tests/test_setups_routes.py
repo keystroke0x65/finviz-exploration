@@ -1,3 +1,4 @@
+import pytest
 from datetime import date, datetime
 from unittest.mock import patch
 
@@ -267,3 +268,91 @@ def test_setups_include_their_sliding_scale_grade(api_client, db_conn):
         "factors": [{"name": "Risk/reward", "grade": "good", "detail": "3.0R (wants 3R+)"}],
     }
     assert setups["WORX"]["sliding_scale"] is None
+
+
+IDLE_PROGRESS = {
+    "running": False, "kind": None, "phase": None, "done": None, "total": None, "ticker": None, "started_at": None,
+}
+
+
+def test_scan_progress_is_idle_without_a_scan(api_client):
+    assert api_client.get("/api/scans/progress").json() == IDLE_PROGRESS
+
+
+def test_scan_progress_shows_a_running_watchlist_scan(api_client):
+    seen = []
+
+    def fake_scan(conn, now, deps, tickers=None, should_refresh_intraday=False, progress=None):
+        progress.set_total(40)
+        progress.set_phase("scanning")
+        progress.begin_ticker("HOST", 12)
+        seen.append(api_client.get("/api/scans/progress").json())
+        return ScanResult(["HOST"], [], 0, NOW)
+
+    with patch("app.routes.setups.run_scan", side_effect=fake_scan):
+        api_client.post("/api/scans", json={})
+
+    assert {key: seen[0][key] for key in ("running", "kind", "phase", "done", "total", "ticker")} == {
+        "running": True, "kind": "manual", "phase": "scanning", "done": 12, "total": 40, "ticker": "HOST",
+    }
+    assert api_client.get("/api/scans/progress").json() == IDLE_PROGRESS
+
+
+def test_scan_progress_clears_after_a_crashed_scan(api_client):
+    with patch("app.routes.setups.run_scan", side_effect=RuntimeError("boom")):
+        with pytest.raises(RuntimeError):
+            api_client.post("/api/scans", json={})
+
+    assert api_client.get("/api/scans/progress").json() == IDLE_PROGRESS
+
+
+def test_one_stock_scan_does_not_show_progress(api_client):
+    seen = []
+
+    def fake_scan(conn, now, deps, tickers=None, should_refresh_intraday=False, progress=None):
+        seen.append(api_client.get("/api/scans/progress").json()["running"])
+        return ScanResult(["HOST"], [], 0, NOW)
+
+    with patch("app.routes.setups.run_scan", side_effect=fake_scan):
+        api_client.post("/api/scans", json={"ticker": "HOST"})
+
+    assert seen == [False]
+
+
+def test_watchlist_scan_is_saved_before_its_progress_clears(api_client, db_conn, monkeypatch):
+    from app.scanning.progress import ProgressTracker
+    from app.scanning.run_status import read_scan_status
+
+    saved_when_cleared = []
+
+    class RecordingTracker(ProgressTracker):
+        def finish(self) -> None:
+            saved_when_cleared.append(read_scan_status(db_conn).latest is not None)
+            super().finish()
+
+    monkeypatch.setattr("app.routes.setups.scan_progress", RecordingTracker())
+    with patch("app.routes.setups.run_scan", return_value=ScanResult(["HOST"], [], 0, NOW)):
+        api_client.post("/api/scans", json={})
+
+    # Otherwise the page could reload on the cleared bar and still show the previous scan.
+    assert saved_when_cleared == [True]
+
+
+def test_a_rejected_scan_leaves_the_running_scans_progress_alone(api_client):
+    from app.scanning.lock import scan_lock
+    from app.scanning.progress import scan_progress
+
+    scan_lock.acquire()
+    try:
+        scan_progress.start("automatic", NOW)
+        scan_progress.set_total(40)
+        scan_progress.set_phase("scanning")
+        scan_progress.begin_ticker("HOST", 5)
+
+        assert api_client.post("/api/scans", json={}).status_code == 409
+        body = api_client.get("/api/scans/progress").json()
+    finally:
+        scan_progress.finish()
+        scan_lock.release()
+
+    assert (body["running"], body["kind"], body["done"]) == (True, "automatic", 5)
