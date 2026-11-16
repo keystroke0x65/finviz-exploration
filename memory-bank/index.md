@@ -9,7 +9,7 @@ or run `memory.py find <keywords>` to pull just the relevant root → delta chai
 |---|---|---|---|---|
 | context/project-brief.md | 4 (4/0/0) | Purpose, Users, Scope, Non-goals, Constraints, User background | audience, product, roadmap, trading | 2026-10-21 |
 | context/architecture.md | 0 (0/0/0) | Components, Data flow, Integrations, Invariants |  |  |
-| context/tech-stack.md | 6 (6/0/0) | Runtime and frameworks, Services and infrastructure, Dev environment, Commands, Storage, External APIs | docker, sqlite, api, python, fastapi | 2026-10-21 |
+| context/tech-stack.md | 6 (6/0/0) | Runtime and frameworks, Services and infrastructure, Dev environment, Commands, Storage, External APIs | docker, sqlite, api, python, fastapi | 2026-11-16 |
 | context/conventions.md | 1 (1/0/0) | Code style, Patterns, Testing, Workflow | ui, design, css | 2026-10-21 |
 | context/decisions.md | 6 (6/0/0) | Decisions, Architecture, Finviz client design | phase2, patterns, architecture, roadmap, verdict | 2026-11-10 |
 | progress.md | 5 (5/0/0) | Now, Next, Done, Known issues | status, phase2, phase1, schwab, options | 2026-10-28 |
@@ -19,4 +19,4 @@ or run `memory.py find <keywords>` to pull just the relevant root → delta chai
 
 Also: `active-context.md` (current focus, freeform), `history/archive.md` (superseded/deleted, not loaded by default), `ops-log.jsonl` (audit trail).
 
-Batches applied: 19. Bank created: 2026-09-17.
+Batches applied: 20. Bank created: 2026-09-17.
