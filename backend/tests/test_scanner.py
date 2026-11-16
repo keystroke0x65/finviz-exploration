@@ -299,3 +299,23 @@ def test_market_count_failure_does_not_stop_the_scan(db_conn):
     assert result.scanned == ["HOST"]
     grade = list_current_setups(db_conn, "HOST")[0].sliding_scale
     assert next(factor for factor in grade.factors if factor.name == "Market").grade == "no_data"
+
+
+def test_run_scan_reports_each_stock_to_progress(db_conn):
+    from app.scanning.progress import ProgressTracker
+
+    progress = ProgressTracker()
+    progress.start("manual", NOW)
+    seen = []
+    fetch_bars = bars_for(HOD_BREAK_CLOSES)
+
+    def watching_fetch(ticker, interval):
+        if interval == "daily":
+            current = progress.snapshot()
+            seen.append((current.phase, current.ticker, current.done, current.total))
+        return fetch_bars(ticker, interval)
+
+    run_scan(db_conn, NOW, deps(fetch_bars=watching_fetch), tickers=["AAA", "BBB"], progress=progress)
+
+    assert seen == [("scanning", "AAA", 0, 2), ("scanning", "BBB", 1, 2)]
+    assert (progress.snapshot().phase, progress.snapshot().done) == ("finishing", 2)
