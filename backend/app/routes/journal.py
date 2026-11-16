@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 from fastapi.responses import PlainTextResponse
+from pydantic import AwareDatetime
 
 from app.cache import get_cached_quote, set_cached_quote
 from app.errors import FinvizAuthError, FinvizRateLimitError, FinvizUnavailableError, TickerNotFoundError
@@ -16,6 +17,7 @@ from app.journal.reasons import MISTAKES, PASS_REASON_GROUPS
 from app.journal.schemas import (
     DailyLossOut,
     DaySetupOut,
+    DaySetupsOut,
     EntryBarsOut,
     EntryIn,
     JournalEntryOut,
@@ -23,8 +25,10 @@ from app.journal.schemas import (
     PassIn,
     PreviewOut,
     ReasonCatalogOut,
+    MAX_PRICE,
     TradeIn,
 )
+from app.journal.setup_matching import match_setups
 from app.journal.service import (
     EntryDraft,
     SetupNotFoundError,
@@ -38,7 +42,7 @@ from app.journal.store import JournalEntry, create_entry, delete_entry, find_ope
 from app.journal.summary import Period, daily_realised_pnl, period_start, summarise
 from app.routes.dependencies import get_db_connection
 from app.routes.stocks import TICKER_PATTERN, TickerPath
-from app.setups.store import list_setups_for_day, setup_values_at
+from app.setups.store import SetupRecord, list_setups_for_day, setup_values_at
 from app.setups.track_record import stats_for
 from app.user_settings import get_journal_settings
 
@@ -184,19 +188,33 @@ def get_entry_bars(entry_id: int, conn: DbConnection, interval: Literal["1m", "5
     )
 
 
-@router.get("/setups/{ticker}", response_model=list[DaySetupOut])
-def get_day_setups(ticker: TickerPath, day: date, at: datetime, conn: DbConnection) -> list[DaySetupOut]:
-    """The stock's setups that day, each as it looked at `at` (for the setup picker)."""
-    rows = []
-    for record in list_setups_for_day(conn, ticker.upper(), day):
-        values = setup_values_at(conn, record.id, at)
-        rows.append(DaySetupOut(
-            setup_record_id=record.id, pattern=record.pattern, timeframe=record.timeframe, direction=record.direction,
-            entry=record.entry, stop=record.stop, target=record.capped_target, reward_risk=record.available_reward_risk,
-            score=values.score, state=values.state, verdict=values.verdict,
-            sliding_scale=values.sliding_scale and asdict(values.sliding_scale), outcome=record.outcome,
-        ))
-    return rows
+def _to_day_setup(conn: sqlite3.Connection, record: SetupRecord, at: datetime) -> DaySetupOut:
+    values = setup_values_at(conn, record.id, at)
+    return DaySetupOut(
+        setup_record_id=record.id, detected_at=record.detected_at, triggered_at=record.triggered_at,
+        pattern=record.pattern, timeframe=record.timeframe, direction=record.direction, entry=record.entry,
+        stop=record.stop, target=record.capped_target, reward_risk=record.available_reward_risk, score=values.score,
+        state=values.state, verdict=values.verdict, sliding_scale=values.sliding_scale and asdict(values.sliding_scale),
+        outcome=record.outcome,
+    )
+
+
+@router.get("/setups/{ticker}", response_model=DaySetupsOut)
+def get_day_setups(
+    ticker: TickerPath,
+    day: date,
+    at: AwareDatetime,
+    conn: DbConnection,
+    direction: Literal["long", "short"] | None = None,
+    price: Annotated[float | None, Query(gt=0, le=MAX_PRICE)] = None,
+) -> DaySetupsOut:
+    """The stock's setups that day for the picker, each as it looked at `at`: those live at `at`
+    in the trade's direction (best fit to `price` first), then the rest."""
+    matches, others = match_setups(list_setups_for_day(conn, ticker.upper(), day), at, direction, price)
+    return DaySetupsOut(
+        matches=[_to_day_setup(conn, record, at) for record in matches],
+        others=[_to_day_setup(conn, record, at) for record in others],
+    )
 
 
 @router.get("/open-trade/{ticker}", response_model=JournalEntryOut | None)

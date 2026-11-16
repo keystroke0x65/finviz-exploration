@@ -192,10 +192,32 @@ def test_five_minute_bars_are_built_from_saved_minutes(api_client):
 def test_day_setups_show_values_at_a_time(api_client, db_conn):
     record_setup(db_conn)
 
-    rows = api_client.get(f"/api/journal/setups/HOST?day=2026-11-02&at={iso(at(9, 45)).replace('+', '%2B')}").json()
+    body = api_client.get(f"/api/journal/setups/HOST?day=2026-11-02&at={iso(at(9, 45)).replace('+', '%2B')}").json()
 
-    assert len(rows) == 1
-    assert (rows[0]["pattern"], rows[0]["score"], rows[0]["state"]) == ("bull_flag", 70.0, "forming")
+    assert len(body["matches"]) == 1
+    row = body["matches"][0]
+    assert (row["pattern"], row["score"], row["state"]) == ("bull_flag", 70.0, "forming")
+    assert row["detected_at"] is not None
+
+
+def test_day_setups_match_the_trade(api_client, db_conn):
+    record_setup(db_conn)
+    moment = iso(at(9, 45)).replace("+", "%2B")
+
+    shorts = api_client.get(f"/api/journal/setups/HOST?day=2026-11-02&at={moment}&direction=short&price=2.0").json()
+    before_detection = iso(datetime(2026, 10, 20, 9, 0, tzinfo=EASTERN)).replace("+", "%2B")
+    before = api_client.get(f"/api/journal/setups/HOST?day=2026-11-02&at={before_detection}").json()
+
+    assert (len(shorts["matches"]), len(shorts["others"])) == (0, 1)
+    # The sample setup was first detected at 10:00 on Oct 20: not yet there for a 9:00 entry.
+    assert (len(before["matches"]), len(before["others"])) == (0, 1)
+
+
+def test_day_setups_reject_a_bad_direction_or_price(api_client):
+    moment = iso(at(9, 45)).replace("+", "%2B")
+
+    assert api_client.get(f"/api/journal/setups/HOST?day=2026-11-02&at={moment}&direction=up").status_code == 422
+    assert api_client.get(f"/api/journal/setups/HOST?day=2026-11-02&at={moment}&price=-1").status_code == 422
 
 
 def test_open_trade_lookup(api_client):

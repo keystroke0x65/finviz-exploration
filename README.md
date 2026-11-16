@@ -201,8 +201,9 @@ stored in the same SQLite file (`journal_entries`, `journal_fills`, `journal_bar
   reason" averages them per reason, and the CSV export includes them.
 - API (`/api/journal`): `GET /reasons`; `GET|POST /entries`; `GET|PUT|DELETE
   /entries/{id}`; `GET /entries/{id}/bars?interval=1m|5m`; `POST /preview` (figures for
-  fills being typed); `GET /setups/{ticker}?day=&at=` (the day's setups as they looked at
-  a moment); `GET /open-trade/{ticker}`; `GET /summary?period=today|week|month|all`;
+  fills being typed); `GET /setups/{ticker}?day=&at=&direction=&price=` (the day's setups as they
+  looked at a moment, split into `matches`, those live then in the trade's direction, closest
+  entry to `price` first, and `others`); `GET /open-trade/{ticker}`; `GET /summary?period=today|week|month|all`;
   `GET /daily-loss`; `GET /export/entries.csv` and `/export/fills.csv` (cells that would
   run as spreadsheet formulas are prefixed with `'`). Settings: `GET|PUT
   /api/settings/journal` (risk per trade, max position, max daily loss, in dollars).

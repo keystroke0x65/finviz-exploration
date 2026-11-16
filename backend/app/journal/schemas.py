@@ -233,6 +233,9 @@ class EntryBarsOut(BaseModel):
 
 class DaySetupOut(BaseModel):
     setup_record_id: int
+    detected_at: datetime
+    # When price last reached the entry; None while forming.
+    triggered_at: datetime | None
     pattern: str
     timeframe: str
     direction: str
@@ -245,6 +248,13 @@ class DaySetupOut(BaseModel):
     verdict: str | None
     sliding_scale: SlidingScaleOut | None
     outcome: str
+
+
+class DaySetupsOut(BaseModel):
+    """The stock's setups for the picker: those fitting the trade (best first), then the rest."""
+
+    matches: list[DaySetupOut]
+    others: list[DaySetupOut]
 
 
 class BucketOut(BaseModel):
