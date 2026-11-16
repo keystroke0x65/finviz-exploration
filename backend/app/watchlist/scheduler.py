@@ -8,6 +8,7 @@ from app.bars.loader import FetchBars
 from app.finviz_client import get_bars, run_screen
 from app.journal.bars import complete_pending_days
 from app.scanning.lock import try_scan_lock
+from app.scanning.progress import scan_progress
 from app.scanning.run_status import CompletedScan, CrashedScan, save_scan_attempt
 from app.scanning.scanner import ScanDeps, ScanResult, finviz_scan_deps, run_scan
 from app.watchlist.run_status import get_last_feeder_run
@@ -61,10 +62,11 @@ def run_scheduled_scan(db_path: str, now: datetime, deps: ScanDeps) -> ScanResul
         if not is_acquired:
             logger.info("scan skipped: another scan is running")
             return None
+        scan_progress.start("automatic", now)
         try:
             conn = connect(db_path)
             try:
-                result = run_scan(conn, now, deps)
+                result = run_scan(conn, now, deps, progress=scan_progress)
             finally:
                 conn.close()
         except Exception as error:
@@ -73,6 +75,9 @@ def run_scheduled_scan(db_path: str, now: datetime, deps: ScanDeps) -> ScanResul
             logger.exception("scan failed")
             _record_scan_attempt(db_path, CrashedScan(finished_at=now, error_type=type(error).__name__))
             return None
+        finally:
+            # Whatever happened, the progress bar must not stay on a scan that has stopped.
+            scan_progress.finish()
         _record_scan_attempt(db_path, CompletedScan(finished_at=now, scanned=len(result.scanned), failed=result.failed))
 
     logger.info("scan: %d tickers scanned, %d setups", len(result.scanned), result.setups_found)

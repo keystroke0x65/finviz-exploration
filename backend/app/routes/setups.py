@@ -9,6 +9,7 @@ from app.routes.dependencies import get_db_connection
 from app.routes.stocks import TickerPath
 from app.config import get_settings
 from app.scanning.lock import try_scan_lock
+from app.scanning.progress import scan_progress
 from app.scanning.run_status import (
     CompletedScan,
     CrashedScan,
@@ -26,6 +27,7 @@ from app.schemas import (
     CrashedScanOut,
     ScanIn,
     ScanOut,
+    ScanProgressOut,
     ScanStatusOut,
     SetupOut,
     SetupsOut,
@@ -53,16 +55,23 @@ def post_scan(body: ScanIn, conn: DbConnection) -> ScanOut:
         if not is_acquired:
             raise HTTPException(status_code=409, detail="A scan is already running; try again when it finishes")
         now = datetime.now(timezone.utc)
+        # Only watchlist scans get a progress bar; one stock takes seconds.
+        if is_full_scan:
+            scan_progress.start("manual", now)
         try:
             # A one-stock scan is someone wanting the latest move, so it skips the
             # bar cache; full scans keep it to stay within Finviz's rate limit.
             result = run_scan(
-                conn, now, finviz_scan_deps(), tickers=tickers, should_refresh_intraday=not is_full_scan
+                conn, now, finviz_scan_deps(), tickers=tickers, should_refresh_intraday=not is_full_scan,
+                progress=scan_progress if is_full_scan else None,
             )
         except Exception as error:
             if is_full_scan:
                 save_scan_attempt(conn, CrashedScan(finished_at=now, error_type=type(error).__name__))
             raise
+        finally:
+            if is_full_scan:
+                scan_progress.finish()
     if is_full_scan:
         save_scan_attempt(
             conn, CompletedScan(finished_at=result.scanned_at, scanned=len(result.scanned), failed=result.failed)
@@ -85,6 +94,14 @@ def _to_scan_attempt_out(attempt: ScanAttempt | None) -> CompletedScanOut | Cras
         scanned=attempt.scanned,
         failed=[{"ticker": ticker, "reason": reason} for ticker, reason in attempt.failed],
     )
+
+
+@router.get("/scans/progress", response_model=ScanProgressOut)
+def get_scan_progress() -> ScanProgressOut:
+    progress = scan_progress.snapshot()
+    if progress is None:
+        return ScanProgressOut(running=False)
+    return ScanProgressOut(running=True, **asdict(progress))
 
 
 @router.get("/scans/status", response_model=ScanStatusOut)

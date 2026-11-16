@@ -388,3 +388,15 @@ class NewsItemOut(BaseModel):
 
 class NewsOut(BaseModel):
     items: list[NewsItemOut]
+
+
+class ScanProgressOut(BaseModel):
+    """The running watchlist scan; every field but running is null when none is running."""
+
+    running: bool
+    kind: Literal["manual", "automatic"] | None = None
+    phase: Literal["preparing", "scanning", "finishing"] | None = None
+    done: int | None = None
+    total: int | None = None
+    ticker: str | None = None
+    started_at: datetime | None = None

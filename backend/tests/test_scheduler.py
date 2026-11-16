@@ -305,3 +305,41 @@ def test_bar_saving_logs_and_survives_errors(tmp_path, caplog):
         assert run_scheduled_bar_saving(_db_with_open_trade(tmp_path), SATURDAY_10AM_ET, broken) == 0
 
     assert "journal bar saving failed" in caplog.text
+
+
+def test_scheduled_scan_shows_as_an_automatic_scan_and_clears_after(tmp_path, monkeypatch):
+    from app.scanning.progress import scan_progress
+    from app.scanning.scanner import ScanDeps
+    from app.watchlist import scheduler
+
+    seen = []
+
+    def fake_scan(conn, now, deps, tickers=None, should_refresh_intraday=False, progress=None):
+        seen.append(progress.snapshot().kind)
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(scheduler, "run_scan", fake_scan)
+    deps = ScanDeps(fetch_bars=lambda *args: [], fetch_snapshots=lambda tickers: [])
+
+    assert scheduler.run_scheduled_scan(_seeded_db_path(tmp_path), TUESDAY_10AM_ET, deps) is None
+
+    assert seen == ["automatic"]
+    assert scan_progress.snapshot() is None
+
+
+def test_scheduled_scan_clears_progress_when_the_database_cannot_open(tmp_path, monkeypatch):
+    from app.scanning.progress import scan_progress
+    from app.scanning.scanner import ScanDeps
+    from app.watchlist import scheduler
+
+    db_path = _seeded_db_path(tmp_path)
+
+    def broken_connect(path):
+        raise OSError("disk unavailable")
+
+    monkeypatch.setattr(scheduler, "connect", broken_connect)
+    monkeypatch.setattr(scheduler, "_record_scan_attempt", lambda *args: None)
+    deps = ScanDeps(fetch_bars=lambda *args: [], fetch_snapshots=lambda tickers: [])
+
+    assert scheduler.run_scheduled_scan(db_path, TUESDAY_10AM_ET, deps) is None
+    assert scan_progress.snapshot() is None
