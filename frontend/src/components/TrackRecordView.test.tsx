@@ -28,7 +28,7 @@ describe("TrackRecordView", () => {
     render(<TrackRecordView />);
 
     const bullFlag = await screen.findByRole("row", { name: /Bull flag/ });
-    expect(document.title).toBe("Track record · Finviz");
+    await vi.waitFor(() => expect(document.title).toBe("Track record · Finviz"));
     expect(within(bullFlag).getByText("42")).toBeInTheDocument();
     expect(within(bullFlag).getByText("48%")).toBeInTheDocument();
     expect(within(bullFlag).getByText("+0.31R")).toBeInTheDocument();
