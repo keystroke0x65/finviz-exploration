@@ -109,7 +109,7 @@ def test_get_snapshots_batches_tickers():
             body=SNAPSHOT_HEADER + f"{batch[0]},Co,USA,1,1,1,2.5,3.0,5%,100,3.1,1%,,,\n",
             match=[
                 matchers.query_param_matcher(
-                    {"v": "152", "c": SCREEN_COLUMN_IDS, "t": ",".join(batch), "auth": TOKEN}
+                    {"type": "stocks", "v": "152", "c": SCREEN_COLUMN_IDS, "t": ",".join(batch), "auth": TOKEN}
                 )
             ],
         )

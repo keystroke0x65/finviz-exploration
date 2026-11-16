@@ -6,6 +6,7 @@ from app.screens.finviz_url import (
     InvalidScreenerUrlError,
     ScreenCriteria,
     build_finviz_screener_url,
+    find_ignored_params,
     parse_finviz_screener_url,
 )
 
@@ -99,3 +100,15 @@ def test_build_url_omits_missing_signal_and_order():
     url = build_finviz_screener_url(ScreenCriteria(["geo_usa"], None, None))
 
     assert url == "https://elite.finviz.com/screener.ashx?v=111&f=geo_usa"
+
+
+def test_parse_accepts_a_stock_screener_url_from_the_new_screener():
+    criteria = parse_finviz_screener_url("https://finviz.com/screener.ashx?type=stocks&v=111&f=geo_usa")
+
+    assert criteria.filters == ["geo_usa"]
+    assert find_ignored_params("https://finviz.com/screener.ashx?type=stocks&v=111&f=geo_usa") == []
+
+
+def test_parse_rejects_an_etf_screener_url():
+    with pytest.raises(InvalidScreenerUrlError, match="ETF screens aren't supported"):
+        parse_finviz_screener_url("https://finviz.com/screener.ashx?type=etf&f=geo_usa")

@@ -60,8 +60,9 @@ and [the original roadmap](docs/superpowers/specs/2026-09-17-finviz-dashboard-ph
   the last 100 items per stock, `GET /api/stocks/{ticker}/news`), cached for 10 minutes;
   "Scan this stock" refreshes it. The Log trade and Pass panels open between the chart and
   the news, so the chart stays in view while logging.
-- **Screens** tab: saved Finviz screens. Paste a Finviz screener URL (build it on
-  finviz.com, copy the address bar) or use the form for country, price, float, market cap,
+- **Screens** tab: saved Finviz screens. Paste a Finviz stock screener URL (build it on
+  finviz.com, copy the address bar; ETF screener URLs, `type=etf`, are refused because the app
+  only screens stocks, and every export asks Finviz for `type=stocks`) or use the form for country, price, float, market cap,
   volume and relative volume. Running a screen shows price, change, after-hours change,
   volume, relative volume, float, market cap and the latest headline (with the date and time it came out, Eastern; older years show the year), then the
   stock's best setup from the latest scan (its score and pattern, and its Sykes grade with

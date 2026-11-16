@@ -83,6 +83,7 @@ def test_run_screen_sends_codes_and_columns():
         match=[
             matchers.query_param_matcher(
                 {
+                    "type": "stocks",
                     "v": "152",
                     "c": SCREEN_COLUMN_IDS,
                     "f": "geo_usa,sh_price_u20",
@@ -108,7 +109,7 @@ def test_run_screen_omits_signal_and_order_when_none():
         status=200,
         match=[
             matchers.query_param_matcher(
-                {"v": "152", "c": SCREEN_COLUMN_IDS, "f": "geo_usa", "auth": TOKEN}
+                {"type": "stocks", "v": "152", "c": SCREEN_COLUMN_IDS, "f": "geo_usa", "auth": TOKEN}
             )
         ],
     )
@@ -132,7 +133,7 @@ def _count_csv(row_count: int) -> str:
 
 
 def _add_count_response(filters: str | None, signal: str | None, row_count: int) -> None:
-    params = {"v": "152", "c": "1", "auth": TOKEN}
+    params = {"type": "stocks", "v": "152", "c": "1", "auth": TOKEN}
     if filters is not None:
         params["f"] = filters
     if signal is not None:
@@ -291,3 +292,28 @@ def test_run_screen_reads_a_dash_news_time_as_no_news_without_a_warning(caplog):
 
     assert row.news_time is None
     assert "Unreadable Finviz news time" not in caplog.text
+
+
+QUOTE_CSV = "Ticker,Company,Price\nHOST,Host Corp,2.0\n"
+
+
+@pytest.mark.parametrize(
+    "call, body",
+    [
+        (lambda: finviz_client.get_quote("HOST"), QUOTE_CSV),
+        (lambda: finviz_client.run_screen(["geo_usa"], None, None), SCREEN_HEADER),
+        (lambda: finviz_client.get_snapshots(["HOST"]), SCREEN_HEADER),
+        (lambda: finviz_client.find_unrecognised_codes(["geo_usa"], None), SCREEN_HEADER),
+    ],
+)
+@responses.activate
+def test_every_screener_export_asks_for_stocks(call, body, monkeypatch):
+    # Finviz retires screener exports without type= on 2026-12-07.
+    monkeypatch.setenv("FINVIZ_API_TOKEN", "test-token")
+    get_settings.cache_clear()
+    responses.add(responses.GET, FINVIZ_EXPORT_URL, body=body, status=200)
+
+    call()
+
+    assert responses.calls
+    assert all(call.request.params.get("type") == "stocks" for call in responses.calls)
