@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
-import { createEntry, DaySetup, fetchReasons, JournalEntry, PassDraft, ReasonCatalog, updateEntry } from "../api/journal";
+import { useEffect, useRef, useState } from "react";
+import { createEntry, fetchReasons, JournalEntry, PassDraft, ReasonCatalog, updateEntry } from "../api/journal";
 import { ReasonChips, toggled } from "./ReasonChips";
 import { SetupPicker } from "./SetupPicker";
+import { useDaySetups } from "../useDaySetups";
 
 const OTHER_REASON = "other";
 
 interface PassPanelProps {
   ticker: string;
-  setups: DaySetup[];
-  defaultSetupId: number | null;
+  // The setup picked on the Stock page, chosen first if it's live now.
+  preferredSetupId: number | null;
   // A saved pass being edited; it keeps the moment it was made.
   existing?: JournalEntry | null;
   onSaved: (entry: JournalEntry) => void;
@@ -19,11 +20,23 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function PassPanel({ ticker, setups, defaultSetupId, existing = null, onSaved, onClose }: PassPanelProps) {
+export function PassPanel({ ticker, preferredSetupId, existing = null, onSaved, onClose }: PassPanelProps) {
   const [catalog, setCatalog] = useState<ReasonCatalog | null>(null);
   const [reasons, setReasons] = useState<string[]>(existing?.reasons ?? []);
   const [note, setNote] = useState(existing?.note ?? "");
-  const [setupId, setSetupId] = useState<number | null>(defaultSetupId);
+  const [setupId, setSetupId] = useState<number | null>(existing ? existing.setup?.setup_record_id ?? null : null);
+  // Once the user (or a saved pass) has a setup, new matches must not swap it.
+  const isSetupChosen = useRef(existing != null);
+  // A pass is matched at its own moment (now, or when a saved pass was made), in any direction.
+  const daySetups = useDaySetups(ticker, existing ? { time: existing.decided_at, price: existing.pass_price } : null, null);
+  const allSetups = [...(daySetups?.matches ?? []), ...(daySetups?.others ?? [])];
+
+  useEffect(() => {
+    if (!daySetups || isSetupChosen.current) return;
+    const best =
+      daySetups.matches.find((setup) => setup.setup_record_id === preferredSetupId) ?? daySetups.matches[0] ?? null;
+    setSetupId(best?.setup_record_id ?? null);
+  }, [daySetups, preferredSetupId]);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,7 +48,7 @@ export function PassPanel({ ticker, setups, defaultSetupId, existing = null, onS
 
   const needsNote = reasons.includes(OTHER_REASON) && !note.trim();
   const canSave = reasons.length > 0 && !needsNote && !isSaving;
-  const direction = setups.find((setup) => setup.setup_record_id === setupId)?.direction === "short" ? "short" : "long";
+  const direction = allSetups.find((setup) => setup.setup_record_id === setupId)?.direction === "short" ? "short" : "long";
 
   async function handleSave() {
     setIsSaving(true);
@@ -60,7 +73,16 @@ export function PassPanel({ ticker, setups, defaultSetupId, existing = null, onS
           Close
         </button>
       </header>
-      <SetupPicker setups={setups} selectedId={setupId} onChange={setSetupId} />
+      <SetupPicker
+        ticker={ticker}
+        setups={daySetups}
+        selectedId={setupId}
+        matchLabel="Setups live now"
+        onChange={(id) => {
+          isSetupChosen.current = true;
+          setSetupId(id);
+        }}
+      />
       {catalog?.pass_reasons.map((group) => (
         <div key={group.group} className="reason-group">
           <span className="plan-label">{group.group}</span>

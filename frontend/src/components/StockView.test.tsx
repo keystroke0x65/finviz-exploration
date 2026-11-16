@@ -11,22 +11,20 @@ const api = vi.hoisted(() => ({
   fetchQuote: vi.fn(),
   refreshQuote: vi.fn(),
   chartProps: [] as ChartProps[],
-  fetchDaySetups: vi.fn(),
   fetchNews: vi.fn(),
   fetchOpenTrade: vi.fn(),
   fetchEntries: vi.fn(),
   fetchJournalSettings: vi.fn(),
-  tradePanelProps: [] as { existing: unknown; clickedBar: unknown; defaultSetupId: number | null }[],
+  tradePanelProps: [] as { existing: unknown; clickedBar: unknown; preferredSetupId: number | null }[],
 }));
 vi.mock("../api/journal", () => ({
-  fetchDaySetups: (...args: unknown[]) => api.fetchDaySetups(...args),
   fetchOpenTrade: (ticker: string) => api.fetchOpenTrade(ticker),
   fetchEntries: (...args: unknown[]) => api.fetchEntries(...args),
 }));
 vi.mock("../api/settings", () => ({ fetchJournalSettings: () => api.fetchJournalSettings() }));
 vi.mock("./DailyLossBanner", () => ({ DailyLossBanner: () => null }));
 vi.mock("./TradePanel", () => ({
-  TradePanel: (props: { existing: unknown; clickedBar: unknown; defaultSetupId: number | null; onClose: () => void }) => {
+  TradePanel: (props: { existing: unknown; clickedBar: unknown; preferredSetupId: number | null; onClose: () => void }) => {
     api.tradePanelProps.push(props);
     return (
       <section aria-label="trade panel">
@@ -70,11 +68,6 @@ const SETUP: Setup = {
   detected_at: "2026-10-20T13:35:00Z", last_seen_at: "2026-10-20T13:35:30Z", has_conflict: false,
 };
 
-const DAY_SETUP = {
-  setup_record_id: 7, pattern: "bull_flag", timeframe: "5m", direction: "long", entry: 2.12, stop: 2.05, target: 2.33,
-  reward_risk: 3, score: 80, state: "forming", verdict: null, sliding_scale: null, outcome: "open",
-};
-
 const BARS_RESPONSE = {
   bars: [{ time: "2026-10-20T09:30:00-04:00", open: 2, high: 2.1, low: 1.95, close: 2.05, volume: 1000 }],
   fetched_at: "2026-10-20T13:36:00Z",
@@ -90,7 +83,6 @@ describe("StockView", () => {
     api.fetchQuote.mockResolvedValue({ Ticker: "HOST", Company: "Host Digital Inc" });
     api.refreshQuote.mockResolvedValue({ Ticker: "HOST", Company: "Host Digital Inc" });
     api.fetchStockVerdict.mockResolvedValue(null);
-    api.fetchDaySetups.mockResolvedValue([DAY_SETUP]);
     api.fetchNews.mockResolvedValue([]);
     api.fetchOpenTrade.mockResolvedValue(null);
     api.fetchEntries.mockResolvedValue([]);
@@ -347,7 +339,6 @@ describe("StockView journal", () => {
     api.fetchStockSetups.mockResolvedValue({ setups: [SETUP], warnings: [], show_short_setups: false });
     api.fetchQuote.mockResolvedValue({ Ticker: "HOST" });
     api.fetchStockVerdict.mockResolvedValue(null);
-    api.fetchDaySetups.mockResolvedValue([DAY_SETUP]);
     api.fetchNews.mockResolvedValue([]);
     api.fetchOpenTrade.mockResolvedValue(null);
     api.fetchEntries.mockResolvedValue([]);
@@ -397,8 +388,6 @@ describe("StockView journal", () => {
 
     await vi.waitFor(() => expect(api.tradePanelProps[api.tradePanelProps.length - 1].existing).toBeNull());
     expect(api.tradePanelProps[api.tradePanelProps.length - 1].clickedBar).toBeNull();
-    // The open trade's setups were for its own day; a new trade gets today's.
-    expect(api.fetchDaySetups).toHaveBeenLastCalledWith("HOST", expect.not.stringMatching("2026-10-19"), expect.any(String));
   });
 
   it("doesn't take fills from the daily chart", async () => {
@@ -422,6 +411,7 @@ describe("StockView journal", () => {
   it("hands clicked candles to the open trade panel", async () => {
     render(<StockView ticker="HOST" onTickerChange={vi.fn()} />);
     await screen.findByTestId("chart");
+    fireEvent.click(await screen.findByRole("button", { name: /Bull flag/ }));
 
     fireEvent.click(screen.getByRole("button", { name: "Log trade" }));
     await screen.findByRole("region", { name: "trade panel" });
@@ -431,7 +421,8 @@ describe("StockView journal", () => {
     await vi.waitFor(() =>
       expect(api.tradePanelProps[api.tradePanelProps.length - 1].clickedBar).toEqual({ bar, id: 1 }),
     );
-    expect(api.tradePanelProps[0].defaultSetupId).toBe(7);
+    // The setup picked in the side list is the panel's first choice if it fits the trade.
+    expect(api.tradePanelProps[0].preferredSetupId).toBe(7);
   });
 
   it("continues the stock's open trade, or starts a new one", async () => {
@@ -482,7 +473,6 @@ describe("StockView news", () => {
     api.fetchQuote.mockResolvedValue({ Ticker: "HOST" });
     api.refreshQuote.mockResolvedValue({ Ticker: "HOST" });
     api.fetchStockVerdict.mockResolvedValue(null);
-    api.fetchDaySetups.mockResolvedValue([DAY_SETUP]);
     api.fetchOpenTrade.mockResolvedValue(null);
     api.fetchEntries.mockResolvedValue([]);
     api.fetchJournalSettings.mockResolvedValue({ risk_per_trade: null, max_position: null, max_daily_loss: null });

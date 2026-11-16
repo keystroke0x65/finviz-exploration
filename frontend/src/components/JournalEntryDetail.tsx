@@ -2,10 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { Bar } from "../api/bars";
 import {
   AfterPass,
-  DaySetup,
   deleteEntry,
   EntryBars,
-  fetchDaySetups,
   fetchEntryBars,
   JournalEntry,
   PassOutcome,
@@ -176,7 +174,7 @@ export function JournalEntryDetail({ entry, labels, settings, onChanged, onDelet
   const [chartInterval, setChartInterval] = useState<Interval>("1m");
   const [bars, setBars] = useState<EntryBars | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [editSetups, setEditSetups] = useState<DaySetup[] | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const [clickedBar, setClickedBar] = useState<ClickedBar | null>(null);
   const clickCount = useRef(0);
   const screenshotRef = useRef<(() => HTMLCanvasElement) | null>(null);
@@ -196,14 +194,10 @@ export function JournalEntryDetail({ entry, labels, settings, onChanged, onDelet
     };
   }, [entry.id, entry.updated_at, chartInterval]);
 
-  useEffect(() => setEditSetups(null), [entry.id]);
+  useEffect(() => setIsEditing(false), [entry.id]);
 
-  async function handleEdit() {
-    try {
-      setEditSetups(await fetchDaySetups(entry.ticker, easternParts(entry.decided_at).date, entry.decided_at));
-    } catch (editError) {
-      setError(errorText(editError));
-    }
+  function handleEdit() {
+    setIsEditing(true);
   }
 
   async function handleDelete() {
@@ -226,13 +220,13 @@ export function JournalEntryDetail({ entry, labels, settings, onChanged, onDelet
   }
 
   function handleBarClick(bar: Bar) {
-    if (editSetups == null || entry.kind !== "trade") return;
+    if (!isEditing || entry.kind !== "trade") return;
     clickCount.current += 1;
     setClickedBar({ bar, id: clickCount.current });
   }
 
   function handleSaved(saved: JournalEntry) {
-    setEditSetups(null);
+    setIsEditing(false);
     onChanged(saved);
   }
 
@@ -276,26 +270,24 @@ export function JournalEntryDetail({ entry, labels, settings, onChanged, onDelet
         />
       )}
       <FillsTable entry={entry} />
-      {editSetups != null && entry.kind === "trade" && (
+      {isEditing && entry.kind === "trade" && (
         <TradePanel
           ticker={entry.ticker}
-          setups={editSetups}
-          defaultSetupId={entry.setup?.setup_record_id ?? null}
+          preferredSetupId={entry.setup?.setup_record_id ?? null}
           existing={entry}
           settings={settings}
           clickedBar={clickedBar}
           onSaved={handleSaved}
-          onClose={() => setEditSetups(null)}
+          onClose={() => setIsEditing(false)}
         />
       )}
-      {editSetups != null && entry.kind === "pass" && (
+      {isEditing && entry.kind === "pass" && (
         <PassPanel
           ticker={entry.ticker}
-          setups={editSetups}
-          defaultSetupId={entry.setup?.setup_record_id ?? null}
+          preferredSetupId={entry.setup?.setup_record_id ?? null}
           existing={entry}
           onSaved={handleSaved}
-          onClose={() => setEditSetups(null)}
+          onClose={() => setIsEditing(false)}
         />
       )}
     </article>
