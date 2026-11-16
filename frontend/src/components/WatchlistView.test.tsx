@@ -54,7 +54,7 @@ describe("WatchlistView", () => {
     const worxRow = screen.getByRole("row", { name: /WORX/ });
     expect(within(worxRow).getByText("manual")).toBeInTheDocument();
     expect(within(worxRow).getByText("never")).toBeInTheDocument();
-    expect(document.title).toBe("Watchlist · 2 stocks · Finviz");
+    await vi.waitFor(() => expect(document.title).toBe("Watchlist · 2 stocks · Finviz"));
   });
 
   it("shows an expiry date for unpinned auto entries only", async () => {
