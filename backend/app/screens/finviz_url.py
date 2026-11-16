@@ -57,6 +57,9 @@ def parse_finviz_screener_url(url: str) -> ScreenCriteria:
         raise InvalidScreenerUrlError("That's not a Finviz screener page (expected /screener.ashx)")
 
     query = parse_qs(parts.query)
+    product = _single_param(query, "type")
+    if product is not None and product != "stocks":
+        raise InvalidScreenerUrlError("ETF screens aren't supported; paste a stock screener URL")
     raw_filters = _single_param(query, "f")
     filters = [code for code in (raw_filters or "").split(",") if code]
     if len(filters) > MAX_FILTER_CODES:
@@ -71,7 +74,8 @@ def parse_finviz_screener_url(url: str) -> ScreenCriteria:
     )
 
 
-USED_PARAMS = {"v", "f", "s", "o"}
+# type= names the product (stocks); exports always ask for stocks, so it isn't stored.
+USED_PARAMS = {"v", "f", "s", "o", "type"}
 
 
 def find_ignored_params(url: str) -> list[str]:

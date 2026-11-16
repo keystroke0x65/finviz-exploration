@@ -24,6 +24,10 @@ logger = logging.getLogger(__name__)
 # /export/stock (a different endpoint) returns historical price bars, not
 # a current quote row, so it doesn't apply here.
 FINVIZ_EXPORT_URL = "https://elite.finviz.com/export/screener"
+# Since Finviz split its screener into Stock and ETF screeners, every export names its product.
+# Without type= the old format is retired on 2026-12-07 (Finviz email, 2026-11-16). The app
+# only screens stocks.
+SCREENER_PRODUCT = "stocks"
 
 # Finviz's "Overview" screener view code, giving one row per ticker with
 # Sector, Market Cap, P/E, Price, Change, Volume, etc.
@@ -117,6 +121,10 @@ class ScreenResult:
     rows: list[ScreenRow]
 
 
+def _fetch_screener_csv(params: dict[str, str], operation: str) -> str:
+    return _fetch_export_csv(FINVIZ_EXPORT_URL, {"type": SCREENER_PRODUCT, **params}, operation)
+
+
 def _fetch_export_csv(url: str, params: dict[str, str], operation: str) -> str:
     settings = get_settings()
     _request_pacer.wait_for_turn()
@@ -173,7 +181,7 @@ def _clean_missing(row: dict) -> dict:
 
 def get_quote(ticker: str) -> dict:
     operation = f"quote {ticker}"
-    csv_text = _fetch_export_csv(FINVIZ_EXPORT_URL, {"v": QUOTE_VIEW, "t": ticker}, operation)
+    csv_text = _fetch_screener_csv({"v": QUOTE_VIEW, "t": ticker}, operation)
     df = _read_csv_as_strings(csv_text, operation)
     if df.empty:
         raise TickerNotFoundError(ticker)
@@ -241,7 +249,7 @@ def _screen_params(
 
 
 def _fetch_screen_rows(params: dict[str, str], operation: str) -> list[ScreenRow]:
-    df = _read_csv_as_strings(_fetch_export_csv(FINVIZ_EXPORT_URL, params, operation), operation)
+    df = _read_csv_as_strings(_fetch_screener_csv(params, operation), operation)
     try:
         return [_to_screen_row(_clean_missing(record)) for record in df.to_dict("records")]
     except ValueError:
@@ -314,7 +322,7 @@ def get_bars(ticker: str, interval: Interval) -> list[Bar]:
 def _count_screen_rows(filters: list[str], signal: str | None) -> int:
     operation = "check filter codes"
     params = _screen_params(COUNT_COLUMN_IDS, filters, signal, None)
-    csv_text = _fetch_export_csv(FINVIZ_EXPORT_URL, params, operation)
+    csv_text = _fetch_screener_csv(params, operation)
     return len(_read_csv_as_strings(csv_text, operation))
 
 
