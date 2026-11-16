@@ -82,3 +82,12 @@ def test_a_setup_first_seen_past_its_entry_is_still_live(db_conn):
     matches, _ = match_setups([seen_late], ENTRY_TIME, "long", 0.76)
 
     assert ids(matches) == [1]
+
+
+def test_a_pass_ranks_live_setups_by_score_alone(db_conn):
+    recent_low = setup(db_conn, 1, score=60.0, triggered_at=at(-1))
+    forming_high = setup(db_conn, 2, pattern="abcd", score=95.0, triggered_at=None)
+
+    matches, _ = match_setups([recent_low, forming_high], ENTRY_TIME, None, 0.76)
+
+    assert ids(matches) == [2, 1]

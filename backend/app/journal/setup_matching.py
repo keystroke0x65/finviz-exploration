@@ -46,13 +46,18 @@ def _fit(record: SetupRecord, moment: datetime, price: float | None) -> tuple[fl
 def match_setups(
     records: list[SetupRecord], moment: datetime, direction: Direction | None, price: float | None
 ) -> tuple[list[SetupRecord], list[SetupRecord]]:
-    """(matches, others): setups live at `moment` in the trade's direction, best fit first,
-    then the rest of the day's setups, best score first."""
+    """(matches, others): setups live at `moment` in the trade's direction, best fit first
+    (for a pass, no direction: best score first), then the rest of the day's setups, best
+    score first."""
     matches: list[SetupRecord] = []
     others: list[SetupRecord] = []
     for record in _one_per_setup(records, moment):
         is_match = _is_live_at(record, moment) and (direction is None or record.direction == direction)
         (matches if is_match else others).append(record)
-    matches.sort(key=lambda record: _fit(record, moment, price))
+    if direction is None:
+        # A pass has no fill to fit: the strongest live setups first.
+        matches.sort(key=lambda record: -record.score)
+    else:
+        matches.sort(key=lambda record: _fit(record, moment, price))
     others.sort(key=lambda record: -record.score)
     return matches, others
