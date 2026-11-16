@@ -1,7 +1,7 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DailyLoss } from "../api/journal";
-import type { ScanStatus, Setup, TrackRecordSummary, Warning } from "../api/setups";
+import type { ScanProgress, ScanStatus, Setup, TrackRecordSummary, Warning } from "../api/setups";
 import { SetupsView } from "./SetupsView";
 
 const CLEAN_SCAN: ScanStatus = {
@@ -14,6 +14,7 @@ const api = {
   runScan: vi.fn(),
   saveSettings: vi.fn(),
   fetchScanStatus: vi.fn(() => Promise.resolve(CLEAN_SCAN)),
+  fetchScanProgress: vi.fn((): Promise<ScanProgress> => Promise.resolve({ running: false })),
   fetchDailyLoss: vi.fn((): Promise<DailyLoss> => Promise.resolve({ realised_pnl_today: 0, max_daily_loss: null, level: "ok" })),
 };
 vi.mock("../api/journal", () => ({ fetchDailyLoss: () => api.fetchDailyLoss() }));
@@ -22,6 +23,7 @@ vi.mock("../api/setups", async (importOriginal) => ({
   fetchSetups: () => api.fetchSetups(),
   runScan: (ticker?: string) => api.runScan(ticker),
   fetchScanStatus: () => api.fetchScanStatus(),
+  fetchScanProgress: () => api.fetchScanProgress(),
 }));
 vi.mock("../api/settings", () => ({ saveSettings: (settings: unknown) => api.saveSettings(settings) }));
 
@@ -312,4 +314,58 @@ describe("SetupsView", () => {
     ).toBeInTheDocument();
   });
 
+});
+
+
+describe("SetupsView scan progress", () => {
+  const RUNNING: ScanProgress = {
+    running: true, kind: "automatic", phase: "scanning", done: 3, total: 40, ticker: "HOST",
+    started_at: "2026-11-16T09:41:00-05:00",
+  };
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    vi.useRealTimers();
+  });
+
+  it("shows the bar while a scan runs, then reloads the setups when it ends", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    respond([setup()]);
+    api.fetchScanProgress.mockResolvedValueOnce(RUNNING).mockResolvedValue({ running: false });
+
+    render(<SetupsView onOpenStock={vi.fn()} />);
+
+    expect(await screen.findByRole("progressbar", { name: "Automatic scan" })).toBeInTheDocument();
+    const setupLoadsBefore = api.fetchSetups.mock.calls.length;
+    await act(() => vi.advanceTimersByTimeAsync(2000));
+
+    await vi.waitFor(() => expect(screen.queryByRole("progressbar")).not.toBeInTheDocument());
+    expect(api.fetchSetups.mock.calls.length).toBeGreaterThan(setupLoadsBefore);
+  });
+
+  it("keeps checking every 2 seconds and stops when the tab closes", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    respond([setup()]);
+    const { unmount } = render(<SetupsView onOpenStock={vi.fn()} />);
+    await vi.waitFor(() => expect(api.fetchScanProgress).toHaveBeenCalledTimes(1));
+
+    await act(() => vi.advanceTimersByTimeAsync(4000));
+    expect(api.fetchScanProgress).toHaveBeenCalledTimes(3);
+
+    unmount();
+    await act(() => vi.advanceTimersByTimeAsync(4000));
+    expect(api.fetchScanProgress).toHaveBeenCalledTimes(3);
+  });
+
+  it("hides the bar when checking fails, without an error", async () => {
+    respond([setup()]);
+    api.fetchScanProgress.mockRejectedValue(new Error("Request failed (502)"));
+
+    render(<SetupsView onOpenStock={vi.fn()} />);
+
+    await vi.waitFor(() => expect(api.fetchScanProgress).toHaveBeenCalled());
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Request failed/)).not.toBeInTheDocument();
+  });
 });

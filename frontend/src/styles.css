@@ -1598,3 +1598,31 @@ input[type="checkbox"] {
 .news-scroll > button {
   margin: 0.75rem 0;
 }
+
+/* Watchlist scan progress, above the "Last scan" line */
+.scan-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 0.5rem;
+  flex-wrap: wrap;
+}
+
+.scan-progress-label {
+  font-weight: 600;
+}
+
+.scan-progress-track {
+  flex: 0 1 320px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.scan-progress-fill {
+  height: 100%;
+  background: var(--amber);
+  transition: width 0.4s ease;
+}

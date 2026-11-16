@@ -192,3 +192,22 @@ export function runScan(ticker?: string): Promise<ScanResult> {
 export function fetchStockVerdict(ticker: string): Promise<Verdict | null> {
   return requestJson<Verdict | null>(`/api/stocks/${encodeURIComponent(ticker)}/verdict`);
 }
+
+export type ScanPhase = "preparing" | "scanning" | "finishing";
+
+export interface RunningScan {
+  running: true;
+  kind: "manual" | "automatic";
+  phase: ScanPhase;
+  done: number;
+  total: number;
+  // The stock being scanned; null while preparing or finishing.
+  ticker: string | null;
+  started_at: string;
+}
+
+export type ScanProgress = RunningScan | { running: false };
+
+export function fetchScanProgress(): Promise<ScanProgress> {
+  return requestJson<ScanProgress>("/api/scans/progress");
+}
